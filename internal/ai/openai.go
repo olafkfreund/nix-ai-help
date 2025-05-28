@@ -87,3 +87,9 @@ func (client *OpenAIClient) GenerateResponse(messages []Message) (string, error)
 
 	return response.Choices[0].Message.Content, nil
 }
+
+// Query implements the AIProvider interface for OpenAIClient.
+func (client *OpenAIClient) Query(prompt string) (string, error) {
+	messages := []Message{{Role: "user", Content: prompt}}
+	return client.GenerateResponse(messages)
+}

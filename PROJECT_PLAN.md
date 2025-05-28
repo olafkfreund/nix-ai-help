@@ -39,6 +39,7 @@ This document tracks the high-level plan, milestones, and progress for the devel
 
 - [x] CLI logic in `internal/cli`
 - [x] Interactive and scriptable modes
+- [x] Show current config and MCP sources in interactive mode (`show config` command)
 - [ ] Add more user-friendly commands and help
 
 ### 6. Utilities & Logging

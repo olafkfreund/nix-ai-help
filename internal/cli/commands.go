@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"nix-ai-help/internal/ai"
+	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/nixos"
 
 	"github.com/spf13/cobra"
@@ -35,6 +36,7 @@ func init() {
 	rootCmd.AddCommand(diagnoseCmd)
 	rootCmd.AddCommand(configureCmd)
 	rootCmd.AddCommand(logsCmd)
+	rootCmd.AddCommand(interactiveCmd)
 
 	diagnoseCmd.Flags().StringVarP(&logFile, "log-file", "l", "", "Path to a log file to analyze")
 	diagnoseCmd.Flags().StringVarP(&configSnippet, "config-snippet", "c", "", "NixOS configuration snippet to analyze")
@@ -88,8 +90,24 @@ var diagnoseCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Load config and AI provider (simplified, real code should use internal/config)
-		provider := ai.NewOllamaProvider("llama3") // Changed from llama2 to llama3
+		// Load config and select AI provider
+		cfg, err := config.LoadYAMLConfig("configs/default.yaml")
+		var provider ai.AIProvider
+		if err == nil {
+			switch cfg.AIProvider {
+			case "ollama":
+				provider = ai.NewOllamaProvider("llama3")
+			case "gemini":
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
+			case "openai":
+				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			default:
+				provider = ai.NewOllamaProvider("llama3")
+			}
+		} else {
+			provider = ai.NewOllamaProvider("llama3")
+		}
+
 		diagnostics := nixos.Diagnose(logInput, userInput, provider)
 		fmt.Print(nixos.FormatDiagnostics(diagnostics))
 	},
@@ -114,6 +132,16 @@ var logsCmd = &cobra.Command{
 		// Implementation for parsing logs
 		fmt.Println("Parsing log outputs...")
 		// Call the appropriate functions to parse logs
+	},
+}
+
+// Interactive command to start interactive mode
+var interactiveCmd = &cobra.Command{
+	Use:   "interactive",
+	Short: "Start interactive mode",
+	Long:  `Start an interactive shell for diagnosing and configuring NixOS with nixai. Type 'help' for commands.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		InteractiveMode()
 	},
 }
 
