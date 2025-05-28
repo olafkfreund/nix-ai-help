@@ -13,8 +13,8 @@ import (
 	"nix-ai-help/internal/nixos"
 
 	"github.com/charmbracelet/glamour"
-
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 // Command structure for the CLI
@@ -59,6 +59,7 @@ func init() {
 	diagnoseCmd.Flags().StringVarP(&nixLogTarget, "nix-log", "g", "", "Run 'nix log' (optionally with a path or derivation) and analyze the output") // New flag
 	searchCmd.Flags().StringVarP(&nixosConfigPath, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
 	rootCmd.PersistentFlags().StringVarP(&nixosConfigPathGlobal, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
+	configCmd.AddCommand(showUserConfig)
 }
 
 // Diagnose command to analyze NixOS configuration issues
@@ -129,7 +130,7 @@ Options:
 		}
 
 		// Load config and select AI provider
-		cfg, err := config.LoadYAMLConfig("configs/default.yaml")
+		cfg, err := config.LoadUserConfig()
 		var provider ai.AIProvider
 		if err == nil {
 			switch cfg.AIProvider {
@@ -340,7 +341,7 @@ var configCmd = &cobra.Command{
 	Long:  `Manage and understand your Nix configuration with AI-powered help.\nExamples:\n  nixai config show\n  nixai config set experimental-features nix-command flakes\n  nixai config explain substituters`,
 	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg, err := config.LoadYAMLConfig("configs/default.yaml")
+		cfg, err := config.LoadUserConfig()
 		var provider ai.AIProvider
 		if err == nil {
 			switch cfg.AIProvider {
@@ -424,7 +425,7 @@ var buildCmd = &cobra.Command{
 	Long:  `Build or rebuild your NixOS system or packages, with AI-powered help for flakes and configuration issues.\nExamples:\n  nixai build\n  nixai build .#nixosConfigurations.myhost.config.system.build.toplevel\n  nixai build --flake .`,
 	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg, err := config.LoadYAMLConfig("configs/default.yaml")
+		cfg, err := config.LoadUserConfig()
 		var provider ai.AIProvider
 		if err == nil {
 			switch cfg.AIProvider {
@@ -787,4 +788,19 @@ func Execute() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+// Show user config command
+var showUserConfig = &cobra.Command{
+	Use:   "show-user",
+	Short: "Show the current user config (~/.config/nixai/config.yaml)",
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Println("Error loading user config:", err)
+			return
+		}
+		out, _ := yaml.Marshal(cfg)
+		fmt.Println(string(out))
+	},
 }

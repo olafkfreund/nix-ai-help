@@ -233,9 +233,34 @@ nixai interactive
 
 ## Configuration
 
-- All configuration is loaded from YAML (see `configs/default.yaml`).
+nixai supports persistent, user-editable configuration for all users. On first run, a config file is created at:
 
-- You can set the AI provider, documentation sources, and more.
+You can edit this file to set your preferred NixOS config folder, AI provider, model, log level, documentation sources, and more. Example contents:
+
+```yaml
+ai_provider: ollama
+ai_model: llama3
+nixos_folder: ~/nixos-config
+log_level: info
+mcp_server:
+  host: localhost
+  port: 8080
+  documentation_sources:
+    - https://wiki.nixos.org/wiki/NixOS_Wiki
+    - https://nix.dev/manual/nix
+    - https://nixos.org/manual/nixpkgs/stable/
+    - https://nix.dev/manual/nix/2.28/language/
+    - https://nix-community.github.io/home-manager/
+nixos:
+  config_path: ~/nixos-config/configuration.nix
+  log_path: /var/log/nixos/nixos-rebuild.log
+diagnostics:
+  enabled: true
+  threshold: 1
+commands:
+  timeout: 30
+  retries: 2
+```
 
 ---
 

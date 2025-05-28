@@ -9,8 +9,6 @@ import (
 
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/nixos"
-
-	"gopkg.in/yaml.v3"
 )
 
 var currentAIProvider string
@@ -219,7 +217,7 @@ func handleCommand(command string) {
 }
 
 func showConfig() {
-	cfg, err := config.LoadYAMLConfig("configs/default.yaml")
+	cfg, err := config.LoadUserConfig()
 	if err != nil {
 		fmt.Println("Could not load config:", err)
 		return
@@ -234,7 +232,7 @@ func showConfig() {
 }
 
 func setAIProvider(provider, model string) {
-	cfg, err := config.LoadYAMLConfig("configs/default.yaml")
+	cfg, err := config.LoadUserConfig()
 	if err != nil {
 		fmt.Println("Could not load config:", err)
 		return
@@ -246,19 +244,11 @@ func setAIProvider(provider, model string) {
 	} else if provider != "ollama" {
 		fmt.Printf("Set AI provider to '%s'.\n", provider)
 	}
-	tmp := struct {
-		Default *config.YAMLConfig `yaml:"default"`
-	}{Default: cfg}
-	// Save back to YAML
-	data, err := yaml.Marshal(&tmp)
+	cfg.AIModel = model // set model if provided
+	err = config.SaveUserConfig(cfg)
 	if err != nil {
-		fmt.Println("Failed to marshal config:", err)
+		fmt.Println("Failed to write user config:", err)
 		return
 	}
-	err = os.WriteFile("configs/default.yaml", data, 0644)
-	if err != nil {
-		fmt.Println("Failed to write config:", err)
-		return
-	}
-	fmt.Println("AI provider updated in config. It will be used for future diagnoses.")
+	fmt.Println("AI provider updated in user config. It will be used for future diagnoses.")
 }

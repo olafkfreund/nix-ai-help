@@ -3,6 +3,8 @@ package utils
 import (
 	"errors"
 	"os"
+	"os/user"
+	"path/filepath"
 	"strings"
 )
 
@@ -48,4 +50,13 @@ func ValidatePath(path string) error {
 		return errors.New("path does not exist")
 	}
 	return nil
+}
+
+// ExpandHome expands the '~/' prefix in a path to the user's home directory.
+func ExpandHome(path string) string {
+	if strings.HasPrefix(path, "~/") {
+		usr, _ := user.Current()
+		return filepath.Join(usr.HomeDir, path[2:])
+	}
+	return path
 }
