@@ -1,38 +1,37 @@
-# Binaries
+# Go build artifacts
 nixai
-result/
-
-# Build artifacts
-*.out
 *.exe
+*.out
 *.test
-*.log
 
-# Go modules
-/go.sum
-/go.mod
+# Go modules and vendor
+/go/
+vendor/
 
-# IDE/editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*.bak
-.DS_Store
-
-# Nix build
+# Nix build results
 /result
 /result-bin
+/result*
 
-# Coverage
-coverage.out
+# Nix flake lock
+flake.lock
 
-# Misc
-*.tmp
-*.cache
+# Editor/project files
+.idea/
+.vscode/
+*.swp
+*~
+.DS_Store
 
-# OS files
+# Test cache
+*.coverprofile
+*.testresult
+
+# Logs
+*.log
+
+# System files
 Thumbs.db
 
-# Ignore local config overrides
-configs/local.yaml
+# Ignore local configs
+configs/*.local.yaml

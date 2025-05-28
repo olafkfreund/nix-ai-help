@@ -3,7 +3,7 @@ package nixos
 import "testing"
 
 func TestDiagnose(t *testing.T) {
-	diagnostics := Diagnose("error: something failed", "user input")
+	diagnostics := Diagnose("error: something failed", "user input", nil)
 	if len(diagnostics) < 2 {
 		t.Errorf("expected at least 2 diagnostics, got %d", len(diagnostics))
 	}
