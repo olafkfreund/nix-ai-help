@@ -16,6 +16,7 @@
       src = ./.;
       vendorSha256 = null;
       subPackages = ["cmd/nixai"];
+      checkPhase = "go test ./...";
       meta = {
         description = "A tool for diagnosing and configuring NixOS using AI.";
         license = pkgs.lib.licenses.mit;

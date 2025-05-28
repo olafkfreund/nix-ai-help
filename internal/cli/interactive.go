@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/nixos"
 
 	"gopkg.in/yaml.v3"
 )
@@ -18,6 +20,9 @@ var currentModel string = "llama3"
 func InteractiveMode() {
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Println("Welcome to nixai! Type 'help' for commands, 'exit' to quit.")
+	if nixosConfigPath != "" {
+		fmt.Printf("Using NixOS config folder: %s\n", nixosConfigPath)
+	}
 
 	for {
 		fmt.Print("> ")
@@ -47,9 +52,108 @@ func handleCommand(command string) {
 	case "help":
 		fmt.Println("Available commands:")
 		fmt.Println("  diagnose <log/config>      - Diagnose NixOS issues")
+		fmt.Println("  search <package>           - Search for and install Nix packages")
 		fmt.Println("  show config                - Show current configuration and MCP sources")
 		fmt.Println("  set ai <provider> [model]  - Set AI provider (ollama, gemini, openai) and model (optional)")
+		fmt.Println("  set-nixos-path <path>      - Set path to NixOS config folder")
 		fmt.Println("  exit                       - Exit interactive mode")
+	case "search":
+		if len(fields) < 2 {
+			fmt.Println("Usage: search <package>")
+			return
+		}
+		query := strings.Join(fields[1:], " ")
+		executor := nixos.NewExecutor()
+		fmt.Printf("Searching for Nix packages matching: %s\n", query)
+		output, err := executor.SearchNixPackages(query)
+		if err != nil {
+			fmt.Printf("Error searching for packages: %v\n", err)
+			return
+		}
+		lines := strings.Split(output, "\n")
+		var pkgs []struct{ Attr, Name, Desc string }
+		var lastAttr string
+		for i := 0; i < len(lines); i++ {
+			line := strings.TrimSpace(lines[i])
+			if line == "" {
+				continue
+			}
+			if strings.HasPrefix(line, "evaluating ") {
+				continue
+			}
+			fields := strings.Fields(line)
+			if len(fields) > 1 && (strings.Contains(fields[0], ".") || strings.Contains(fields[0], ":")) {
+				attr := fields[0]
+				attr = strings.TrimPrefix(attr, "legacyPackages.x86_64-linux.")
+				attr = strings.TrimPrefix(attr, "nixpkgs.")
+				name := attr
+				desc := strings.Join(fields[1:], " ")
+				pkgs = append(pkgs, struct{ Attr, Name, Desc string }{fields[0], name, desc})
+				lastAttr = fields[0]
+				continue
+			}
+			if (strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t")) && lastAttr != "" {
+				if len(pkgs) > 0 {
+					pkgs[len(pkgs)-1].Desc += " " + strings.TrimSpace(line)
+				}
+				continue
+			}
+			if idx := strings.Index(line, " - "); idx > 0 {
+				name := line[:idx]
+				desc := line[idx+3:]
+				pkgs = append(pkgs, struct{ Attr, Name, Desc string }{name, name, desc})
+				lastAttr = name
+			}
+		}
+		if len(pkgs) == 0 {
+			fmt.Println("No packages found.")
+			return
+		}
+		fmt.Println()
+		for i, pkg := range pkgs {
+			fmt.Printf("%2d. %s\n    %s\n", i+1, pkg.Name, pkg.Desc)
+		}
+		fmt.Print("\nEnter the number of the package to see configuration and test options (or leave blank to exit): ")
+		reader := bufio.NewReader(os.Stdin)
+		sel, _ := reader.ReadString('\n')
+		sel = strings.TrimSpace(sel)
+		if sel == "" {
+			return
+		}
+		idx := -1
+		fmt.Sscanf(sel, "%d", &idx)
+		if idx < 1 || idx > len(pkgs) {
+			fmt.Println("Invalid selection.")
+			return
+		}
+		pkg := pkgs[idx-1]
+		fmt.Printf("\nSelected: %s\n\n", pkg.Name)
+		fmt.Println("NixOS (configuration.nix):")
+		fmt.Printf("  environment.systemPackages = with pkgs; [ %s ];\n", pkg.Name)
+		fmt.Println("Home Manager (home.nix):")
+		fmt.Printf("  home.packages = with pkgs; [ %s ];\n", pkg.Name)
+		fmt.Println("\nFetching available options with nixos-option...")
+		optOut, err := executor.ShowNixOSOptions(pkg.Name)
+		if err == nil && strings.TrimSpace(optOut) != "" {
+			fmt.Println(optOut)
+		} else {
+			fmt.Println("No additional options found or nixos-option failed.")
+		}
+		fmt.Print("\nTest this package in a temporary shell? [y/N]: ")
+		yn, _ := reader.ReadString('\n')
+		yn = strings.TrimSpace(yn)
+		if strings.ToLower(yn) == "y" {
+			fmt.Printf("\nLaunching 'nix-shell -p %s'...\n", pkg.Name)
+			cmdShell := exec.Command("nix-shell", "-p", pkg.Name)
+			cmdShell.Stdin = os.Stdin
+			cmdShell.Stdout = os.Stdout
+			cmdShell.Stderr = os.Stderr
+			err := cmdShell.Run()
+			if err != nil {
+				fmt.Printf("Error running nix-shell: %v\n", err)
+			}
+			return
+		}
 	case "show":
 		if len(fields) > 1 && fields[1] == "config" {
 			showConfig()
@@ -67,6 +171,14 @@ func handleCommand(command string) {
 		} else {
 			fmt.Println("Usage: set ai <provider> [model]")
 		}
+	case "set-nixos-path":
+		if len(fields) < 2 {
+			fmt.Println("Usage: set-nixos-path <path-to-nixos-config-folder>")
+			return
+		}
+		nixosConfigPath = fields[1]
+		fmt.Printf("NixOS config folder set to: %s\n", nixosConfigPath)
+		return
 	case "exit":
 		fmt.Println("Exiting nixai. Goodbye!")
 		os.Exit(0)
