@@ -1,0 +1,38 @@
+# Binaries
+nixai
+result/
+
+# Build artifacts
+*.out
+*.exe
+*.test
+*.log
+
+# Go modules
+/go.sum
+/go.mod
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+.DS_Store
+
+# Nix build
+/result
+/result-bin
+
+# Coverage
+coverage.out
+
+# Misc
+*.tmp
+*.cache
+
+# OS files
+Thumbs.db
+
+# Ignore local config overrides
+configs/local.yaml

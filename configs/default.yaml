@@ -1,0 +1,21 @@
+default: 
+  ai_provider: "ollama"  # Default AI provider, can be changed to "gemini" or "openai"
+  log_level: "info"      # Logging level: debug, info, warn, error
+  mcp_server: 
+    host: "localhost"    # MCP server host
+    port: 8080            # MCP server port
+    documentation_sources:
+      - "https://wiki.nixos.org/wiki/NixOS_Wiki"
+      - "https://nix.dev/manual/nix"
+      - "https://nixos.org/manual/nixpkgs/stable/"
+      - "https://nix.dev/manual/nix/2.28/language/"
+      - "https://nix-community.github.io/home-manager/"
+  nixos:
+    config_path: "/etc/nixos/configuration.nix"  # Path to NixOS configuration file
+    log_path: "/var/log/nixos.log"                # Path to NixOS log file
+  diagnostics:
+    enabled: true       # Enable or disable diagnostics
+    threshold: 5        # Number of issues to report before stopping
+  commands:
+    timeout: 30         # Default timeout for executing commands in seconds
+    retries: 3          # Number of retries for failed commands

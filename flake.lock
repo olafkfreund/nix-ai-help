@@ -1,0 +1,26 @@
+{
+  "nodes": [
+    {
+      "locked": true,
+      "name": "nixai",
+      "version": "0.1.0",
+      "inputs": {
+        "nixpkgs": {
+          "locked": true,
+          "name": "nixpkgs",
+          "version": "22.11"
+        }
+      },
+      "outputs": {
+        "packages": {
+          "x86_64-linux": {
+            "nixai": {
+              "name": "nixai",
+              "version": "0.1.0"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
