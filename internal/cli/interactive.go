@@ -56,6 +56,7 @@ func handleCommand(command string) {
 		fmt.Println("  show config                - Show current configuration and MCP sources")
 		fmt.Println("  set ai <provider> [model]  - Set AI provider (ollama, gemini, openai) and model (optional)")
 		fmt.Println("  set-nixos-path <path>      - Set path to NixOS config folder")
+		fmt.Println("  flake <subcommand>         - Manage Nix flakes (show, update, check, explain-inputs, explain <input>, ...)")
 		fmt.Println("  exit                       - Exit interactive mode")
 	case "search":
 		if len(fields) < 2 {
@@ -178,6 +179,36 @@ func handleCommand(command string) {
 		}
 		nixosConfigPath = fields[1]
 		fmt.Printf("NixOS config folder set to: %s\n", nixosConfigPath)
+		return
+	case "flake":
+		if len(fields) < 2 {
+			fmt.Println("Usage: flake <show|update|check|explain-inputs|explain <input>|...>")
+			return
+		}
+		if fields[1] == "explain-inputs" {
+			ExplainFlakeInputs(nil)
+			return
+		}
+		if fields[1] == "explain" {
+			if len(fields) >= 3 {
+				ExplainFlakeInputs(fields[2:3])
+			} else {
+				fmt.Println("Usage: flake explain <input>")
+			}
+			return
+		}
+		// fallback: pass to nix flake
+		cmdArgs := append([]string{"flake"}, fields[1:]...)
+		out, err := exec.Command("nix", cmdArgs...).CombinedOutput()
+		fmt.Println(string(out))
+		if err != nil {
+			fmt.Printf("nix flake failed: %v\n", err)
+			problemSummary := summarizeBuildOutput(string(out))
+			if problemSummary != "" {
+				fmt.Println("\nProblem summary:")
+				fmt.Println(problemSummary)
+			}
+		}
 		return
 	case "exit":
 		fmt.Println("Exiting nixai. Goodbye!")

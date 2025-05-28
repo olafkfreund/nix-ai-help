@@ -5,26 +5,34 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/nixos"
 
+	"github.com/charmbracelet/glamour"
+
 	"github.com/spf13/cobra"
 )
 
 // Command structure for the CLI
 var rootCmd = &cobra.Command{
-	Use:   "nixai",
+	Use:   "nixai [question]",
 	Short: "NixAI helps solve Nix configuration problems",
-	Long:  `NixAI is a command-line tool that assists users in diagnosing and solving NixOS configuration issues using AI models and documentation queries.`,
+	Long: `NixAI is a command-line tool that assists users in diagnosing and solving NixOS configuration issues using AI models and documentation queries.
+
+You can also ask questions directly, e.g.:
+  nixai "how can I configure curl?"`,
+	Args: cobra.ArbitraryArgs,
 }
 
 var logFile string
 var configSnippet string
 var nixosConfigPath string
-var nixLogTarget string // New: for --nix-log flag
+var nixLogTarget string          // New: for --nix-log flag
+var nixosConfigPathGlobal string // Global path for build/flake context
 
 // Tail the last n lines of a string
 func tailLines(s string, n int) string {
@@ -42,11 +50,15 @@ func init() {
 	rootCmd.AddCommand(logsCmd)
 	rootCmd.AddCommand(interactiveCmd)
 	rootCmd.AddCommand(searchCmd)
+	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(buildCmd)
+	rootCmd.AddCommand(flakeCmd)
 
 	diagnoseCmd.Flags().StringVarP(&logFile, "log-file", "l", "", "Path to a log file to analyze")
 	diagnoseCmd.Flags().StringVarP(&configSnippet, "config-snippet", "c", "", "NixOS configuration snippet to analyze")
 	diagnoseCmd.Flags().StringVarP(&nixLogTarget, "nix-log", "g", "", "Run 'nix log' (optionally with a path or derivation) and analyze the output") // New flag
 	searchCmd.Flags().StringVarP(&nixosConfigPath, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
+	rootCmd.PersistentFlags().StringVarP(&nixosConfigPathGlobal, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
 }
 
 // Diagnose command to analyze NixOS configuration issues
@@ -321,8 +333,456 @@ var searchCmd = &cobra.Command{
 	},
 }
 
+// Config command for AI-assisted Nix configuration management
+var configCmd = &cobra.Command{
+	Use:   "config [show|set|unset|edit|explain] [key] [value]",
+	Short: "AI-assisted Nix configuration management",
+	Long:  `Manage and understand your Nix configuration with AI-powered help.\nExamples:\n  nixai config show\n  nixai config set experimental-features nix-command flakes\n  nixai config explain substituters`,
+	Args:  cobra.ArbitraryArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := config.LoadYAMLConfig("configs/default.yaml")
+		var provider ai.AIProvider
+		if err == nil {
+			switch cfg.AIProvider {
+			case "ollama":
+				provider = ai.NewOllamaProvider("llama3")
+			case "gemini":
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
+			case "openai":
+				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			default:
+				provider = ai.NewOllamaProvider("llama3")
+			}
+		} else {
+			provider = ai.NewOllamaProvider("llama3")
+		}
+		if len(args) == 0 || args[0] == "show" {
+			out, err := exec.Command("nix", "config", "show").CombinedOutput()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to run 'nix config show': %v\nOutput: %s\n", err, string(out))
+				os.Exit(1)
+			}
+			fmt.Println("Current Nix configuration:")
+			fmt.Println(string(out))
+			prompt := "Summarize and suggest improvements for this Nix config:\n" + string(out)
+			aiResp, err := provider.Query(prompt)
+			if err == nil && aiResp != "" {
+				fmt.Println("\nAI suggestions:")
+				fmt.Println(aiResp)
+			}
+			return
+		}
+		if args[0] == "set" && len(args) >= 3 {
+			key := args[1]
+			value := strings.Join(args[2:], " ")
+			cmdOut, err := exec.Command("nix", "config", "set", key, value).CombinedOutput()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to set config: %v\nOutput: %s\n", err, string(cmdOut))
+				os.Exit(1)
+			}
+			fmt.Printf("Set %s = %s\n", key, value)
+			return
+		}
+		if args[0] == "unset" && len(args) >= 2 {
+			key := args[1]
+			cmdOut, err := exec.Command("nix", "config", "unset", key).CombinedOutput()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to unset config: %v\nOutput: %s\n", err, string(cmdOut))
+				os.Exit(1)
+			}
+			fmt.Printf("Unset %s\n", key)
+			return
+		}
+		if args[0] == "edit" {
+			cmdOut, err := exec.Command("nix", "config", "edit").CombinedOutput()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to edit config: %v\nOutput: %s\n", err, string(cmdOut))
+				os.Exit(1)
+			}
+			fmt.Println("Opened config in editor.")
+			return
+		}
+		if args[0] == "explain" && len(args) >= 2 {
+			key := args[1]
+			prompt := "Explain the Nix config option '" + key + "' and how to use it."
+			aiResp, err := provider.Query(prompt)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "AI error: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Println(aiResp)
+			return
+		}
+		fmt.Println("Usage: nixai config [show|set|unset|edit|explain] [key] [value]")
+	},
+}
+
+// Build command for AI-assisted nix build troubleshooting
+var buildCmd = &cobra.Command{
+	Use:   "build [args]",
+	Short: "AI-assisted nix build/flakes troubleshooting and guidance",
+	Long:  `Build or rebuild your NixOS system or packages, with AI-powered help for flakes and configuration issues.\nExamples:\n  nixai build\n  nixai build .#nixosConfigurations.myhost.config.system.build.toplevel\n  nixai build --flake .`,
+	Args:  cobra.ArbitraryArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := config.LoadYAMLConfig("configs/default.yaml")
+		var provider ai.AIProvider
+		if err == nil {
+			switch cfg.AIProvider {
+			case "ollama":
+				provider = ai.NewOllamaProvider("llama3")
+			case "gemini":
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
+			case "openai":
+				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			default:
+				provider = ai.NewOllamaProvider("llama3")
+			}
+		} else {
+			provider = ai.NewOllamaProvider("llama3")
+		}
+		cmdArgs := []string{"build"}
+		if len(args) > 0 {
+			cmdArgs = append(cmdArgs, args...)
+		}
+		command := exec.Command("nix", cmdArgs...)
+		if nixosConfigPathGlobal != "" {
+			command.Dir = nixosConfigPathGlobal
+		}
+		out, err := command.CombinedOutput()
+		fmt.Println(string(out))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "nix build failed: %v\n", err)
+			// Parse and summarize the error output for the user (basic version)
+			problemSummary := summarizeBuildOutput(string(out))
+			if problemSummary != "" {
+				fmt.Println("\nProblem summary:")
+				fmt.Println(problemSummary)
+			}
+			prompt := "I ran 'nix build" + " " + strings.Join(args, " ") + "' and got this output:\n" + string(out) + "\nHow can I fix this build or configuration problem?"
+			aiResp, aiErr := provider.Query(prompt)
+			if aiErr == nil && aiResp != "" {
+				fmt.Println("\nAI suggestions:")
+				fmt.Println(aiResp)
+			}
+			os.Exit(1)
+		}
+	},
+}
+
+// summarizeBuildOutput provides a simple summary of common nix build errors.
+func summarizeBuildOutput(output string) string {
+	lines := strings.Split(output, "\n")
+	var summary []string
+	for _, line := range lines {
+		if strings.Contains(line, "error:") || strings.Contains(line, "failed") || strings.Contains(line, "cannot") {
+			summary = append(summary, line)
+		}
+	}
+	return strings.Join(summary, "\n")
+}
+
+// Flake command for AI-assisted nix flake troubleshooting
+var flakeCmd = &cobra.Command{
+	Use:   "flake [args]",
+	Short: "AI-assisted nix flake commands and troubleshooting",
+	Long:  `Run nix flake commands (show, update, check, etc.) with AI-powered help for troubleshooting and configuration.\nExamples:\n  nixai flake show\n  nixai flake update\n  nixai flake check\n  nixai flake explain-inputs\n  nixai flake explain <input>`,
+	Args:  cobra.ArbitraryArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) > 0 && (args[0] == "explain-inputs" || args[0] == "explain") {
+			ExplainFlakeInputs(args[1:])
+			return
+		}
+		cmdArgs := []string{"flake"}
+		if len(args) > 0 {
+			cmdArgs = append(cmdArgs, args...)
+		}
+		command := exec.Command("nix", cmdArgs...)
+		if nixosConfigPathGlobal != "" {
+			command.Dir = nixosConfigPathGlobal
+		}
+		out, err := command.CombinedOutput()
+		fmt.Println(string(out))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "nix flake failed: %v\n", err)
+			problemSummary := summarizeBuildOutput(string(out))
+			if problemSummary != "" {
+				fmt.Println("\nProblem summary:")
+				fmt.Println(problemSummary)
+			}
+			prompt := "I ran 'nix flake" + " " + strings.Join(args, " ") + "' and got this output:\n" + string(out) + "\nHow can I fix this flake or configuration problem?"
+			cfg, _ := config.LoadYAMLConfig("configs/default.yaml")
+			var provider ai.AIProvider
+			switch cfg.AIProvider {
+			case "ollama":
+				provider = ai.NewOllamaProvider("llama3")
+			case "gemini":
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
+			case "openai":
+				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			default:
+				provider = ai.NewOllamaProvider("llama3")
+			}
+			aiResp, aiErr := provider.Query(prompt)
+			if aiErr == nil && aiResp != "" {
+				fmt.Println("\nAI suggestions:")
+				fmt.Println(aiResp)
+			}
+			os.Exit(1)
+		}
+	},
+}
+
+// renderForTerminal formats markdown and simple HTML for terminal output with color
+func renderForTerminal(input string) string {
+	if input == "" {
+		return ""
+	}
+	// Remove HTML tags except <b>, <i>, <code>, <pre>, <a>, <ul>, <ol>, <li>
+	re := regexp.MustCompile(`<[^>]+>`)
+	clean := re.ReplaceAllStringFunc(input, func(tag string) string {
+		// Allow some tags to pass as markdown
+		switch {
+		case tag == "<b>" || tag == "</b>":
+			return "**"
+		case tag == "<i>" || tag == "</i>":
+			return "_"
+		case tag == "<code>" || tag == "</code>":
+			return "`"
+		case tag == "<pre>" || tag == "</pre>":
+			return "\n```\n"
+		case tag == "<ul>" || tag == "</ul>" || tag == "<ol>" || tag == "</ol>":
+			return ""
+		case tag == "<li>":
+			return "- "
+		case tag == "</li>":
+			return "\n"
+		case tag[:2] == "<a":
+			return ""
+		case tag == "</a>":
+			return ""
+		default:
+			return ""
+		}
+	})
+	// Use glamour to render markdown to ANSI
+	out, err := glamour.Render(clean, "dark")
+	if err != nil {
+		return clean
+	}
+	return out
+}
+
+// ExplainFlakeInputs handles 'nixai flake explain-inputs' and 'nixai flake explain <input>'
+func ExplainFlakeInputs(inputs []string) {
+	// Use the correct flake.nix path based on nixosConfigPathGlobal
+	flakePath := "flake.nix"
+	if nixosConfigPathGlobal != "" {
+		flakePath = nixosConfigPathGlobal + "/flake.nix"
+	}
+	data, err := os.ReadFile(flakePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Could not read flake.nix at %s: %v\n", flakePath, err)
+		os.Exit(1)
+	}
+	flakeInputs := parseFlakeInputs(string(data))
+	if len(flakeInputs) == 0 {
+		fmt.Println("No inputs found in flake.nix.")
+		return
+	}
+	fmt.Println("Found the following flake inputs:")
+	for i, inp := range flakeInputs {
+		fmt.Printf("%2d. %s\n", i+1, inp.Name)
+		fmt.Printf("    URL: %s\n", inp.URL)
+	}
+	// 2. If a specific input is requested, focus on that
+	var targets []FlakeInput
+	if len(inputs) > 0 && inputs[0] != "" {
+		for _, inp := range flakeInputs {
+			if inp.Name == inputs[0] {
+				targets = []FlakeInput{inp}
+				break
+			}
+		}
+		if len(targets) == 0 {
+			fmt.Printf("Input '%s' not found in flake.nix.\n", inputs[0])
+			return
+		}
+	} else {
+		targets = flakeInputs
+	}
+	// 3. For each input, try to fetch README.md and flake.nix from GitHub if possible
+	for _, inp := range targets {
+		readme, flake, repoURL := fetchGitHubReadmeAndFlake(inp.URL)
+		fmt.Println(renderForTerminal("\n---\n"))
+		fmt.Print(renderForTerminal(fmt.Sprintf("**Input:** `%s`\n**Source:** %s\n", inp.Name, inp.URL)))
+		if repoURL != "" {
+			fmt.Print(renderForTerminal(fmt.Sprintf("**Repo:** %s\n", repoURL)))
+		}
+		if readme != "" {
+			fmt.Println(renderForTerminal("### README.md summary:"))
+			fmt.Println(renderForTerminal(summarizeText(readme)))
+		} else {
+			fmt.Println(renderForTerminal("_No README.md found._"))
+		}
+		if flake != "" {
+			fmt.Println(renderForTerminal("### flake.nix summary:"))
+			fmt.Println(renderForTerminal(summarizeText(flake)))
+		} else {
+			fmt.Println(renderForTerminal("_No flake.nix found in repo._"))
+		}
+		// 4. Use AI to explain and suggest improvements
+		cfg, _ := config.LoadYAMLConfig("configs/default.yaml")
+		var provider ai.AIProvider
+		switch cfg.AIProvider {
+		case "ollama":
+			provider = ai.NewOllamaProvider("llama3")
+		case "gemini":
+			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
+		case "openai":
+			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		default:
+			provider = ai.NewOllamaProvider("llama3")
+		}
+		prompt := "Explain the purpose and best practices for the Nix flake input '" + inp.Name + "' with this source URL: " + inp.URL + ".\n" +
+			"README.md (if any):\n" + readme + "\nflake.nix (if any):\n" + flake + "\nSuggest improvements or highlight issues."
+		aiResp, aiErr := provider.Query(prompt)
+		if aiErr == nil && aiResp != "" {
+			fmt.Println(renderForTerminal("\n**AI explanation and suggestions:**"))
+			fmt.Println(renderForTerminal(aiResp))
+		}
+	}
+}
+
+type FlakeInput struct {
+	Name string
+	URL  string
+}
+
+// parseFlakeInputs extracts flake inputs from a flake.nix string (supports both 'name.url = ...;' and 'name = { url = ...; ... };' forms)
+func parseFlakeInputs(flake string) []FlakeInput {
+	var inputs []FlakeInput
+	inInputs := false
+	lines := strings.Split(flake, "\n")
+	var i int
+	for i = 0; i < len(lines); i++ {
+		l := strings.TrimSpace(lines[i])
+		if l == "" || strings.HasPrefix(l, "#") {
+			continue // skip empty lines and comments
+		}
+		if strings.HasPrefix(l, "inputs =") || strings.HasPrefix(l, "inputs=") {
+			inInputs = true
+			continue
+		}
+		if inInputs && l == "}" {
+			break
+		}
+		if !inInputs {
+			continue
+		}
+		// Match 'name.url = ...;' form
+		if strings.Contains(l, ".url") && strings.Contains(l, "=") {
+			parts := strings.SplitN(l, "=", 2)
+			namePart := strings.TrimSpace(parts[0])
+			if !strings.HasSuffix(namePart, ".url") {
+				continue
+			}
+			name := strings.TrimSuffix(namePart, ".url")
+			url := strings.TrimSpace(strings.TrimSuffix(parts[1], ";"))
+			url = strings.Trim(url, "\"'")
+			inputs = append(inputs, FlakeInput{Name: name, URL: url})
+			continue
+		}
+		// Match 'name = { url = ...; ... };' form
+		if strings.HasSuffix(l, "=") && i+1 < len(lines) && strings.HasPrefix(strings.TrimSpace(lines[i+1]), "{") {
+			name := strings.TrimSuffix(strings.TrimSpace(strings.TrimSuffix(l, "=")), " ")
+			// Parse the attribute set block
+			blockLevel := 0
+			url := ""
+			for j := i + 1; j < len(lines); j++ {
+				line := strings.TrimSpace(lines[j])
+				if line == "" || strings.HasPrefix(line, "#") {
+					continue
+				}
+				if strings.HasPrefix(line, "{") {
+					blockLevel++
+				}
+				if strings.HasPrefix(line, "}") || strings.HasPrefix(line, "};") {
+					blockLevel--
+					if blockLevel <= 0 {
+						i = j // advance outer loop
+						break
+					}
+				}
+				// Look for 'url = ...;' inside the block
+				if strings.HasPrefix(line, "url") && strings.Contains(line, "=") {
+					urlParts := strings.SplitN(line, "=", 2)
+					urlVal := strings.TrimSpace(strings.TrimSuffix(urlParts[1], ";"))
+					urlVal = strings.Trim(urlVal, "\"'")
+					url = urlVal
+				}
+			}
+			if name != "" && url != "" {
+				inputs = append(inputs, FlakeInput{Name: name, URL: url})
+			}
+			continue
+		}
+	}
+	return inputs
+}
+
+// fetchGitHubReadmeAndFlake tries to fetch README.md and flake.nix from a GitHub repo URL
+func fetchGitHubReadmeAndFlake(url string) (readme, flake, repoURL string) {
+	if !strings.HasPrefix(url, "github:") {
+		return "", "", ""
+	}
+	// github:NixOS/nixpkgs/nixos-unstable -> NixOS/nixpkgs
+	parts := strings.Split(url, ":")
+	if len(parts) < 2 {
+		return "", "", ""
+	}
+	repo := parts[1]
+	if idx := strings.Index(repo, "/"); idx > 0 {
+		if idx2 := strings.Index(repo[idx+1:], "/"); idx2 > 0 {
+			repo = repo[:idx+1+idx2]
+		}
+	}
+	repoURL = "https://github.com/" + repo
+	readmeURL := "https://raw.githubusercontent.com/" + repo + "/master/README.md"
+	flakeURL := "https://raw.githubusercontent.com/" + repo + "/master/flake.nix"
+	readme = fetchURL(readmeURL)
+	flake = fetchURL(flakeURL)
+	return readme, flake, repoURL
+}
+
+// fetchURL fetches the content of a URL (returns empty string on error)
+func fetchURL(url string) string {
+	resp, err := exec.Command("curl", "-sL", url).Output()
+	if err != nil {
+		return ""
+	}
+	return string(resp)
+}
+
+// summarizeText returns the first 20 lines or 1500 chars of text
+func summarizeText(text string) string {
+	lines := strings.Split(text, "\n")
+	if len(lines) > 20 {
+		return strings.Join(lines[:20], "\n") + "\n..."
+	}
+	if len(text) > 1500 {
+		return text[:1500] + "..."
+	}
+	return text
+}
+
 // Execute runs the root command
 func Execute() {
+	// Set from env if not set by flag
+	if nixosConfigPathGlobal == "" {
+		if envPath := os.Getenv("NIXAI_NIXOS_PATH"); envPath != "" {
+			nixosConfigPathGlobal = envPath
+		}
+	}
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)

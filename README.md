@@ -4,6 +4,25 @@
 
 ---
 
+## 📚 Table of Contents
+
+- [🚀 Project Overview](#-project-overview)
+- [✨ Features](#-features)
+- [🧩 Flake Input Analysis & AI Explanations](#-flake-input-analysis--ai-explanations)
+- [🎨 Terminal Output Formatting](#-terminal-output-formatting)
+- [🛠️ Installation & Usage](#%EF%B8%8F-installation--usage)
+- [📝 Commands & Usage](#-commands--usage)
+- [🗺️ Project Plan](#%EF%B8%8F-project-plan)
+- [Configuration](#configuration)
+- [Build & Test](#build--test)
+- [Where to Find NixOS Build Logs](#where-to-find-nixos-build-logs)
+- [Example: Diagnosing a Build Failure](#example-diagnosing-a-build-failure)
+- [🤝 Contributing](#-contributing)
+- [📄 License](#-license)
+- [🙏 Acknowledgments](#-acknowledgments)
+
+---
+
 ## 🚀 Project Overview
 
 **nixai** is a powerful, console-based Linux application designed to help you solve NixOS configuration problems, create and configure NixOS systems, and diagnose issues—all from the command line. It leverages advanced Large Language Models (LLMs) like Gemini, OpenAI, and Ollama, with a strong preference for local Ollama models to ensure your privacy. nixai integrates an MCP server to query NixOS documentation from multiple official and community sources, and provides interactive and scriptable diagnostics, log parsing, and command execution.
@@ -33,6 +52,32 @@
 - Modular, testable, and well-documented Go codebase.
 
 - Privacy-first: prefers local LLMs (Ollama) by default.
+
+- **NEW:** 🧩 **Flake Input Analysis & AI Explanations** — Analyze and explain flake inputs using AI, with upstream README/flake.nix summaries.
+
+- **NEW:** 🎨 **Beautiful Terminal Output** — All Markdown/HTML output is colorized and formatted for readability using [glamour](https://github.com/charmbracelet/glamour) and [termenv](https://github.com/muesli/termenv).
+
+---
+
+## 🧩 Flake Input Analysis & AI Explanations
+
+Easily analyze your `flake.nix` inputs and get AI-powered explanations for each input, including upstream README and flake.nix summaries. nixai supports both `name.url = ...;` and `name = { url = ...; ... };` forms, robustly handling comments and whitespace.
+
+**Example:**
+
+```sh
+nixai flake explain --flake /path/to/flake.nix
+```
+
+---
+
+## 🎨 Terminal Output Formatting
+
+All Markdown and HTML output from nixai is rendered as beautiful, colorized terminal output using [glamour](https://github.com/charmbracelet/glamour) and [termenv](https://github.com/muesli/termenv). This makes AI explanations, documentation, and search results easy to read and visually appealing.
+
+- Works in all modern terminals.
+- Respects your terminal theme (light/dark).
+- Makes complex output (tables, code, links) readable at a glance.
 
 ---
 
