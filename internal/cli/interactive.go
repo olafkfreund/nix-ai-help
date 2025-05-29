@@ -12,8 +12,9 @@ import (
 	"nix-ai-help/pkg/utils"
 )
 
-var currentAIProvider string
-var currentModel string = "llama3"
+// TODO: Implement AI provider and model switching in interactive mode
+// var currentAIProvider string
+// var currentModel string = "llama3"
 
 // InteractiveMode starts the interactive command-line interface for nixai.
 func InteractiveMode() {
@@ -32,8 +33,12 @@ func InteractiveMode() {
 		fmt.Print(utils.AccentStyle.Render("> "))
 		input, err := reader.ReadString('\n')
 		if err != nil {
+			if err.Error() == "EOF" {
+				fmt.Println("\nExiting nixai. Goodbye!")
+				break
+			}
 			fmt.Println("Error reading input:", err)
-			continue
+			break
 		}
 
 		input = strings.TrimSpace(input)
@@ -62,6 +67,20 @@ func handleCommand(command string) {
 			"search <package>           - Search for and install Nix packages",
 			"explain-option <option>    - Get AI-powered explanations for NixOS options",
 			"find-option <description>  - Find NixOS options from natural language description",
+			"service-examples <service> - Get AI-powered service configuration examples",
+			"lint-config <file>         - AI-powered configuration file analysis and linting",
+			"config <subcommand>        - AI-assisted Nix configuration management",
+			"  config show               - Show current configuration with AI analysis",
+			"  config set <key> <value>  - Set configuration option with AI guidance",
+			"  config unset <key>        - Unset configuration option with safety checks",
+			"  config explain <key>      - AI-powered explanation of config options",
+			"  config analyze            - Comprehensive configuration analysis",
+			"  config validate           - Validate configuration and suggest improvements",
+			"  config optimize           - AI recommendations for performance optimization",
+			"  config backup             - Create backup of current configuration",
+			"  config restore <backup>   - Restore configuration from backup",
+			"health                     - Run comprehensive system health check",
+			"upgrade-advisor            - Get AI-powered upgrade guidance and safety checks",
 			"show config                - Show current configuration and MCP sources",
 			"set ai <provider> [model]  - Set AI provider (ollama, gemini, openai) and model (optional)",
 			"set-nixos-path <path>      - Set path to NixOS config folder",
@@ -70,6 +89,56 @@ func handleCommand(command string) {
 		}
 
 		fmt.Println(utils.FormatList(commands))
+	case "config":
+		if len(fields) < 2 {
+			fmt.Println("Usage: config <show|set|unset|edit|explain|analyze|validate|optimize|backup|restore> [args...]")
+			fmt.Println("Examples:")
+			fmt.Println("  config show                              # Show current config with analysis")
+			fmt.Println("  config set experimental-features \"nix-command flakes\"")
+			fmt.Println("  config explain substituters             # Get AI explanation")
+			fmt.Println("  config analyze                          # Full analysis")
+			fmt.Println("  config validate                         # Validate config")
+			fmt.Println("  config optimize                         # Performance tips")
+			return
+		}
+		// Use the same logic as the CLI command by calling it directly
+		configCmd.Run(configCmd, fields[1:])
+		return
+	case "health":
+		fmt.Println("Running comprehensive system health check...")
+		healthCheckCmd.Run(healthCheckCmd, []string{})
+		return
+	case "upgrade-advisor":
+		fmt.Println("Starting upgrade advisor analysis...")
+		upgradeAdvisorCmd.Run(upgradeAdvisorCmd, []string{})
+		return
+	case "service-examples":
+		if len(fields) < 2 {
+			fmt.Println("Usage: service-examples <service>")
+			fmt.Println("Examples:")
+			fmt.Println("  service-examples nginx")
+			fmt.Println("  service-examples postgresql")
+			fmt.Println("  service-examples docker")
+			fmt.Println("  service-examples prometheus")
+			return
+		}
+		service := strings.Join(fields[1:], " ")
+		// Use the same logic as the CLI command by calling it directly
+		serviceExamplesCmd.Run(serviceExamplesCmd, []string{service})
+		return
+	case "lint-config":
+		if len(fields) < 2 {
+			fmt.Println("Usage: lint-config <file>")
+			fmt.Println("Examples:")
+			fmt.Println("  lint-config /etc/nixos/configuration.nix")
+			fmt.Println("  lint-config ~/.config/nixpkgs/home.nix")
+			fmt.Println("  lint-config ./flake.nix")
+			return
+		}
+		file := strings.Join(fields[1:], " ")
+		// Use the same logic as the CLI command by calling it directly
+		lintConfigCmd.Run(lintConfigCmd, []string{file})
+		return
 	case "decode-error":
 		if len(fields) < 2 {
 			fmt.Println("Usage: decode-error <error_message>")
@@ -299,7 +368,6 @@ func setAIProvider(provider, model string) {
 	}
 	cfg.AIProvider = provider
 	if provider == "ollama" && model != "" {
-		currentModel = model
 		fmt.Printf("Set AI provider to '%s' with model '%s'.\n", provider, model)
 	} else if provider != "ollama" {
 		fmt.Printf("Set AI provider to '%s'.\n", provider)

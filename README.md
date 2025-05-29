@@ -1,6 +1,6 @@
 # nixai: NixOS AI Assistant
 
-![nixai logo](https://nixos.org/logo/nixos-logo-only-hires.png)
+![nixai logo](./nix-ai2.png)
 
 ---
 

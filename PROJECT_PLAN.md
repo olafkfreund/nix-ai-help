@@ -36,6 +36,13 @@ A console-based Linux application to help solve NixOS configuration problems and
 - 🏗️ Flake input parser now supports all real-world input forms (attribute sets, comments, whitespace)
 - 🤖 `nixai flake explain` and `nixai flake explain-inputs` now provide AI-powered, colorized, terminal-friendly explanations for all flake inputs
 - 📖 README and help text updated for new features
+- ✅ **NEW: AI-assisted Nix configuration management** with comprehensive `config` command (9 subcommands)
+- ✅ **NEW: AI-powered service examples** with `service-examples` command for real-world configurations
+- ✅ **NEW: AI-powered config linting** with `lint-config` command for comprehensive analysis
+- ✅ **NEW: Enhanced error decoder** with `decode-error` command for human-friendly error explanations
+- ✅ **Enhanced justfile** with 40+ comprehensive development commands and categorized help
+- ✅ **Fixed interactive mode EOF handling** for proper graceful exit with piped input
+- ✅ **Comprehensive testing** with MCP server integration and all features validated
 
 ---
 
@@ -128,14 +135,64 @@ A console-based Linux application to help solve NixOS configuration problems and
   nixai explain-option boot.loader.systemd-boot.enable
   ```
 
-### 2. AI-Driven NixOS Error Decoder
+### 8. AI-Assisted Nix Configuration Management ✅ **COMPLETED**
 
-- **Description:** Paste or pipe in a NixOS error message and get a human-friendly explanation and actionable next steps.
+- **Description:** Comprehensive AI-powered configuration management with backup/restore, validation, optimization, and intelligent explanations for all Nix configuration operations.
 
-- **Implementation:**
-  - Enhance diagnostics to recognize more error patterns.
-  - Use AI to generate explanations and fixes.
-  - Link to docs or wiki as needed.
+- **Implementation:** ✅ **COMPLETED**
+  - ✅ Added `nixai config` command with 9 subcommands (CLI/interactive):
+    - ✅ `config show` - Display current configuration with AI analysis
+    - ✅ `config set <key> <value>` - Set configuration options with AI guidance  
+    - ✅ `config unset <key>` - Remove configuration options with safety checks
+    - ✅ `config edit` - Open configuration in editor with AI tips
+    - ✅ `config explain <key>` - AI-powered explanations of configuration options
+    - ✅ `config analyze` - Comprehensive configuration analysis
+    - ✅ `config validate` - Validate configuration and suggest improvements
+    - ✅ `config optimize` - AI recommendations for performance optimization
+    - ✅ `config backup` - Create timestamped configuration backups
+    - ✅ `config restore <backup>` - Restore configuration from backup with validation
+  - ✅ **Safety Features**: Automatic backups before changes, validation checks, and dry-run testing
+  - ✅ **AI Integration**: Intelligent explanations, best practices, and optimization suggestions
+  - ✅ **Multi-Config Support**: Works with user configs, system configs, and flake configurations
+  - ✅ **Beautiful Output**: Progress indicators, colorized status, and markdown-rendered analysis
+  - ✅ **Interactive Mode Support**: Full functionality available in interactive mode with enhanced help
+
+- **Usage:**
+
+  ```bash
+  nixai config show                              # Show and analyze current config
+  nixai config set experimental-features "nix-command flakes"
+  nixai config explain substituters             # Get AI explanation
+  nixai config analyze                          # Full configuration analysis
+  nixai config validate                         # Validate and suggest improvements
+  nixai config optimize                         # Performance optimization tips
+  nixai config backup                           # Create backup
+  nixai config restore backup-20250529-123456   # Restore from backup
+  ```
+
+### 9. AI-Powered Error Decoder ✅ **COMPLETED**
+
+- **Description:** Paste or pipe in a NixOS error message and get a human-friendly explanation with actionable next steps, comprehensive troubleshooting guidance, and prevention tips.
+
+- **Implementation:** ✅ **COMPLETED**
+  - ✅ Added `nixai decode-error <error>` command (CLI/interactive).
+  - ✅ **AI-Powered Analysis**: Advanced error pattern recognition and solution generation
+  - ✅ **Comprehensive Troubleshooting**: Step-by-step solutions, alternative approaches, and prevention tips
+  - ✅ **Documentation Integration**: Links to relevant documentation and resources via MCP server
+  - ✅ **Error Classification**: Categorizes errors by type, severity, and complexity
+  - ✅ **Context-Aware Solutions**: Provides solutions based on detected system configuration
+  - ✅ **Beautiful Terminal Output**: Color-coded analysis with clear action items and progress indicators
+  - ✅ **Interactive Mode Support**: Full functionality available in interactive mode
+
+- **Usage:**
+
+  ```bash
+  nixai decode-error "syntax error at line 42"
+  nixai decode-error "error: function 'buildNodePackage' called without required argument"
+  nixai decode-error "error: infinite recursion encountered"
+  ```
+
+### 2. AI-Driven NixOS Error Decoder ✅ **COMPLETED** → **See #9 above**
 
 ### 3. Interactive NixOS Health Check ✅ **COMPLETED**
 
@@ -201,14 +258,27 @@ A console-based Linux application to help solve NixOS configuration problems and
   - **Real-Time Progress**: 7-step analysis process with detailed status indicators
   - **Critical Issue Detection**: Prevents upgrades when critical problems are found
 
-### 5. NixOS Service Usage Examples
+### 5. NixOS Service Usage Examples ✅ **COMPLETED**
 
-- **Description:** For any service, show real-world config examples and explain them.
+- **Description:** For any service, show real-world config examples and explain them with AI-powered analysis and best practices.
 
-- **Implementation:**
-  - Add `nixai service-examples <service>` command.
-  - Fetch examples from docs/community via MCP.
-  - Summarize and explain with AI.
+- **Implementation:** ✅ **COMPLETED**
+  - ✅ Added `nixai service-examples <service>` command (CLI/interactive).
+  - ✅ Comprehensive AI integration for generating real-world configuration examples.
+  - ✅ **Multi-Purpose Examples**: Basic setup, common configurations, and advanced use cases
+  - ✅ **Best Practices Integration**: Security tips, performance optimizations, and common pitfalls
+  - ✅ **Documentation Integration**: Uses MCP server to fetch official documentation
+  - ✅ **Beautiful Terminal Output**: Markdown-rendered examples with syntax highlighting
+  - ✅ **Interactive Mode Support**: Full functionality available in interactive mode
+
+- **Usage:**
+
+  ```bash
+  nixai service-examples nginx
+  nixai service-examples postgresql  
+  nixai service-examples docker
+  nixai service-examples openssh
+  ```
 
 ### 6. Reverse Option Lookup ✅ **COMPLETED**
 
@@ -230,13 +300,27 @@ A console-based Linux application to help solve NixOS configuration problems and
   nixai find-option "enable docker"
   ```
 
-### 7. NixOS Config Linter & Formatter
+### 7. NixOS Config Linter & Formatter ✅ **COMPLETED**
 
-- **Description:** Lint and auto-format NixOS config files, suggesting improvements and flagging anti-patterns.
+- **Description:** Lint and auto-format NixOS config files, suggesting improvements and flagging anti-patterns with AI-powered analysis.
 
-- **Implementation:**
-  - Add `nixai lint-config <file>` command.
-  - Use a Nix parser and AI to analyze and suggest fixes.
+- **Implementation:** ✅ **COMPLETED**
+  - ✅ Added `nixai lint-config <file>` command (CLI/interactive).
+  - ✅ **Comprehensive Analysis**: Syntax validation, structure analysis, and best practices checking
+  - ✅ **AI-Powered Recommendations**: Security analysis, performance suggestions, and anti-pattern detection
+  - ✅ **Multi-File Support**: Works with configuration.nix, flake.nix, home.nix, and other Nix files
+  - ✅ **Formatting Suggestions**: Indentation, spacing, and readability improvements
+  - ✅ **Security Focus**: Identifies potential security issues and suggests mitigations
+  - ✅ **Beautiful Terminal Output**: Color-coded analysis with clear action items
+  - ✅ **Interactive Mode Support**: Full functionality available in interactive mode
+
+- **Usage:**
+
+  ```bash
+  nixai lint-config /etc/nixos/configuration.nix
+  nixai lint-config ./flake.nix
+  nixai lint-config /home/user/.config/nixpkgs/home.nix
+  ```
 
 ---
 

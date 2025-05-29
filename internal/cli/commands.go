@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -60,11 +61,13 @@ func init() {
 	rootCmd.AddCommand(buildCmd)
 	rootCmd.AddCommand(flakeCmd)
 	rootCmd.AddCommand(explainOptionCmd)
-	rootCmd.AddCommand(findOptionCmd)     // Register the find-option command
-	rootCmd.AddCommand(mcpServerCmd)      // Register the MCP server command
-	rootCmd.AddCommand(healthCheckCmd)    // Register the health check command
-	rootCmd.AddCommand(decodeErrorCmd)    // Register the decode-error command
-	rootCmd.AddCommand(upgradeAdvisorCmd) // Register the upgrade-advisor command
+	rootCmd.AddCommand(findOptionCmd)      // Register the find-option command
+	rootCmd.AddCommand(mcpServerCmd)       // Register the MCP server command
+	rootCmd.AddCommand(healthCheckCmd)     // Register the health check command
+	rootCmd.AddCommand(decodeErrorCmd)     // Register the decode-error command
+	rootCmd.AddCommand(upgradeAdvisorCmd)  // Register the upgrade-advisor command
+	rootCmd.AddCommand(serviceExamplesCmd) // Register the service-examples command
+	rootCmd.AddCommand(lintConfigCmd)      // Register the lint-config command
 
 	diagnoseCmd.Flags().StringVarP(&logFile, "log-file", "l", "", "Path to a log file to analyze")
 	diagnoseCmd.Flags().StringVarP(&configSnippet, "config-snippet", "c", "", "NixOS configuration snippet to analyze")
@@ -385,17 +388,38 @@ var searchCmd = &cobra.Command{
 
 // Config command for AI-assisted Nix configuration management
 var configCmd = &cobra.Command{
-	Use:   "config [show|set|unset|edit|explain] [key] [value]",
+	Use:   "config [show|set|unset|edit|explain|analyze|validate|optimize|backup|restore] [key] [value]",
 	Short: "AI-assisted Nix configuration management",
-	Long:  `Manage and understand your Nix configuration with AI-powered help.\nExamples:\n  nixai config show\n  nixai config set experimental-features nix-command flakes\n  nixai config explain substituters`,
-	Args:  cobra.ArbitraryArgs,
+	Long: `Manage and understand your Nix configuration with AI-powered help and intelligent recommendations.
+
+Commands:
+  show                     - Show current Nix configuration with AI analysis
+  set <key> <value>       - Set configuration option with AI guidance  
+  unset <key>             - Unset configuration option with safety checks
+  edit                    - Open configuration in editor with AI tips
+  explain <key>           - AI-powered explanation of configuration options
+  analyze                 - Comprehensive analysis of current configuration
+  validate                - Validate configuration and suggest improvements
+  optimize                - AI recommendations for performance optimization
+  backup                  - Create backup of current configuration
+  restore <backup>        - Restore configuration from backup
+  
+Examples:
+  nixai config show                              # Show and analyze current config
+  nixai config set experimental-features "nix-command flakes"
+  nixai config explain substituters             # Get AI explanation of option
+  nixai config analyze                          # Full configuration analysis
+  nixai config validate                         # Validate and suggest improvements
+  nixai config optimize                         # Performance optimization tips`,
+	Args: cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Load configuration and initialize AI provider
 		cfg, err := config.LoadUserConfig()
 		var provider ai.AIProvider
 		if err == nil {
 			switch cfg.AIProvider {
 			case "ollama":
-				provider = ai.NewOllamaProvider("llama3")
+				provider = ai.NewOllamaProvider(cfg.AIModel)
 			case "gemini":
 				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
 			case "openai":
@@ -406,64 +430,36 @@ var configCmd = &cobra.Command{
 		} else {
 			provider = ai.NewOllamaProvider("llama3")
 		}
+
+		// Handle different subcommands
 		if len(args) == 0 || args[0] == "show" {
-			out, err := exec.Command("nix", "config", "show").CombinedOutput()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to run 'nix config show': %v\nOutput: %s\n", err, string(out))
-				os.Exit(1)
-			}
-			fmt.Println("Current Nix configuration:")
-			fmt.Println(string(out))
-			prompt := "Summarize and suggest improvements for this Nix config:\n" + string(out)
-			aiResp, err := provider.Query(prompt)
-			if err == nil && aiResp != "" {
-				fmt.Println("\nAI suggestions:")
-				fmt.Println(aiResp)
-			}
+			handleConfigShow(provider)
 			return
 		}
-		if args[0] == "set" && len(args) >= 3 {
-			key := args[1]
-			value := strings.Join(args[2:], " ")
-			cmdOut, err := exec.Command("nix", "config", "set", key, value).CombinedOutput()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to set config: %v\nOutput: %s\n", err, string(cmdOut))
-				os.Exit(1)
-			}
-			fmt.Printf("Set %s = %s\n", key, value)
-			return
+
+		switch args[0] {
+		case "set":
+			handleConfigSet(args, provider)
+		case "unset":
+			handleConfigUnset(args, provider)
+		case "edit":
+			handleConfigEdit(provider)
+		case "explain":
+			handleConfigExplain(args, provider)
+		case "analyze":
+			handleConfigAnalyze(provider)
+		case "validate":
+			handleConfigValidate(provider)
+		case "optimize":
+			handleConfigOptimize(provider)
+		case "backup":
+			handleConfigBackup()
+		case "restore":
+			handleConfigRestore(args)
+		default:
+			fmt.Println(utils.FormatError("Unknown config command: " + args[0]))
+			fmt.Println(utils.FormatInfo("Run 'nixai config --help' for available commands"))
 		}
-		if args[0] == "unset" && len(args) >= 2 {
-			key := args[1]
-			cmdOut, err := exec.Command("nix", "config", "unset", key).CombinedOutput()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to unset config: %v\nOutput: %s\n", err, string(cmdOut))
-				os.Exit(1)
-			}
-			fmt.Printf("Unset %s\n", key)
-			return
-		}
-		if args[0] == "edit" {
-			cmdOut, err := exec.Command("nix", "config", "edit").CombinedOutput()
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Failed to edit config: %v\nOutput: %s\n", err, string(cmdOut))
-				os.Exit(1)
-			}
-			fmt.Println("Opened config in editor.")
-			return
-		}
-		if args[0] == "explain" && len(args) >= 2 {
-			key := args[1]
-			prompt := "Explain the Nix config option '" + key + "' and how to use it."
-			aiResp, err := provider.Query(prompt)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "AI error: %v\n", err)
-				os.Exit(1)
-			}
-			fmt.Println(aiResp)
-			return
-		}
-		fmt.Println("Usage: nixai config [show|set|unset|edit|explain] [key] [value]")
 	},
 }
 
@@ -1350,6 +1346,14 @@ func runHealthCheck(cfg *config.UserConfig) {
 		}
 	}
 
+	// Get AI analysis if there are issues or warnings
+	if len(issues) > 0 || len(warnings) > 0 {
+		aiAnalysis, err := getAIHealthAnalysis(cfg, issues, warnings)
+		if err == nil {
+			report += "\n\n" + utils.FormatSection("🤖 AI Analysis & Recommendations", aiAnalysis)
+		}
+	}
+
 	// Render the report with glamour
 	r, err := glamour.NewTermRenderer(
 		glamour.WithAutoStyle(),
@@ -2156,4 +2160,1085 @@ func countChecksByStatus(checks []nixos.CheckResult, status string) int {
 func init() {
 	upgradeAdvisorCmd.Flags().String("target", "", "Target NixOS version (e.g., 24.11)")
 	upgradeAdvisorCmd.Flags().Bool("dry-run", false, "Show system analysis without upgrade recommendations")
+}
+
+// Service examples command for showing real-world config examples
+var serviceExamplesCmd = &cobra.Command{
+	Use:   "service-examples <service>",
+	Short: "Show real-world configuration examples for NixOS services",
+	Long: `Get AI-powered, real-world configuration examples and explanations for any NixOS service.
+
+Examples:
+  nixai service-examples nginx
+  nixai service-examples postgresql
+  nixai service-examples docker
+  nixai service-examples openssh`,
+	Args: cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		serviceName := args[0]
+
+		// Load configuration and initialize AI provider
+		cfg, err := config.LoadUserConfig()
+		var provider ai.AIProvider
+		if err == nil {
+			switch cfg.AIProvider {
+			case "ollama":
+				provider = ai.NewOllamaProvider(cfg.AIModel)
+			case "gemini":
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
+			case "openai":
+				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			default:
+				provider = ai.NewOllamaProvider("llama3")
+			}
+		} else {
+			provider = ai.NewOllamaProvider("llama3")
+		}
+
+		fmt.Println(utils.FormatHeader("🛠️ NixOS Service Examples: " + serviceName))
+		fmt.Println(utils.FormatProgress("Analyzing service and generating examples..."))
+
+		// Check if MCP server is running for documentation queries
+		mcpURL := "http://localhost:8080"
+		statusResp, err := http.Get(mcpURL + "/healthz")
+		if err == nil && statusResp != nil {
+			defer statusResp.Body.Close()
+			if statusResp.StatusCode == 200 {
+				// Query documentation for the service
+				mcpClient := mcp.NewMCPClient(mcpURL)
+				doc, err := mcpClient.QueryDocumentation("services." + serviceName)
+				if err == nil && strings.TrimSpace(doc) != "" {
+					fmt.Println(utils.FormatSuccess("Found service documentation!"))
+				}
+			}
+		}
+
+		// Build comprehensive prompt for service examples
+		prompt := buildServiceExamplesPrompt(serviceName)
+
+		// Get AI response
+		response, err := provider.Query(prompt)
+		if err != nil {
+			fmt.Println(utils.FormatError("Error getting AI response: " + err.Error()))
+			os.Exit(1)
+		}
+
+		// Render the response with markdown formatting
+		rendered := renderForTerminal(response)
+		fmt.Println(rendered)
+
+		fmt.Println()
+		fmt.Println(utils.FormatNote("💡 Tip: Use 'nixai explain-option services." + serviceName + ".*' to get detailed explanations of specific options"))
+	},
+}
+
+// Config linter command for linting and formatting NixOS config files
+var lintConfigCmd = &cobra.Command{
+	Use:   "lint-config <file>",
+	Short: "Lint and analyze NixOS configuration files",
+	Long: `Lint, analyze, and suggest improvements for NixOS configuration files using AI-powered analysis.
+
+Features:
+- Syntax and structure validation
+- Best practices analysis
+- Security and performance recommendations
+- Anti-pattern detection
+- Formatting suggestions
+
+Examples:
+  nixai lint-config /etc/nixos/configuration.nix
+  nixai lint-config ./flake.nix
+  nixai lint-config /home/user/.config/nixpkgs/home.nix`,
+	Args: cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		filePath := args[0]
+
+		fmt.Println(utils.FormatHeader("🔍 NixOS Configuration Linter"))
+		fmt.Println(utils.FormatKeyValue("File", filePath))
+		fmt.Println(utils.FormatDivider())
+
+		// Check if file exists
+		if !utils.IsFile(filePath) {
+			fmt.Println(utils.FormatError("File not found: " + filePath))
+			os.Exit(1)
+		}
+
+		// Read the configuration file
+		fmt.Println(utils.FormatProgress("Reading configuration file..."))
+		content, err := os.ReadFile(filePath)
+		if err != nil {
+			fmt.Println(utils.FormatError("Error reading file: " + err.Error()))
+			os.Exit(1)
+		}
+
+		configContent := string(content)
+		if strings.TrimSpace(configContent) == "" {
+			fmt.Println(utils.FormatWarning("Configuration file is empty"))
+			return
+		}
+
+		// Initialize AI provider
+		cfg, err := config.LoadUserConfig()
+		var provider ai.AIProvider
+		if err == nil {
+			switch cfg.AIProvider {
+			case "ollama":
+				provider = ai.NewOllamaProvider(cfg.AIModel)
+			case "gemini":
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
+			case "openai":
+				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			default:
+				provider = ai.NewOllamaProvider("llama3")
+			}
+		} else {
+			provider = ai.NewOllamaProvider("llama3")
+		}
+
+		// Perform basic syntax validation
+		fmt.Println(utils.FormatProgress("Performing syntax validation..."))
+		syntaxIssues := performBasicSyntaxCheck(configContent)
+
+		// Get file statistics
+		lines := strings.Split(configContent, "\n")
+		stats := fmt.Sprintf("Lines: %d, Size: %d bytes", len(lines), len(content))
+
+		// Run AI analysis
+		fmt.Println(utils.FormatProgress("Running AI-powered configuration analysis..."))
+		prompt := buildConfigLintPrompt(configContent, filePath, stats, syntaxIssues)
+
+		response, err := provider.Query(prompt)
+		if err != nil {
+			fmt.Println(utils.FormatError("Error getting AI analysis: " + err.Error()))
+			os.Exit(1)
+		}
+
+		// Render the response
+		rendered := renderForTerminal(response)
+		fmt.Println(rendered)
+
+		// Show basic syntax issues if any
+		if len(syntaxIssues) > 0 {
+			fmt.Println()
+			fmt.Println(utils.FormatHeader("⚠️ Syntax Issues Detected"))
+			for _, issue := range syntaxIssues {
+				fmt.Println(utils.FormatError("• " + issue))
+			}
+		}
+
+		fmt.Println()
+		fmt.Println(utils.FormatNote("💡 Tip: Test your configuration with 'sudo nixos-rebuild dry-run' before applying changes"))
+	},
+}
+
+// buildServiceExamplesPrompt creates a comprehensive prompt for service examples
+func buildServiceExamplesPrompt(serviceName string) string {
+	return fmt.Sprintf(`You are a NixOS expert providing real-world configuration examples for services.
+
+**Service:** %s
+
+Please provide comprehensive examples and explanations:
+
+## 🛠️ Service Overview
+- What this service does and why you'd use it
+- Common use cases and scenarios
+
+## ⚙️ Basic Configuration
+- Minimal working configuration
+- Essential options that must be set
+- Default behavior when enabled
+
+## 🔧 Common Configurations
+- Popular real-world setups
+- Different use case scenarios
+- Configuration variations
+
+## 🚀 Advanced Examples
+- Complex configurations
+- Integration with other services
+- Performance and security optimizations
+
+## 💡 Best Practices
+- Security considerations
+- Performance recommendations
+- Common pitfalls to avoid
+- Maintenance tips
+
+## 🔗 Related Services
+- Services that work well together
+- Dependencies or prerequisites
+- Complementary tools
+
+**Format your response using clear Markdown with:**
+- Code blocks for all configuration examples (use `+"`nix`"+` code blocks)
+- Clear headings and sections
+- Practical, working examples
+- Explanations for each configuration option
+
+Focus on real-world, practical examples that users can actually use and adapt.`, serviceName)
+}
+
+// performBasicSyntaxCheck performs basic Nix syntax validation
+func performBasicSyntaxCheck(content string) []string {
+	var issues []string
+
+	lines := strings.Split(content, "\n")
+	openBraces := 0
+	openParens := 0
+	openBrackets := 0
+
+	for lineNum, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+
+		// Count braces, parentheses, and brackets
+		for _, char := range line {
+			switch char {
+			case '{':
+				openBraces++
+			case '}':
+				openBraces--
+				if openBraces < 0 {
+					issues = append(issues, fmt.Sprintf("Line %d: Unmatched closing brace", lineNum+1))
+					openBraces = 0
+				}
+			case '(':
+				openParens++
+			case ')':
+				openParens--
+				if openParens < 0 {
+					issues = append(issues, fmt.Sprintf("Line %d: Unmatched closing parenthesis", lineNum+1))
+					openParens = 0
+				}
+			case '[':
+				openBrackets++
+			case ']':
+				openBrackets--
+				if openBrackets < 0 {
+					issues = append(issues, fmt.Sprintf("Line %d: Unmatched closing bracket", lineNum+1))
+					openBrackets = 0
+				}
+			}
+		}
+
+		// Check for common syntax issues
+		if strings.Contains(line, "=;") {
+			issues = append(issues, fmt.Sprintf("Line %d: Empty assignment (=;)", lineNum+1))
+		}
+
+		if strings.Count(line, "\"")%2 != 0 {
+			issues = append(issues, fmt.Sprintf("Line %d: Unmatched quote", lineNum+1))
+		}
+	}
+
+	// Check for unclosed braces, parentheses, brackets
+	if openBraces > 0 {
+		issues = append(issues, fmt.Sprintf("Unclosed braces: %d", openBraces))
+	}
+	if openParens > 0 {
+		issues = append(issues, fmt.Sprintf("Unclosed parentheses: %d", openParens))
+	}
+	if openBrackets > 0 {
+		issues = append(issues, fmt.Sprintf("Unclosed brackets: %d", openBrackets))
+	}
+
+	return issues
+}
+
+// buildConfigLintPrompt creates a comprehensive prompt for config linting
+func buildConfigLintPrompt(configContent, filePath, stats string, syntaxIssues []string) string {
+	syntaxSection := ""
+	if len(syntaxIssues) > 0 {
+		syntaxSection = fmt.Sprintf("\n**Syntax Issues Found:**\n%s\n", strings.Join(syntaxIssues, "\n"))
+	}
+
+	return fmt.Sprintf(`You are a NixOS configuration expert performing a comprehensive lint and analysis.
+
+**File:** %s
+**Statistics:** %s
+%s
+**Configuration Content:**
+%s
+
+Please provide a detailed analysis:
+
+## 🔍 Syntax Analysis
+- Overall syntax quality and correctness
+- Any additional syntax issues not caught by basic checks
+- Formatting and style recommendations
+
+## 📋 Structure Analysis
+- Configuration organization and readability
+- Use of proper Nix idioms and patterns
+- Module structure and imports
+
+## 🔒 Security Review
+- Security best practices compliance
+- Potential security issues or vulnerabilities
+- Recommended security improvements
+
+## ⚡ Performance Analysis
+- Performance implications of current settings
+- Resource usage considerations
+- Optimization opportunities
+
+## 🎯 Best Practices
+- Alignment with NixOS best practices
+- Modern Nix language features usage
+- Maintainability improvements
+
+## ⚠️ Issues Found
+- Deprecated options or patterns
+- Conflicting configurations
+- Missing recommended settings
+- Anti-patterns to avoid
+
+## 💡 Recommendations
+- Specific improvements to implement
+- Modern alternatives to current approaches
+- Additional options to consider
+
+## 📝 Action Items
+- Priority fixes to implement
+- Optional improvements
+- Commands to run for testing
+
+Use clear Markdown formatting with code blocks for configuration examples.
+Rate the overall configuration quality (1-10) and provide specific, actionable feedback.`, filePath, stats, syntaxSection, configContent)
+}
+
+// Config handler functions for AI-assisted Nix configuration management
+
+// handleConfigShow displays and analyzes current Nix configuration
+func handleConfigShow(provider ai.AIProvider) {
+	fmt.Println(utils.FormatHeader("📊 Current Nix Configuration"))
+
+	// Get current nix config
+	cmd := exec.Command("nix", "show-config")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Println(utils.FormatError("Error getting current config: " + err.Error()))
+		return
+	}
+
+	configOutput := string(output)
+	fmt.Println(utils.FormatSection("Current Configuration", configOutput))
+
+	// Get AI analysis
+	fmt.Println()
+	fmt.Println(utils.FormatProgress("🤖 Analyzing configuration with AI..."))
+
+	prompt := fmt.Sprintf(`Analyze this Nix configuration and provide insights:
+
+%s
+
+Please provide:
+1. Configuration summary and key settings
+2. Potential improvements or optimizations
+3. Security considerations
+4. Best practices alignment
+5. Recommendations for better performance or maintainability
+
+Format your response using clear Markdown with sections.`, configOutput)
+
+	response, err := provider.Query(prompt)
+	if err != nil {
+		fmt.Println(utils.FormatError("AI analysis failed: " + err.Error()))
+		return
+	}
+
+	rendered := renderForTerminal(response)
+	fmt.Println(rendered)
+}
+
+// handleConfigSet sets a configuration option with AI guidance
+func handleConfigSet(args []string, provider ai.AIProvider) {
+	if len(args) < 3 {
+		fmt.Println(utils.FormatError("Usage: config set <key> <value>"))
+		fmt.Println("Examples:")
+		fmt.Println("  nixai config set experimental-features \"nix-command flakes\"")
+		fmt.Println("  nixai config set substituters \"https://cache.nixos.org/\"")
+		return
+	}
+
+	key := args[1]
+	value := args[2]
+
+	fmt.Println(utils.FormatHeader("⚙️ Setting Nix Configuration"))
+	fmt.Println(utils.FormatKeyValue("Key", key))
+	fmt.Println(utils.FormatKeyValue("Value", value))
+
+	// Get AI guidance before setting
+	fmt.Println()
+	fmt.Println(utils.FormatProgress("🤖 Getting AI guidance..."))
+
+	prompt := fmt.Sprintf(`Provide guidance for setting this Nix configuration option:
+
+Key: %s
+Value: %s
+
+Please provide:
+1. What this option does and its impact
+2. Whether this is a safe change
+3. Any prerequisites or dependencies
+4. Potential side effects or considerations
+5. Best practices for this setting
+6. Alternative values to consider
+
+Be specific and practical.`, key, value)
+
+	response, err := provider.Query(prompt)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("AI guidance unavailable: " + err.Error()))
+	} else {
+		rendered := renderForTerminal(response)
+		fmt.Println(rendered)
+	}
+
+	// Confirm before setting
+	fmt.Println()
+	fmt.Print("Do you want to proceed with setting this configuration? [y/N]: ")
+	var confirmation string
+	fmt.Scanln(&confirmation)
+
+	if strings.ToLower(confirmation) != "y" {
+		fmt.Println("Configuration change cancelled.")
+		return
+	}
+
+	// Set the configuration
+	cmd := exec.Command("nix", "config", "set", key, value)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Println(utils.FormatError("Failed to set configuration: " + err.Error()))
+		fmt.Println(string(output))
+		return
+	}
+
+	fmt.Println(utils.FormatSuccess("Configuration set successfully!"))
+	if len(output) > 0 {
+		fmt.Println(string(output))
+	}
+}
+
+// handleConfigUnset unsets a configuration option with safety checks
+func handleConfigUnset(args []string, provider ai.AIProvider) {
+	if len(args) < 2 {
+		fmt.Println(utils.FormatError("Usage: config unset <key>"))
+		fmt.Println("Examples:")
+		fmt.Println("  nixai config unset experimental-features")
+		fmt.Println("  nixai config unset substituters")
+		return
+	}
+
+	key := args[1]
+
+	fmt.Println(utils.FormatHeader("🗑️ Unsetting Nix Configuration"))
+	fmt.Println(utils.FormatKeyValue("Key", key))
+
+	// Get AI safety guidance
+	fmt.Println()
+	fmt.Println(utils.FormatProgress("🤖 Checking safety with AI..."))
+
+	prompt := fmt.Sprintf(`Analyze the safety of unsetting this Nix configuration option:
+
+Key: %s
+
+Please provide:
+1. What this option controls
+2. Safety of removing this setting
+3. Potential impacts of unsetting
+4. Systems or features that might be affected
+5. Whether this requires additional changes
+6. Recommended alternatives if any
+
+Be specific about any risks or considerations.`, key)
+
+	response, err := provider.Query(prompt)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("AI safety check unavailable: " + err.Error()))
+	} else {
+		rendered := renderForTerminal(response)
+		fmt.Println(rendered)
+	}
+
+	// Confirm before unsetting
+	fmt.Println()
+	fmt.Print("Do you want to proceed with unsetting this configuration? [y/N]: ")
+	var confirmation string
+	fmt.Scanln(&confirmation)
+
+	if strings.ToLower(confirmation) != "y" {
+		fmt.Println("Configuration change cancelled.")
+		return
+	}
+
+	// Unset the configuration
+	cmd := exec.Command("nix", "config", "unset", key)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Println(utils.FormatError("Failed to unset configuration: " + err.Error()))
+		fmt.Println(string(output))
+		return
+	}
+
+	fmt.Println(utils.FormatSuccess("Configuration unset successfully!"))
+	if len(output) > 0 {
+		fmt.Println(string(output))
+	}
+}
+
+// handleConfigEdit opens configuration in editor with AI tips
+func handleConfigEdit(provider ai.AIProvider) {
+	fmt.Println(utils.FormatHeader("📝 Edit Nix Configuration"))
+
+	// Get AI tips before editing
+	fmt.Println(utils.FormatProgress("🤖 Generating editing tips..."))
+
+	prompt := `Provide helpful tips for editing Nix configuration files:
+
+Please provide:
+1. Key configuration options to know about
+2. Common editing patterns and best practices
+3. Safety tips and things to avoid
+4. Useful configuration examples
+5. How to validate changes before applying
+6. Recommended editor settings for Nix files
+
+Make it practical and actionable for someone editing their Nix config.`
+
+	response, err := provider.Query(prompt)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("AI tips unavailable: " + err.Error()))
+	} else {
+		rendered := renderForTerminal(response)
+		fmt.Println(rendered)
+		fmt.Println()
+	}
+
+	// Find config file location
+	configPath := ""
+
+	// Try user config file first
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		userConfigPath := filepath.Join(homeDir, ".config", "nix", "nix.conf")
+		if utils.IsFile(userConfigPath) {
+			configPath = userConfigPath
+		}
+	}
+
+	// Fallback to system config
+	if configPath == "" {
+		systemConfigPath := "/etc/nix/nix.conf"
+		if utils.IsFile(systemConfigPath) {
+			configPath = systemConfigPath
+		}
+	}
+
+	if configPath == "" {
+		fmt.Println(utils.FormatWarning("No Nix configuration file found."))
+		fmt.Println("You can create one at ~/.config/nix/nix.conf")
+		return
+	}
+
+	fmt.Println(utils.FormatKeyValue("Config file", configPath))
+
+	// Open in editor
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = "nano" // fallback editor
+	}
+
+	fmt.Printf("Opening %s in %s...\n", configPath, editor)
+	cmd := exec.Command(editor, configPath)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	err = cmd.Run()
+	if err != nil {
+		fmt.Println(utils.FormatError("Editor failed: " + err.Error()))
+		return
+	}
+
+	fmt.Println(utils.FormatSuccess("Configuration editing completed!"))
+	fmt.Println(utils.FormatNote("💡 Tip: Test your changes with 'nix show-config' to verify the configuration"))
+}
+
+// handleConfigExplain explains configuration options with AI
+func handleConfigExplain(args []string, provider ai.AIProvider) {
+	if len(args) < 2 {
+		fmt.Println(utils.FormatError("Usage: config explain <key>"))
+		fmt.Println("Examples:")
+		fmt.Println("  nixai config explain experimental-features")
+		fmt.Println("  nixai config explain substituters")
+		fmt.Println("  nixai config explain trusted-users")
+		return
+	}
+
+	key := strings.Join(args[1:], " ")
+
+	fmt.Println(utils.FormatHeader("📖 Configuration Option Explanation"))
+	fmt.Println(utils.FormatKeyValue("Option", key))
+
+	// Get current value if set
+	cmd := exec.Command("nix", "show-config", key)
+	output, err := cmd.CombinedOutput()
+	if err == nil && len(output) > 0 {
+		fmt.Println(utils.FormatKeyValue("Current Value", strings.TrimSpace(string(output))))
+	}
+
+	fmt.Println()
+	fmt.Println(utils.FormatProgress("🤖 Getting AI explanation..."))
+
+	prompt := fmt.Sprintf(`Explain this Nix configuration option in detail:
+
+Option: %s
+
+Please provide:
+1. **Purpose**: What this option controls and why it exists
+2. **Type**: What type of value it expects (string, boolean, list, etc.)
+3. **Default Value**: What the default is if not set
+4. **Usage Examples**: Show 2-3 practical examples of setting this option
+5. **Impact**: How changing this affects the system
+6. **Best Practices**: Recommended values and usage patterns
+7. **Related Options**: Other options that work with or affect this one
+8. **Troubleshooting**: Common issues and solutions
+
+Use clear Markdown formatting with code blocks for examples.
+Make it comprehensive but easy to understand.`, key)
+
+	response, err := provider.Query(prompt)
+	if err != nil {
+		fmt.Println(utils.FormatError("AI explanation failed: " + err.Error()))
+		return
+	}
+
+	rendered := renderForTerminal(response)
+	fmt.Println(rendered)
+}
+
+// handleConfigAnalyze performs comprehensive configuration analysis
+func handleConfigAnalyze(provider ai.AIProvider) {
+	fmt.Println(utils.FormatHeader("🔍 Comprehensive Configuration Analysis"))
+
+	// Get current configuration
+	fmt.Println(utils.FormatProgress("📊 Gathering configuration data..."))
+
+	cmd := exec.Command("nix", "show-config")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Println(utils.FormatError("Error getting configuration: " + err.Error()))
+		return
+	}
+
+	configOutput := string(output)
+
+	// Get system info
+	unameCmd := exec.Command("uname", "-a")
+	unameOutput, _ := unameCmd.CombinedOutput()
+
+	// Get Nix version
+	versionCmd := exec.Command("nix", "--version")
+	versionOutput, _ := versionCmd.CombinedOutput()
+
+	fmt.Println(utils.FormatProgress("🤖 Performing AI analysis..."))
+
+	prompt := fmt.Sprintf(`Perform a comprehensive analysis of this Nix configuration:
+
+**System Information:**
+%s
+
+**Nix Version:**
+%s
+
+**Current Configuration:**
+%s
+
+Please provide a detailed analysis including:
+
+## 📊 Configuration Overview
+- Summary of current settings
+- Configuration completeness assessment
+- Key features enabled/disabled
+
+## 🔒 Security Analysis
+- Security posture evaluation
+- Potential security improvements
+- Risk assessment of current settings
+
+## ⚡ Performance Analysis
+- Performance impact of current settings
+- Optimization opportunities
+- Resource usage considerations
+
+## 🎯 Best Practices Compliance
+- Alignment with Nix best practices
+- Modern features utilization
+- Maintainability assessment
+
+## ⚠️ Issues and Recommendations
+- Configuration issues found
+- Recommended improvements
+- Priority actions to take
+
+## 📈 Optimization Suggestions
+- Performance optimizations
+- Feature enhancements
+- Modern alternatives to consider
+
+Use clear Markdown formatting and provide specific, actionable recommendations.`,
+		string(unameOutput), string(versionOutput), configOutput)
+
+	response, err := provider.Query(prompt)
+	if err != nil {
+		fmt.Println(utils.FormatError("AI analysis failed: " + err.Error()))
+		return
+	}
+
+	rendered := renderForTerminal(response)
+	fmt.Println(rendered)
+}
+
+// handleConfigValidate validates configuration and suggests improvements
+func handleConfigValidate(provider ai.AIProvider) {
+	fmt.Println(utils.FormatHeader("✅ Configuration Validation"))
+
+	// Test configuration validity
+	fmt.Println(utils.FormatProgress("🔍 Testing configuration validity..."))
+
+	cmd := exec.Command("nix", "show-config")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Println(utils.FormatError("Configuration validation failed: " + err.Error()))
+		fmt.Println(string(output))
+		return
+	}
+
+	fmt.Println(utils.FormatSuccess("✓ Configuration syntax is valid"))
+
+	configOutput := string(output)
+
+	// Get AI validation insights
+	fmt.Println(utils.FormatProgress("🤖 Getting AI validation insights..."))
+
+	prompt := fmt.Sprintf(`Validate this Nix configuration and provide improvement suggestions:
+
+%s
+
+Please analyze:
+
+## ✅ Validation Results
+- Configuration validity status
+- Syntax and structure assessment
+- Completeness evaluation
+
+## 🔧 Configuration Issues
+- Missing recommended settings
+- Deprecated or problematic options
+- Conflicting configurations
+
+## 💡 Improvement Suggestions
+- Security enhancements
+- Performance optimizations
+- Best practice implementations
+- Modern feature adoption
+
+## 🚨 Critical Issues
+- Security vulnerabilities
+- Performance bottlenecks
+- Stability concerns
+- Maintenance issues
+
+## 📋 Action Plan
+- Priority fixes to implement
+- Optional improvements
+- Verification steps
+- Testing recommendations
+
+Provide specific, actionable recommendations with example configurations.`, configOutput)
+
+	response, err := provider.Query(prompt)
+	if err != nil {
+		fmt.Println(utils.FormatError("AI validation analysis failed: " + err.Error()))
+		return
+	}
+
+	rendered := renderForTerminal(response)
+	fmt.Println(rendered)
+}
+
+// handleConfigOptimize provides AI recommendations for performance optimization
+func handleConfigOptimize(provider ai.AIProvider) {
+	fmt.Println(utils.FormatHeader("🚀 Configuration Optimization"))
+
+	// Get current configuration
+	fmt.Println(utils.FormatProgress("📊 Analyzing current configuration..."))
+
+	cmd := exec.Command("nix", "show-config")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Println(utils.FormatError("Error getting configuration: " + err.Error()))
+		return
+	}
+
+	configOutput := string(output)
+
+	// Get system specs
+	cpuCmd := exec.Command("nproc")
+	cpuOutput, _ := cpuCmd.CombinedOutput()
+
+	memCmd := exec.Command("sh", "-c", "free -h | head -2")
+	memOutput, _ := memCmd.CombinedOutput()
+
+	fmt.Println(utils.FormatProgress("🤖 Generating optimization recommendations..."))
+
+	prompt := fmt.Sprintf(`Provide performance optimization recommendations for this Nix configuration:
+
+**Current Configuration:**
+%s
+
+**System Resources:**
+- CPU Cores: %s
+- Memory: %s
+
+Please provide optimization recommendations:
+
+## 🚀 Performance Optimizations
+- Build performance improvements
+- Download and cache optimizations
+- Resource utilization enhancements
+- Parallel processing optimizations
+
+## ⚙️ Specific Settings
+- Recommended configuration changes
+- Optimal values for current hardware
+- Feature flags for better performance
+- Cache and storage optimizations
+
+## 🏗️ Build Optimizations
+- Faster build configurations
+- Dependency management improvements
+- Local cache optimizations
+- Network optimization settings
+
+## 💾 Storage Optimizations
+- Disk usage optimizations
+- Store cleanup recommendations
+- Space-saving configurations
+- Efficient storage practices
+
+## 🌐 Network Optimizations
+- Download speed improvements
+- Mirror and cache configurations
+- Bandwidth optimization settings
+- Reliable fallback options
+
+## 📋 Implementation Plan
+- Priority optimizations to implement first
+- Expected performance improvements
+- Testing and verification steps
+- Monitoring recommendations
+
+Provide specific configuration examples and expected benefits.`,
+		configOutput, strings.TrimSpace(string(cpuOutput)), string(memOutput))
+
+	response, err := provider.Query(prompt)
+	if err != nil {
+		fmt.Println(utils.FormatError("AI optimization analysis failed: " + err.Error()))
+		return
+	}
+
+	rendered := renderForTerminal(response)
+	fmt.Println(rendered)
+}
+
+// handleConfigBackup creates backup of current configuration
+func handleConfigBackup() {
+	fmt.Println(utils.FormatHeader("💾 Configuration Backup"))
+
+	// Create backup directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println(utils.FormatError("Error getting home directory: " + err.Error()))
+		return
+	}
+
+	backupDir := filepath.Join(homeDir, ".config", "nixai", "backups")
+	err = os.MkdirAll(backupDir, 0755)
+	if err != nil {
+		fmt.Println(utils.FormatError("Error creating backup directory: " + err.Error()))
+		return
+	}
+
+	// Generate backup filename with timestamp
+	timestamp := time.Now().Format("2006-01-02_15-04-05")
+	backupFile := filepath.Join(backupDir, fmt.Sprintf("nix-config-backup_%s.conf", timestamp))
+
+	fmt.Println(utils.FormatProgress("📄 Backing up current configuration..."))
+
+	// Get current configuration
+	cmd := exec.Command("nix", "show-config")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Println(utils.FormatError("Error getting current configuration: " + err.Error()))
+		return
+	}
+
+	// Write backup file
+	err = os.WriteFile(backupFile, output, 0644)
+	if err != nil {
+		fmt.Println(utils.FormatError("Error writing backup file: " + err.Error()))
+		return
+	}
+
+	fmt.Println(utils.FormatSuccess("✓ Configuration backed up successfully!"))
+	fmt.Println(utils.FormatKeyValue("Backup file", backupFile))
+	fmt.Println(utils.FormatKeyValue("Timestamp", timestamp))
+
+	// List existing backups
+	files, err := filepath.Glob(filepath.Join(backupDir, "nix-config-backup_*.conf"))
+	if err == nil && len(files) > 1 {
+		fmt.Println()
+		fmt.Println(utils.FormatSubsection("Available Backups:", ""))
+		for _, file := range files {
+			basename := filepath.Base(file)
+			fmt.Printf("  - %s\n", basename)
+		}
+		fmt.Println()
+		fmt.Println(utils.FormatNote("💡 Tip: Use 'nixai config restore <backup-file>' to restore a previous configuration"))
+	}
+}
+
+// handleConfigRestore restores configuration from backup
+func handleConfigRestore(args []string) {
+	if len(args) < 2 {
+		fmt.Println(utils.FormatError("Usage: config restore <backup-file>"))
+
+		// List available backups
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return
+		}
+
+		backupDir := filepath.Join(homeDir, ".config", "nixai", "backups")
+		files, err := filepath.Glob(filepath.Join(backupDir, "nix-config-backup_*.conf"))
+		if err != nil || len(files) == 0 {
+			fmt.Println(utils.FormatWarning("No backup files found"))
+			return
+		}
+
+		fmt.Println()
+		fmt.Println("Available backups:")
+		for _, file := range files {
+			basename := filepath.Base(file)
+			fmt.Printf("  - %s\n", basename)
+		}
+		return
+	}
+
+	backupName := args[1]
+
+	fmt.Println(utils.FormatHeader("🔄 Configuration Restore"))
+	fmt.Println(utils.FormatKeyValue("Backup", backupName))
+
+	// Find backup file
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		fmt.Println(utils.FormatError("Error getting home directory: " + err.Error()))
+		return
+	}
+
+	var backupFile string
+	if filepath.IsAbs(backupName) {
+		backupFile = backupName
+	} else {
+		backupDir := filepath.Join(homeDir, ".config", "nixai", "backups")
+		if !strings.HasSuffix(backupName, ".conf") {
+			backupName += ".conf"
+		}
+		if !strings.HasPrefix(backupName, "nix-config-backup_") {
+			backupName = "nix-config-backup_" + backupName
+		}
+		backupFile = filepath.Join(backupDir, backupName)
+	}
+
+	// Check if backup file exists
+	if !utils.IsFile(backupFile) {
+		fmt.Println(utils.FormatError("Backup file not found: " + backupFile))
+		return
+	}
+
+	// Read backup content
+	content, err := os.ReadFile(backupFile)
+	if err != nil {
+		fmt.Println(utils.FormatError("Error reading backup file: " + err.Error()))
+		return
+	}
+
+	fmt.Println(utils.FormatWarning("⚠️  This will restore the entire Nix configuration from the backup."))
+	fmt.Println("Current configuration will be replaced.")
+	fmt.Print("Do you want to proceed? [y/N]: ")
+
+	var confirmation string
+	fmt.Scanln(&confirmation)
+
+	if strings.ToLower(confirmation) != "y" {
+		fmt.Println("Restore cancelled.")
+		return
+	}
+
+	// Create current backup before restore
+	fmt.Println(utils.FormatProgress("📄 Creating backup of current configuration..."))
+	handleConfigBackup()
+
+	fmt.Println(utils.FormatProgress("🔄 Restoring configuration..."))
+
+	// Parse backup content and restore each setting
+	lines := strings.Split(string(content), "\n")
+	restored := 0
+	failed := 0
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		// Parse "key = value" format
+		parts := strings.SplitN(line, " = ", 2)
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+
+		// Restore setting
+		cmd := exec.Command("nix", "config", "set", key, value)
+		err := cmd.Run()
+		if err != nil {
+			failed++
+		} else {
+			restored++
+		}
+	}
+
+	fmt.Println()
+	if failed == 0 {
+		fmt.Println(utils.FormatSuccess("✓ Configuration restored successfully!"))
+	} else {
+		fmt.Println(utils.FormatWarning(fmt.Sprintf("⚠️  Configuration partially restored: %d succeeded, %d failed", restored, failed)))
+	}
+
+	fmt.Println(utils.FormatKeyValue("Settings restored", fmt.Sprintf("%d", restored)))
+	if failed > 0 {
+		fmt.Println(utils.FormatKeyValue("Settings failed", fmt.Sprintf("%d", failed)))
+	}
+
+	fmt.Println()
+	fmt.Println(utils.FormatNote("💡 Tip: Use 'nix show-config' to verify the restored configuration"))
 }
