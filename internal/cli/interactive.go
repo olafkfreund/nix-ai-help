@@ -51,6 +51,7 @@ func handleCommand(command string) {
 		fmt.Println("Available commands:")
 		fmt.Println("  diagnose <log/config>      - Diagnose NixOS issues")
 		fmt.Println("  search <package>           - Search for and install Nix packages")
+		fmt.Println("  explain-option <option>    - Get AI-powered explanations for NixOS options")
 		fmt.Println("  show config                - Show current configuration and MCP sources")
 		fmt.Println("  set ai <provider> [model]  - Set AI provider (ollama, gemini, openai) and model (optional)")
 		fmt.Println("  set-nixos-path <path>      - Set path to NixOS config folder")
@@ -215,6 +216,18 @@ func handleCommand(command string) {
 				fmt.Println(problemSummary)
 			}
 		}
+		return
+	case "explain-option":
+		if len(fields) < 2 {
+			fmt.Println("Usage: explain-option <option>")
+			fmt.Println("Examples:")
+			fmt.Println("  explain-option services.nginx.enable")
+			fmt.Println("  explain-option networking.firewall.enable")
+			return
+		}
+		option := strings.Join(fields[1:], " ")
+		// Use the same logic as the CLI command
+		explainOptionCmd.Run(explainOptionCmd, []string{option})
 		return
 	case "exit":
 		fmt.Println("Exiting nixai. Goodbye!")

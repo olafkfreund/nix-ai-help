@@ -85,22 +85,54 @@ nixai flake explain --flake /path/to/flake.nix
 
 ## 🔧 NixOS Option Explainer
 
-Get detailed explanations for any NixOS option:
+Get comprehensive, AI-powered explanations for any NixOS option with **usage examples**, **best practices**, and **related options**:
 
 ```sh
+# Get detailed explanation with examples and best practices
 nixai explain-option services.nginx.enable
 
+# Comprehensive firewall configuration guide
 nixai explain-option networking.firewall.enable
 
+# Boot loader setup with real-world examples
 nixai explain-option boot.loader.systemd-boot.enable
+
+# Natural language queries also work
+nixai explain-option "how to enable SSH access"
+
+# Get help for complex nested options with advanced examples
+nixai explain-option services.postgresql.settings.shared_preload_libraries
+```
+
+**What you get with each explanation:**
+
+- 📖 **Purpose & Overview**: Clear explanation of what the option does
+- 🔧 **Type & Default**: Data type and default value information
+- 💡 **Usage Examples**: Basic, real-world, and advanced configuration examples
+- ⭐ **Best Practices**: Tips, warnings, and recommendations
+- 🔗 **Related Options**: Other options that work well together
+- 🎨 **Beautiful Formatting**: Colorized terminal output with proper syntax highlighting
+
+**Available in both CLI and interactive modes:**
+
+```sh
+# CLI mode
+nixai explain-option <option>
+
+# Interactive mode
+nixai interactive
+> explain-option <option>
 ```
 
 The Option Explainer provides:
+
 - **Type**: The data type of the option (boolean, string, list, etc.)
 - **Default Value**: What the option defaults to if not set
 - **Description**: Official documentation from NixOS
 - **Source**: The module file where the option is defined
 - **AI Explanation**: Context, purpose, and best practices
+- **Usage Examples**: Practical configuration examples (basic, common, advanced)
+- **Related Options**: Other options that work well together
 
 ---
 

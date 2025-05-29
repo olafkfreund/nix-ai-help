@@ -68,3 +68,30 @@ func TestExplainOptionCmd_Mock(t *testing.T) {
 		t.Errorf("expected AI explanation in output, got: %s", output)
 	}
 }
+
+func TestBuildExplainOptionPrompt(t *testing.T) {
+	option := "services.nginx.enable"
+	doc := "services.nginx.enable: Enable the nginx service. Type: boolean. Default: false."
+
+	prompt := buildExplainOptionPrompt(option, doc)
+
+	// Verify the prompt includes key elements for comprehensive explanations
+	if !strings.Contains(prompt, "Usage Examples") {
+		t.Error("prompt should request usage examples")
+	}
+	if !strings.Contains(prompt, "Best Practices") {
+		t.Error("prompt should request best practices")
+	}
+	if !strings.Contains(prompt, "Related Options") {
+		t.Error("prompt should request related options")
+	}
+	if !strings.Contains(prompt, "Code blocks") {
+		t.Error("prompt should request code blocks for examples")
+	}
+	if !strings.Contains(prompt, option) {
+		t.Error("prompt should include the option name")
+	}
+	if !strings.Contains(prompt, doc) {
+		t.Error("prompt should include the documentation")
+	}
+}

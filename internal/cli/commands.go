@@ -933,6 +933,74 @@ func extractNixOSOption(input string) string {
 	return strings.TrimSpace(input)
 }
 
+// suggestSimilarOptions attempts to suggest similar or related options when an option isn't found
+func suggestSimilarOptions(option string) []string {
+	suggestions := []string{}
+
+	// Extract the service/module name for suggestions
+	parts := strings.Split(option, ".")
+	if len(parts) >= 2 {
+		if parts[0] == "services" && len(parts) >= 2 {
+			serviceName := parts[1]
+			suggestions = append(suggestions, []string{
+				fmt.Sprintf("services.%s.enable", serviceName),
+				fmt.Sprintf("services.%s.package", serviceName),
+				fmt.Sprintf("services.%s.settings", serviceName),
+				fmt.Sprintf("services.%s.extraConfig", serviceName),
+			}...)
+		}
+
+		if parts[0] == "networking" {
+			suggestions = append(suggestions, []string{
+				"networking.firewall.enable",
+				"networking.hostName",
+				"networking.interfaces",
+				"networking.nameservers",
+			}...)
+		}
+
+		if parts[0] == "boot" {
+			suggestions = append(suggestions, []string{
+				"boot.loader.systemd-boot.enable",
+				"boot.loader.grub.enable",
+				"boot.kernelPackages",
+				"boot.initrd.availableKernelModules",
+			}...)
+		}
+	}
+
+	return suggestions
+}
+
+// buildExplainOptionPrompt creates a comprehensive prompt for AI to explain NixOS options with usage examples
+func buildExplainOptionPrompt(option, documentation string) string {
+	return fmt.Sprintf(`You are a NixOS expert helping users understand configuration options. Please explain the following NixOS option in a clear, practical manner.
+
+**Option:** %s
+
+**Official Documentation:**
+%s
+
+**Please provide:**
+
+1. **Purpose & Overview**: What this option does and why you'd use it
+2. **Type & Default**: The data type and default value (if any)
+3. **Usage Examples**: Show 2-3 practical configuration examples:
+   - Basic/minimal usage
+   - Common real-world scenario
+   - Advanced configuration (if applicable)
+4. **Best Practices**: Tips, warnings, or recommendations
+5. **Related Options**: Other options that work well with this one
+
+**Format your response using Markdown with:**
+- Clear headings (##)
+- Code blocks for configuration examples
+- Bullet points for lists
+- **Bold** text for emphasis
+
+Make it practical and actionable for someone configuring their NixOS system.`, option, documentation)
+}
+
 // Explain option command for AI-powered NixOS option explanation
 var explainOptionCmd = &cobra.Command{
 	Use:   "explain-option <option|question>",
@@ -942,7 +1010,7 @@ var explainOptionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		query := args[0]
 		option := extractNixOSOption(query)
-		fmt.Printf("Explaining NixOS option: %s\n", option)
+		fmt.Printf("🔍 Analyzing NixOS option: %s\n", option)
 
 		cfg, err := config.LoadUserConfig()
 		if err != nil {
@@ -951,10 +1019,11 @@ var explainOptionCmd = &cobra.Command{
 		}
 
 		// Check MCP server status before querying
+		fmt.Print("📚 Fetching official documentation... ")
 		mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
 		statusResp, err := http.Get(mcpURL + "/healthz")
 		if err != nil || statusResp.StatusCode != 200 {
-			fmt.Fprintln(os.Stderr, "MCP server is not running. Please start it with 'nixai mcp-server start' or 'nixai mcp-server start -d'.")
+			fmt.Fprintln(os.Stderr, "\nMCP server is not running. Please start it with 'nixai mcp-server start' or 'nixai mcp-server start -d'.")
 			os.Exit(1)
 		}
 		if statusResp != nil {
@@ -964,15 +1033,24 @@ var explainOptionCmd = &cobra.Command{
 		mcpClient := mcp.NewMCPClient(mcpURL)
 		doc, err := mcpClient.QueryDocumentation(option)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error querying documentation: %v\n", err)
+			fmt.Fprintf(os.Stderr, "\nError querying documentation: %v\n", err)
 			os.Exit(1)
 		}
 		if strings.TrimSpace(doc) == "" || strings.Contains(doc, "No relevant documentation found") {
-			fmt.Println("No relevant documentation found for this option.")
+			fmt.Println("\nNo relevant documentation found for this option.")
+			suggestions := suggestSimilarOptions(option)
+			if len(suggestions) > 0 {
+				fmt.Println("\nDid you mean one of these options?")
+				for _, suggestion := range suggestions {
+					fmt.Printf("  - %s\n", suggestion)
+				}
+			}
 			return
 		}
+		fmt.Println("✓")
 
 		// Select AI provider
+		fmt.Printf("🤖 Generating explanation with %s... ", cfg.AIProvider)
 		var provider ai.AIProvider
 		switch cfg.AIProvider {
 		case "ollama":
@@ -985,16 +1063,21 @@ var explainOptionCmd = &cobra.Command{
 			provider = ai.NewOllamaProvider("llama3")
 		}
 
-		prompt := "Summarize and explain the following NixOS option documentation for a user. Include the option's purpose, type, default, and best practices.\nOption: '" + option + "'\nDocumentation:\n" + doc
+		prompt := buildExplainOptionPrompt(option, doc)
 		aiResp, aiErr := provider.Query(prompt)
 		if aiErr != nil {
-			fmt.Fprintf(os.Stderr, "AI error: %v\n", aiErr)
+			fmt.Fprintf(os.Stderr, "\nAI error: %v\n", aiErr)
 			os.Exit(1)
 		}
 		if strings.TrimSpace(aiResp) == "" {
-			fmt.Println("AI did not return an explanation.")
+			fmt.Println("\nAI did not return an explanation.")
 			return
 		}
+		fmt.Println("✓")
+
+		fmt.Println("\n" + strings.Repeat("=", 80))
+		fmt.Printf("📋 NixOS Option Explanation: %s\n", option)
+		fmt.Println(strings.Repeat("=", 80))
 
 		// Render output as markdown in terminal
 		out, err := glamour.Render(aiResp, "dark")
@@ -1003,5 +1086,9 @@ var explainOptionCmd = &cobra.Command{
 		} else {
 			fmt.Print(out)
 		}
+
+		fmt.Println("\n" + strings.Repeat("-", 80))
+		fmt.Println("💡 Tip: Use 'nixai search service <name>' to find related services")
+		fmt.Println("📖 Run 'nixai mcp-server query <option>' for raw documentation")
 	},
 }

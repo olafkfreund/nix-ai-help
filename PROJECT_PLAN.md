@@ -105,15 +105,23 @@ A console-based Linux application to help solve NixOS configuration problems and
 
 - **Description:** Users can ask about any NixOS option (e.g., `services.nginx.enable`) and get a concise, AI-generated explanation, including type, default, and best practices.
 
-- **Implementation:** ✅ **COMPLETED**
+- **Implementation:** ✅ **COMPLETED** & **ENHANCED**
   - ✅ Added `nixai explain-option <option>` command (CLI/interactive).
   - ✅ Integrated MCP server with Elasticsearch backend for structured NixOS option documentation.
   - ✅ AI provider integration for generating human-readable explanations.
   - ✅ Beautiful terminal output with colorized, readable formatting using glamour.
   - ✅ Robust error handling for non-existent options with graceful fallbacks.
   - ✅ Comprehensive testing and debugging completed.
+  - 🆕 **Enhanced AI prompts** for comprehensive explanations including:
+    - **Usage Examples**: Basic, common, and advanced configuration examples
+    - **Best Practices**: Tips, warnings, and recommendations
+    - **Related Options**: Other options that work well together
+    - **Structured Markdown Output**: Clear headings, code blocks, and formatting
+  - 🆕 **Improved User Experience**: Progress indicators, emojis, and helpful tips
+  - 🆕 **Interactive Mode Support**: Full explain-option functionality in interactive mode
 
 - **Usage:**
+
   ```bash
   nixai explain-option services.nginx.enable
   nixai explain-option networking.firewall.enable
