@@ -62,7 +62,15 @@ func handleCommand(command string) {
 			return
 		}
 		query := strings.Join(fields[1:], " ")
-		executor := nixos.NewExecutor()
+		cfg, _ := config.LoadUserConfig()
+		configPath := ""
+		if nixosConfigPath != "" {
+			fmt.Printf("Using NixOS config folder: %s\n", nixosConfigPath)
+			configPath = nixosConfigPath
+		} else if cfg != nil && cfg.NixosFolder != "" {
+			configPath = cfg.NixosFolder
+		}
+		executor := nixos.NewExecutor(configPath)
 		fmt.Printf("Searching for Nix packages matching: %s\n", query)
 		output, err := executor.SearchNixPackages(query)
 		if err != nil {

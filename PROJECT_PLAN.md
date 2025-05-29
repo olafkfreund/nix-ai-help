@@ -61,7 +61,7 @@ A console-based Linux application to help solve NixOS configuration problems and
 - [x] Robust flake input parser for all input forms
 - [x] AI-powered flake input explanation and upstream summarization
 - [x] Terminal markdown/HTML formatting for explain output
-- [ ] (Optional) Use config path for context-aware features everywhere
+- [x] (Optional) Use config path for context-aware features everywhere
 - [ ] (Optional) Automate service option lookup further
 - [ ] (Optional) Enhance user guidance and error handling for config path
 - [ ] (Optional) Add more tests for new features

@@ -6,7 +6,7 @@ import (
 )
 
 func TestExecuteCommand(t *testing.T) {
-	exec := NewExecutor()
+	exec := NewExecutor("")
 	output, err := exec.ExecuteCommand("echo", "hello")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)

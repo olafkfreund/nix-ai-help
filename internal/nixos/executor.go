@@ -7,16 +7,21 @@ import (
 )
 
 // Executor provides functionality to execute local commands related to NixOS configuration.
-type Executor struct{}
+type Executor struct {
+	ConfigPath string
+}
 
-// NewExecutor creates a new instance of Executor.
-func NewExecutor() *Executor {
-	return &Executor{}
+// NewExecutor creates a new instance of Executor with an optional config path.
+func NewExecutor(configPath string) *Executor {
+	return &Executor{ConfigPath: configPath}
 }
 
 // ExecuteCommand executes a given command and returns its output.
 func (e *Executor) ExecuteCommand(command string, args ...string) (string, error) {
 	cmd := exec.Command(command, args...)
+	if e.ConfigPath != "" {
+		cmd.Dir = e.ConfigPath
+	}
 	output, err := cmd.CombinedOutput()
 	return string(output), err
 }

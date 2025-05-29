@@ -6,7 +6,7 @@ import (
 )
 
 func TestSearchNixPackages(t *testing.T) {
-	exec := NewExecutor()
+	exec := NewExecutor("")
 	output, err := exec.SearchNixPackages("hello")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -17,7 +17,7 @@ func TestSearchNixPackages(t *testing.T) {
 }
 
 func TestSearchNixPackages_Firefox(t *testing.T) {
-	exec := NewExecutor()
+	exec := NewExecutor("")
 	output, err := exec.SearchNixPackages("firefox")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -31,7 +31,7 @@ func TestSearchNixPackages_Firefox(t *testing.T) {
 }
 
 func TestSearchNixPackages_MultiWord(t *testing.T) {
-	exec := NewExecutor()
+	exec := NewExecutor("")
 	output, err := exec.SearchNixPackages("libre office")
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -42,7 +42,7 @@ func TestSearchNixPackages_MultiWord(t *testing.T) {
 }
 
 func TestInstallNixPackage(t *testing.T) {
-	exec := NewExecutor()
+	exec := NewExecutor("")
 	// Use a dummy package unlikely to be installed, but don't actually install in test
 	// Instead, check that the command is constructed and returns output (may error)
 	_, _ = exec.InstallNixPackage("nixpkgs.hello")

@@ -197,13 +197,17 @@ var searchCmd = &cobra.Command{
 		}
 		query := strings.Join(args, " ")
 		fmt.Printf("Searching for Nix %ss matching: %s\n", searchType, query)
+		cfg, _ := config.LoadUserConfig()
+		configPath := ""
 		if nixosConfigPath != "" {
 			fmt.Printf("Using NixOS config folder: %s\n", nixosConfigPath)
-			// Optionally: pass this to executor or use for context
+			configPath = nixosConfigPath
+		} else if cfg != nil && cfg.NixosFolder != "" {
+			configPath = cfg.NixosFolder
 		}
 		var output string
 		var err error
-		executor := nixos.NewExecutor()
+		executor := nixos.NewExecutor(configPath)
 		if searchType == "service" {
 			// Instead of using 'nix search nixos', which fails, provide a helpful message and example config
 			fmt.Println("Service search is not yet fully automated. For most NixOS services, use:")
