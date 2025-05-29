@@ -15,7 +15,6 @@
       version = "0.1.0";
       src = ./.;
       vendorHash = "sha256-K/N+qbJQei29Mo3pVZpJafpf5Zbkgv5aE8d1ciL7qG0=";
-      subPackages = ["cmd/nixai"];
       doCheck = false; # Disable tests in Nix build due to network/sandbox restrictions
       meta = {
         description = "A tool for diagnosing and configuring NixOS using AI.";
