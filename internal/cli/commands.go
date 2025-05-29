@@ -280,14 +280,22 @@ var searchCmd = &cobra.Command{
 		}
 		// Only print package results, not any skipped lines
 		if len(items) == 0 {
-			fmt.Println("No matches found. Please refine your query or check the spelling.")
+			fmt.Println(utils.FormatWarning("No matches found. Please refine your query or check the spelling."))
 			return
 		}
-		fmt.Println()
+		
+		// Display search results with enhanced formatting
+		fmt.Println(utils.FormatHeader("🔍 Search Results"))
+		fmt.Println(utils.FormatKeyValue("Query", query))
+		fmt.Println(utils.FormatKeyValue("Type", searchType))
+		fmt.Println(utils.FormatDivider())
+		
 		for i, item := range items {
-			fmt.Printf("%2d. %s\n    %s\n", i+1, item.Name, item.Desc)
+			title := fmt.Sprintf("%d. %s", i+1, item.Name)
+			fmt.Println(utils.FormatSubsection(title, utils.MutedStyle.Render(item.Desc)))
 		}
-		fmt.Print("\nEnter the number of the ", searchType, " to see configuration options (or leave blank to exit): ")
+		
+		fmt.Print(utils.FormatInfo("Enter the number of the " + searchType + " to see configuration options (or leave blank to exit): "))
 		var sel string
 		scan := bufio.NewScanner(os.Stdin)
 		if scan.Scan() {
@@ -299,34 +307,47 @@ var searchCmd = &cobra.Command{
 		idx := -1
 		fmt.Sscanf(sel, "%d", &idx)
 		if idx < 1 || idx > len(items) {
-			fmt.Println("Invalid selection.")
+			fmt.Println(utils.FormatError("Invalid selection."))
 			return
 		}
 		item := items[idx-1]
-		fmt.Printf("\nSelected: %s\n\n", item.Name)
+		
+		// Display selected item with enhanced formatting
+		fmt.Println(utils.FormatHeader("📦 Selected " + strings.Title(searchType)))
+		fmt.Println(utils.FormatKeyValue("Name", item.Name))
+		fmt.Println(utils.FormatKeyValue("Description", item.Desc))
+		fmt.Println(utils.FormatDivider())
+		
 		// Show config options (placeholder or MCP/doc search)
 		// executor already defined above
 		if searchType == "service" {
-			fmt.Printf("  services.%s.enable = true;\n", item.Name)
-			fmt.Println("  # For more options, see the NixOS manual or run: nixos-option --find services.", item.Name)
-			fmt.Println("\nFetching available options with nixos-option --find...")
+			fmt.Println(utils.FormatSection("Configuration Example", ""))
+			fmt.Println(utils.FormatCodeBlock(fmt.Sprintf("services.%s.enable = true;", item.Name), "nix"))
+			fmt.Println(utils.FormatNote("For more options, see the NixOS manual or run: nixos-option --find services." + item.Name))
+			fmt.Println(utils.FormatProgress("Fetching available options with nixos-option --find..."))
 			optOut, err := executor.ListServiceOptions(item.Name)
 			if err == nil && strings.TrimSpace(optOut) != "" {
-				fmt.Println(optOut)
+				fmt.Println(utils.FormatSection("Available Options", optOut))
 			} else {
-				fmt.Println("No additional options found or nixos-option --find failed.")
+				fmt.Println(utils.FormatWarning("No additional options found or nixos-option --find failed."))
 			}
 		} else {
-			fmt.Println("NixOS (configuration.nix):")
-			fmt.Printf("  environment.systemPackages = with pkgs; [ %s ];\n", item.Name)
-			fmt.Println("Home Manager (home.nix):")
-			fmt.Printf("  home.packages = with pkgs; [ %s ];\n", item.Name)
-			fmt.Println("\nFetching available options with nixos-option...")
+			fmt.Println(utils.FormatSection("Configuration Examples", ""))
+			
+			nixosConfig := fmt.Sprintf("environment.systemPackages = with pkgs; [ %s ];", item.Name)
+			hmConfig := fmt.Sprintf("home.packages = with pkgs; [ %s ];", item.Name)
+			
+			fmt.Println(utils.FormatSubsection("NixOS (configuration.nix)", ""))
+			fmt.Println(utils.FormatCodeBlock(nixosConfig, "nix"))
+			fmt.Println(utils.FormatSubsection("Home Manager (home.nix)", ""))
+			fmt.Println(utils.FormatCodeBlock(hmConfig, "nix"))
+			
+			fmt.Println(utils.FormatProgress("Fetching available options with nixos-option..."))
 			optOut, err := executor.ShowNixOSOptions(item.Name)
 			if err == nil && strings.TrimSpace(optOut) != "" {
-				fmt.Println(optOut)
+				fmt.Println(utils.FormatSection("Available Options", optOut))
 			} else {
-				fmt.Println("No additional options found or nixos-option failed.")
+				fmt.Println(utils.FormatWarning("No additional options found or nixos-option failed."))
 			}
 		}
 		fmt.Print("\nWould you like to install this ", searchType, " [i], run in nix-shell [r], or exit [Enter]? ")
@@ -864,18 +885,26 @@ var mcpServerStopCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg, err := config.LoadYAMLConfig("configs/default.yaml")
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+			fmt.Println(utils.FormatError("Failed to load config: " + err.Error()))
 			os.Exit(1)
 		}
+		
+		fmt.Println(utils.FormatProgress("Stopping MCP server..."))
 		addr := fmt.Sprintf("http://%s:%d/shutdown", cfg.MCPServer.Host, cfg.MCPServer.Port)
 		resp, err := http.Get(addr)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to contact MCP server: %v\n", err)
+			fmt.Println(utils.FormatError("Failed to contact MCP server: " + err.Error()))
 			os.Exit(1)
 		}
 		defer resp.Body.Close()
 		msg, _ := io.ReadAll(resp.Body)
-		fmt.Print(string(msg))
+		
+		if strings.TrimSpace(string(msg)) != "" {
+			fmt.Println(utils.FormatSuccess("MCP server stopped successfully"))
+			fmt.Println(utils.InfoStyle.Render(string(msg)))
+		} else {
+			fmt.Println(utils.FormatSuccess("MCP server stopped"))
+		}
 	},
 }
 
@@ -886,22 +915,29 @@ var mcpServerStatusCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		cfg, err := config.LoadYAMLConfig("configs/default.yaml")
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+			fmt.Println(utils.FormatError("Failed to load config: " + err.Error()))
 			os.Exit(1)
 		}
+		
+		fmt.Println(utils.FormatProgress("Checking MCP server status..."))
 		addr := fmt.Sprintf("http://%s:%d/healthz", cfg.MCPServer.Host, cfg.MCPServer.Port)
 		client := http.Client{Timeout: 2 * time.Second}
 		resp, err := client.Get(addr)
 		if err != nil {
-			fmt.Println("MCP server is NOT running.")
+			fmt.Println(utils.FormatError("MCP server is NOT running"))
+			fmt.Println(utils.FormatInfo("Start it with: nixai mcp-server start"))
 			os.Exit(1)
 		}
 		defer resp.Body.Close()
 		body, _ := io.ReadAll(resp.Body)
+		
 		if resp.StatusCode == 200 && strings.TrimSpace(string(body)) == "ok" {
-			fmt.Println("MCP server is running.")
+			fmt.Println(utils.FormatSuccess("MCP server is running"))
+			fmt.Println(utils.FormatKeyValue("Address", addr))
+			fmt.Println(utils.FormatKeyValue("Status", "Healthy"))
 		} else {
-			fmt.Println("MCP server is NOT running.")
+			fmt.Println(utils.FormatWarning("MCP server is responding but not healthy"))
+			fmt.Println(utils.FormatKeyValue("Response", strings.TrimSpace(string(body))))
 		}
 	},
 }
@@ -1010,20 +1046,21 @@ var explainOptionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		query := args[0]
 		option := extractNixOSOption(query)
-		fmt.Printf("🔍 Analyzing NixOS option: %s\n", option)
+		fmt.Println(utils.FormatProgress("Analyzing NixOS option: " + option))
 
 		cfg, err := config.LoadUserConfig()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error loading user config: %v\n", err)
+			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading user config: "+err.Error()))
 			os.Exit(1)
 		}
 
 		// Check MCP server status before querying
-		fmt.Print("📚 Fetching official documentation... ")
+		fmt.Print(utils.FormatProgress("Fetching official documentation..."))
 		mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
 		statusResp, err := http.Get(mcpURL + "/healthz")
 		if err != nil || statusResp.StatusCode != 200 {
-			fmt.Fprintln(os.Stderr, "\nMCP server is not running. Please start it with 'nixai mcp-server start' or 'nixai mcp-server start -d'.")
+			fmt.Println(utils.FormatError("MCP server is not running"))
+			fmt.Println(utils.FormatInfo("Please start it with 'nixai mcp-server start' or 'nixai mcp-server start -d'"))
 			os.Exit(1)
 		}
 		if statusResp != nil {
@@ -1033,24 +1070,22 @@ var explainOptionCmd = &cobra.Command{
 		mcpClient := mcp.NewMCPClient(mcpURL)
 		doc, err := mcpClient.QueryDocumentation(option)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "\nError querying documentation: %v\n", err)
+			fmt.Println(utils.FormatError("Error querying documentation: "+err.Error()))
 			os.Exit(1)
 		}
 		if strings.TrimSpace(doc) == "" || strings.Contains(doc, "No relevant documentation found") {
-			fmt.Println("\nNo relevant documentation found for this option.")
+			fmt.Println(utils.FormatWarning("No relevant documentation found for this option"))
 			suggestions := suggestSimilarOptions(option)
 			if len(suggestions) > 0 {
-				fmt.Println("\nDid you mean one of these options?")
-				for _, suggestion := range suggestions {
-					fmt.Printf("  - %s\n", suggestion)
-				}
+				fmt.Println(utils.FormatSubsection("Did you mean one of these options?", ""))
+				fmt.Println(utils.FormatList(suggestions))
 			}
 			return
 		}
-		fmt.Println("✓")
+		fmt.Println(utils.FormatSuccess("Documentation found!"))
 
 		// Select AI provider
-		fmt.Printf("🤖 Generating explanation with %s... ", cfg.AIProvider)
+		fmt.Print(utils.FormatProgress("Generating explanation with " + cfg.AIProvider + "..."))
 		var provider ai.AIProvider
 		switch cfg.AIProvider {
 		case "ollama":
@@ -1066,29 +1101,33 @@ var explainOptionCmd = &cobra.Command{
 		prompt := buildExplainOptionPrompt(option, doc)
 		aiResp, aiErr := provider.Query(prompt)
 		if aiErr != nil {
-			fmt.Fprintf(os.Stderr, "\nAI error: %v\n", aiErr)
+			fmt.Println(utils.FormatError("AI error: "+aiErr.Error()))
 			os.Exit(1)
 		}
 		if strings.TrimSpace(aiResp) == "" {
-			fmt.Println("\nAI did not return an explanation.")
+			fmt.Println("\n" + utils.FormatError("AI did not return an explanation."))
 			return
 		}
-		fmt.Println("✓")
+		fmt.Println(utils.FormatSuccess("Complete!"))
 
-		fmt.Println("\n" + strings.Repeat("=", 80))
-		fmt.Printf("📋 NixOS Option Explanation: %s\n", option)
-		fmt.Println(strings.Repeat("=", 80))
+		// Create a beautiful header for the explanation
+		fmt.Println("\n" + utils.FormatHeader("📋 NixOS Option Explanation"))
+		fmt.Println(utils.FormatKeyValue("Option", option))
+		fmt.Println(utils.FormatDivider())
 
-		// Render output as markdown in terminal
+		// Render output as markdown in terminal with enhanced styling
 		out, err := glamour.Render(aiResp, "dark")
 		if err != nil {
-			fmt.Println(aiResp)
+			// Fallback to plain text with basic formatting
+			fmt.Println(utils.FormatSection("Explanation", aiResp))
 		} else {
 			fmt.Print(out)
 		}
 
-		fmt.Println("\n" + strings.Repeat("-", 80))
-		fmt.Println("💡 Tip: Use 'nixai search service <name>' to find related services")
-		fmt.Println("📖 Run 'nixai mcp-server query <option>' for raw documentation")
+		fmt.Println("\n" + utils.FormatDivider())
+		
+		// Enhanced tips section
+		fmt.Println(utils.FormatTip("Use 'nixai search service <name>' to find related services"))
+		fmt.Println(utils.FormatNote("Run 'nixai mcp-server query <option>' for raw documentation"))
 	},
 }

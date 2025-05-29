@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/pkg/logger"
+	"nix-ai-help/pkg/utils"
 	"regexp"
 	"strings"
 )
@@ -116,14 +117,34 @@ func SuggestFix(diagnostic Diagnostic) string {
 
 // FormatDiagnostics returns a formatted string for displaying diagnostics.
 func FormatDiagnostics(diags []Diagnostic) string {
-	var sb strings.Builder
-	for _, d := range diags {
-		sb.WriteString("\033[1;34m[" + d.Issue + "]\033[0m ") // Blue bold issue
-		sb.WriteString(d.Details)
-		sb.WriteString("\n")
-		sb.WriteString("  \033[1;32mSuggestion:\033[0m ") // Green bold
-		sb.WriteString(SuggestFix(d))
-		sb.WriteString("\n\n")
+	if len(diags) == 0 {
+		return utils.FormatInfo("No diagnostics found.")
 	}
+
+	var sb strings.Builder
+	
+	// Add a header for the diagnostics
+	sb.WriteString(utils.FormatHeader("🔍 NixOS Diagnostics Report"))
+	sb.WriteString("\n\n")
+	
+	for i, d := range diags {
+		// Create a formatted diagnostic entry
+		title := fmt.Sprintf("Issue %d: %s", i+1, d.Issue)
+		
+		// Format the diagnostic as a box with details and suggestions
+		content := fmt.Sprintf("%s\n\n%s\n%s", 
+			utils.FormatKeyValue("Details", d.Details),
+			utils.FormatSubsection("Suggested Fix", SuggestFix(d)),
+			"")
+		
+		sb.WriteString(utils.FormatBox(title, content))
+		sb.WriteString("\n")
+	}
+	
+	// Add a helpful footer
+	sb.WriteString(utils.FormatDivider())
+	sb.WriteString("\n")
+	sb.WriteString(utils.FormatTip("Run 'nixai interactive' for more detailed troubleshooting"))
+	
 	return sb.String()
 }
