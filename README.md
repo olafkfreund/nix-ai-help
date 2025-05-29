@@ -152,10 +152,21 @@ All Markdown and HTML output from nixai is rendered as beautiful, colorized term
 
 ### Using Nix (Recommended)
 
+**For Development Environment:**
 ```sh
-nix build .#nixai
+# Enter development environment (includes Go, just, golangci-lint, etc.)
+nix develop
 
-./result/bin/nixai
+# Build using just (recommended)
+just build
+./nixai --help
+```
+
+**For Direct Nix Build:**
+```sh
+# Note: Nix direct build currently has some packaging issues
+# Use the development environment + just build instead
+nix build .#nixai  # Currently under development
 ```
 
 ### Using Go
@@ -181,6 +192,115 @@ just fmt     # Format the code
 
 just all     # Clean, build, test, and run
 ```
+
+---
+
+## 🧑‍💻 Development Setup (For New Contributors)
+
+This project uses **Nix flakes** for reproducible development environments. Here's the complete workflow for new users:
+
+### Prerequisites
+
+- **Nix** with flakes enabled
+- **Git** for version control
+
+### Quick Start
+
+1. **Clone the repository:**
+   ```sh
+   git clone <repository-url>
+   cd nix-ai-help
+   ```
+
+2. **Enter the development environment:**
+   ```sh
+   nix develop
+   ```
+   This automatically provides:
+   - Go 1.24.3
+   - just (task runner)
+   - golangci-lint
+   - All required development tools
+
+3. **Clean and install dependencies:**
+   ```sh
+   go clean -modcache  # Clean any cached modules
+   go mod tidy         # Download and organize dependencies
+   ```
+
+4. **Build the project:**
+   ```sh
+   just build
+   ```
+
+5. **Test the application:**
+   ```sh
+   ./nixai --help      # Verify the build works
+   just test           # Run the test suite
+   ```
+
+### Development Commands
+
+```sh
+# Available just commands (run `just -l` to see all)
+just build          # Build nixai binary
+just test           # Run all tests
+just lint           # Run linter (may show minor issues)
+just fmt            # Format Go code
+just clean          # Remove build artifacts
+just run            # Build and run nixai
+just deps           # Install/update dependencies
+
+# Manual Go commands
+go build -o nixai ./cmd/nixai/main.go    # Direct Go build
+go test ./...                            # Direct test execution
+go mod tidy                              # Update dependencies
+```
+
+### Project Structure
+
+```
+├── cmd/nixai/           # Main application entry point
+├── internal/            # Internal packages
+│   ├── ai/             # LLM provider integrations (Ollama, OpenAI, Gemini)
+│   ├── cli/            # CLI commands and interactive mode
+│   ├── config/         # Configuration management (YAML)
+│   ├── mcp/            # MCP server for documentation queries
+│   └── nixos/          # NixOS-specific diagnostics and parsing
+├── pkg/                # Public utility packages
+│   ├── logger/         # Structured logging
+│   └── utils/          # General utilities
+├── configs/            # Default configuration files
+├── flake.nix          # Nix flake for development environment
+└── justfile           # Task automation
+```
+
+### Testing Your Changes
+
+1. **Unit tests:**
+   ```sh
+   just test
+   ```
+
+2. **Integration testing:**
+   ```sh
+   # Test specific functionality
+   ./nixai --help
+   ./nixai search nginx
+   ./nixai explain-option services.nginx.enable
+   ```
+
+3. **Code quality:**
+   ```sh
+   just lint  # Check for code quality issues
+   just fmt   # Format code automatically
+   ```
+
+### Common Development Issues
+
+- **Module permission errors**: Run `go clean -modcache` and `go mod tidy`
+- **Build failures**: Ensure you're in the Nix development shell (`nix develop`)
+- **Missing tools**: The Nix flake provides all required tools automatically
 
 ---
 
@@ -394,9 +514,72 @@ commands:
 
 ## Build & Test
 
-- Use the `justfile` for common tasks: `just build`, `just test`, etc.
+### Using Nix (Recommended for Reproducible Builds)
 
-- Nix (`flake.nix`) provides a reproducible dev environment.
+The project includes a comprehensive Nix flake for reproducible development:
+
+```sh
+# Enter development environment (includes Go, just, golangci-lint, etc.)
+nix develop
+
+# Build the project
+just build
+
+# Run all tests
+just test
+
+# Check code quality
+just lint
+
+# Build using Nix directly
+nix build .#nixai
+./result/bin/nixai --help
+```
+
+### Using Go Directly
+
+```sh
+# Clean module cache if needed
+go clean -modcache
+
+# Download dependencies
+go mod tidy
+
+# Build
+go build -o nixai ./cmd/nixai/main.go
+
+# Test
+go test ./...
+
+# Run
+./nixai --help
+```
+
+### Development Workflow
+
+1. **Setup**: `nix develop` (or ensure Go 1.24+ is installed)
+2. **Dependencies**: `go mod tidy`
+3. **Build**: `just build`
+4. **Test**: `just test`
+5. **Quality Check**: `just lint`
+6. **Run**: `./nixai --help`
+
+### Available Just Commands
+
+Run `just -l` to see all available commands:
+
+- `just build` - Build the nixai binary
+- `just test` - Run all tests
+- `just lint` - Run linter (static analysis)
+- `just fmt` - Format Go code
+- `just clean` - Remove build artifacts
+- `just run` - Build and run nixai
+- `just deps` - Install/update dependencies
+- `just all` - Clean, build, test, and run
+
+Use the `justfile` for common tasks: `just build`, `just test`, etc.
+
+Nix (`flake.nix`) provides a reproducible dev environment.
 
 ---
 

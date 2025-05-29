@@ -27,7 +27,7 @@ func TestHandleQuery_DebugLogging(t *testing.T) {
 	defer ts.Close()
 
 	srcs := []string{ts.URL + "/options"}
-	srv := &Server{addr: "", documentationSources: srcs}
+	srv := NewServerWithDebug("", srcs)
 
 	req := httptest.NewRequest("GET", "/query?q=services.nginx.enable", nil)
 	rw := httptest.NewRecorder()
@@ -39,7 +39,7 @@ func TestHandleQuery_DebugLogging(t *testing.T) {
 	if !strings.Contains(logOutput, "[DEBUG] Querying documentation source") {
 		t.Errorf("expected debug log for source query, got: %s", logOutput)
 	}
-	if !strings.Contains(logOutput, "[DEBUG] Raw NixOS ES response") {
+	if !strings.Contains(logOutput, "[DEBUG] Received") && !strings.Contains(logOutput, "bytes from NixOS ES") {
 		t.Errorf("expected debug log for ES response, got: %s", logOutput)
 	}
 	if !strings.Contains(logOutput, "[DEBUG] Structured doc found") {

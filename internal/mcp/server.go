@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/pkg/logger"
 	"os"
 	"regexp"
 	"strings"
@@ -20,6 +21,8 @@ import (
 type Server struct {
 	addr                 string
 	documentationSources []string
+	logger               *logger.Logger
+	debugLogging         bool
 }
 
 // Add a simple in-memory cache for query results
@@ -30,7 +33,23 @@ var (
 
 // NewServer creates a new MCP server instance with documentation sources.
 func NewServer(addr string, documentationSources []string) *Server {
-	return &Server{addr: addr, documentationSources: documentationSources}
+	return &Server{
+		addr:                 addr,
+		documentationSources: documentationSources,
+		logger:               logger.NewLoggerWithLevel("info"), // Default to info level
+		debugLogging:         false,
+	}
+}
+
+// NewServerWithDebug creates a new MCP server instance with debug logging enabled.
+// This is primarily intended for testing purposes.
+func NewServerWithDebug(addr string, documentationSources []string) *Server {
+	return &Server{
+		addr:                 addr,
+		documentationSources: documentationSources,
+		logger:               logger.NewLoggerWithLevel("debug"), // Enable debug level
+		debugLogging:         true,
+	}
 }
 
 // NewServerFromConfig creates a new MCP server from a YAML config file.
@@ -40,7 +59,12 @@ func NewServerFromConfig(configPath string) (*Server, error) {
 		return nil, err
 	}
 	addr := fmt.Sprintf("%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
-	return &Server{addr: addr, documentationSources: cfg.MCPServer.DocumentationSources}, nil
+	return &Server{
+		addr:                 addr,
+		documentationSources: cfg.MCPServer.DocumentationSources,
+		logger:               logger.NewLoggerWithLevel(cfg.LogLevel),
+		debugLogging:         strings.ToLower(cfg.LogLevel) == "debug",
+	}, nil
 }
 
 // Start initializes and starts the MCP server with graceful shutdown support.
@@ -169,7 +193,9 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[DEBUG] handleQuery: received query: %s", query)
+	if s.debugLogging {
+		log.Printf("[DEBUG] handleQuery: received query: %s", query)
+	}
 
 	// Helper to write JSON response
 	writeJSON := func(result string) {
@@ -194,7 +220,9 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	var results []result
 	var structuredNoDoc bool
 	for _, src := range s.documentationSources {
-		log.Printf("[DEBUG] Querying documentation source: %s for option: %s", src, query)
+		if s.debugLogging {
+			log.Printf("[DEBUG] Querying documentation source: %s for option: %s", src, query)
+		}
 		var body string
 		var err error
 		isStructured := false
@@ -208,13 +236,17 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 			body, err = fetchDocSource(src)
 		}
 		if err != nil {
-			log.Printf("[DEBUG] Error querying source %s: %v", src, err)
+			if s.debugLogging {
+				log.Printf("[DEBUG] Error querying source %s: %v", src, err)
+			}
 			continue
 		}
 		if isStructured {
 			clean := strings.TrimSpace(body)
 			if clean != "" && !strings.HasPrefix(clean, "No documentation found") {
-				log.Printf("[DEBUG] Structured doc found from %s: %s", src, clean)
+				if s.debugLogging {
+					log.Printf("[DEBUG] Structured doc found from %s: %s", src, clean)
+				}
 				// Return immediately if a structured doc is found
 				cacheMutex.Lock()
 				cache[query] = clean
@@ -222,7 +254,9 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 				writeJSON(clean)
 				return
 			} else if strings.HasPrefix(clean, "No documentation found") {
-				log.Printf("[DEBUG] No documentation found for %s in %s", query, src)
+				if s.debugLogging {
+					log.Printf("[DEBUG] No documentation found for %s in %s", query, src)
+				}
 				structuredNoDoc = true
 			}
 			continue
@@ -240,7 +274,6 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 				score -= 5 // prefer direct substring matches
 			}
 			if score < 20 { // only keep reasonably close matches
-				log.Printf("[DEBUG] Fuzzy match from %s: %s (score %d)", src, clean, score)
 				results = append(results, result{line: clean, source: src, score: score})
 			}
 		}
@@ -368,7 +401,7 @@ func fetchNixOSOptionsAPI(_ string, option string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	log.Printf("[DEBUG] Raw NixOS ES response: %s", string(data))
+	log.Printf("Received %d bytes from NixOS ES", len(data))
 	// Parse hits
 	var esResp struct {
 		Hits struct {

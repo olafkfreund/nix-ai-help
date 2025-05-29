@@ -14,9 +14,9 @@
       pname = "nixai";
       version = "0.1.0";
       src = ./.;
-      vendorSha256 = null;
+      vendorHash = "sha256-K/N+qbJQei29Mo3pVZpJafpf5Zbkgv5aE8d1ciL7qG0=";
       subPackages = ["cmd/nixai"];
-      checkPhase = "go test ./...";
+      doCheck = false; # Disable tests in Nix build due to network/sandbox restrictions
       meta = {
         description = "A tool for diagnosing and configuring NixOS using AI.";
         license = pkgs.lib.licenses.mit;
@@ -30,10 +30,19 @@
     defaultPackage.${system} = self.packages.${system}.nixai;
     defaultApp.${system} = self.apps.${system}.nixai;
     devShells.${system}.default = pkgs.mkShell {
-      buildInputs = [pkgs.go pkgs.git pkgs.curl pkgs.nix];
+      buildInputs = with pkgs; [
+        go
+        just
+        golangci-lint
+        git
+        curl
+        nix
+      ];
       shellHook = ''
         export GOPATH=$(pwd)/go
         export PATH=$GOPATH/bin:$PATH
+        echo "🚀 Nix development environment ready!"
+        echo "Available tools: go $(go version | cut -d' ' -f3), just $(just --version)"
       '';
     };
   };

@@ -20,7 +20,7 @@ func TestHandleQuery_OptionAPI(t *testing.T) {
 	defer ts.Close()
 
 	srcs := []string{ts.URL + "/options"}
-	srv := &Server{addr: "", documentationSources: srcs}
+	srv := NewServer("", srcs)
 
 	req := httptest.NewRequest("GET", "/query?q=services.nginx.enable", nil)
 	rw := httptest.NewRecorder()
