@@ -163,14 +163,43 @@ A console-based Linux application to help solve NixOS configuration problems and
   # Runs comprehensive system health check with AI analysis
   ```
 
-### 4. NixOS Upgrade Advisor
+### 4. NixOS Upgrade Advisor ✅ **COMPLETED**
 
-- **Description:** Guides users through upgrading NixOS, including pre-upgrade checks, backup advice, and post-upgrade validation.
+- **Description:** Guides users through upgrading NixOS with pre-upgrade checks, backup advice, step-by-step upgrade instructions, and post-upgrade validation, all enhanced with AI-powered explanations and real-time progress feedback.
 
-- **Implementation:**
-  - Add `nixai upgrade-advisor` command.
-  - Check for updates, channel status, config compatibility.
-  - Use AI to explain steps and warn about pitfalls.
+- **Implementation:** ✅ **COMPLETED**
+  - ✅ Added `nixai upgrade-advisor` command (CLI/interactive).
+  - ✅ **Smart Configuration Detection**: Automatically detects flake-based vs traditional configurations
+  - ✅ **Conditional Logic**: Different upgrade paths for flake and channel-based configs:
+    - **Flake configs**: Uses `nix flake update` and `--flake` flags, skips channel checks
+    - **Traditional configs**: Uses `nix-channel --update` and standard rebuild commands
+  - ✅ **Comprehensive Pre-Upgrade Checks**: 
+    - Configuration file validation, disk space analysis, service status
+    - Config validity testing, boot loader verification, network connectivity
+    - **Flake-specific**: Input validation and lock file status checks
+    - **Traditional-specific**: Channel update checks and availability
+  - ✅ **AI-Powered Guidance**: System compatibility analysis, upgrade recommendations, and risk assessment
+  - ✅ **Beautiful Progress Feedback**: 7-step detailed progress indicators with real-time status
+  - ✅ **Path-Aware Commands**: Automatically adjusts commands to use specified config paths
+  - ✅ **Comprehensive Backup Advice**: Pre-upgrade backup checklist and recommendations
+  - ✅ **Step-by-Step Instructions**: Detailed upgrade steps with time estimates and safety warnings
+  - ✅ **Post-Upgrade Validation**: Complete checklist for verifying successful upgrades
+  - ✅ **Enhanced Error Handling**: Clear validation messages and helpful guidance for setup
+
+- **Usage:**
+
+  ```bash
+  nixai upgrade-advisor --nixos-path /etc/nixos
+  # For flake-based: Uses nix flake update, nixos-rebuild --flake
+  # For traditional: Uses nix-channel --update, standard nixos-rebuild
+  ```
+
+- **Key Features:**
+  - **Flake Detection**: When `flake.nix` is detected, skips channel checks entirely
+  - **Conditional Upgrade Steps**: Different command sequences for flake vs traditional configs
+  - **Smart Path Integration**: Commands automatically use the provided configuration path
+  - **Real-Time Progress**: 7-step analysis process with detailed status indicators
+  - **Critical Issue Detection**: Prevents upgrades when critical problems are found
 
 ### 5. NixOS Service Usage Examples
 

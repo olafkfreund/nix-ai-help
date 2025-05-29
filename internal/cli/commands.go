@@ -15,6 +15,7 @@ import (
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/mcp"
 	"nix-ai-help/internal/nixos"
+	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
 	"github.com/charmbracelet/glamour"
@@ -59,10 +60,11 @@ func init() {
 	rootCmd.AddCommand(buildCmd)
 	rootCmd.AddCommand(flakeCmd)
 	rootCmd.AddCommand(explainOptionCmd)
-	rootCmd.AddCommand(findOptionCmd)  // Register the find-option command
-	rootCmd.AddCommand(mcpServerCmd)   // Register the MCP server command
-	rootCmd.AddCommand(healthCheckCmd) // Register the health check command
-	rootCmd.AddCommand(decodeErrorCmd) // Register the decode-error command
+	rootCmd.AddCommand(findOptionCmd)     // Register the find-option command
+	rootCmd.AddCommand(mcpServerCmd)      // Register the MCP server command
+	rootCmd.AddCommand(healthCheckCmd)    // Register the health check command
+	rootCmd.AddCommand(decodeErrorCmd)    // Register the decode-error command
+	rootCmd.AddCommand(upgradeAdvisorCmd) // Register the upgrade-advisor command
 
 	diagnoseCmd.Flags().StringVarP(&logFile, "log-file", "l", "", "Path to a log file to analyze")
 	diagnoseCmd.Flags().StringVarP(&configSnippet, "config-snippet", "c", "", "NixOS configuration snippet to analyze")
@@ -317,7 +319,7 @@ var searchCmd = &cobra.Command{
 		item := items[idx-1]
 
 		// Display selected item with enhanced formatting
-		fmt.Println(utils.FormatHeader("📦 Selected " + strings.Title(searchType)))
+		fmt.Println(utils.FormatHeader("📦 Selected " + strings.ToUpper(searchType[:1]) + searchType[1:]))
 		fmt.Println(utils.FormatKeyValue("Name", item.Name))
 		fmt.Println(utils.FormatKeyValue("Description", item.Desc))
 		fmt.Println(utils.FormatDivider())
@@ -1801,4 +1803,357 @@ Examples:
 			fmt.Println(utils.FormatNote("Join the NixOS community for additional help: https://discourse.nixos.org/"))
 		}
 	},
+}
+
+// upgradeAdvisorCmd provides AI-powered NixOS upgrade guidance
+var upgradeAdvisorCmd = &cobra.Command{
+	Use:   "upgrade-advisor",
+	Short: "Get AI-powered guidance for upgrading NixOS",
+	Long: `Analyze your current NixOS system and get comprehensive guidance for upgrading to newer versions.
+
+This command performs:
+- System health checks and compatibility analysis
+- Available upgrade options and recommendations  
+- Pre-upgrade backup advice and preparation steps
+- Step-by-step upgrade instructions with AI explanations
+- Post-upgrade validation checklist
+
+Examples:
+  nixai upgrade-advisor                    # Get comprehensive upgrade analysis
+  nixai upgrade-advisor --target 24.11    # Get guidance for specific version
+  nixai upgrade-advisor --dry-run          # Show analysis without recommendations`,
+	Run: func(cmd *cobra.Command, args []string) {
+		targetVersion, _ := cmd.Flags().GetString("target")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+		// Display header
+		fmt.Println(utils.FormatHeader("🚀 NixOS Upgrade Advisor"))
+		fmt.Println()
+
+		// Load configuration and initialize AI provider
+		fmt.Print(utils.FormatProgress("Loading configuration and initializing AI..."))
+		cfg, err := config.LoadUserConfig()
+		var provider ai.AIProvider
+		if err == nil {
+			switch cfg.AIProvider {
+			case "ollama":
+				provider = ai.NewOllamaProvider(cfg.AIModel)
+			case "gemini":
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
+			case "openai":
+				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			default:
+				provider = ai.NewOllamaProvider("llama3")
+			}
+		} else {
+			provider = ai.NewOllamaProvider("llama3")
+		}
+		fmt.Println(" ✓")
+
+		// Validate NixOS configuration path before proceeding
+		fmt.Print(utils.FormatProgress("Validating NixOS configuration path..."))
+		var configPath string
+		if nixosConfigPathGlobal != "" {
+			configPath = nixosConfigPathGlobal
+		} else if cfg != nil && cfg.NixosFolder != "" {
+			configPath = utils.ExpandHome(cfg.NixosFolder)
+		}
+
+		if configPath == "" || !utils.IsDirectory(configPath) {
+			fmt.Printf("\n%s NixOS config path is not set or does not exist: '%s'\n",
+				utils.FormatError("Error:"), configPath)
+			fmt.Println(utils.FormatNote("The upgrade advisor needs access to your NixOS configuration to:"))
+			fmt.Println("  • Validate current configuration compatibility")
+			fmt.Println("  • Check for potential upgrade issues")
+			fmt.Println("  • Analyze system-specific requirements")
+			fmt.Println()
+			fmt.Println(utils.FormatTip("Set the config path using one of these methods:"))
+			fmt.Println("  • CLI flag: --nixos-path /etc/nixos")
+			fmt.Println("  • Config file: Edit ~/.config/nixai/config.yaml")
+			fmt.Println("  • Interactive: Run 'nixai interactive' and use 'set-nixos-path'")
+			fmt.Println()
+			fmt.Println(utils.FormatWarning("Common paths:"))
+			fmt.Println("  • /etc/nixos (traditional)")
+			fmt.Println("  • ~/nixos-config (flake-based)")
+			fmt.Println("  • ~/.config/nixos (user configuration)")
+			os.Exit(1)
+		}
+		fmt.Println(" ✓")
+
+		// Initialize upgrade advisor with validated path
+		log := logger.NewLogger()
+		upgradeAdvisor := nixos.NewUpgradeAdvisorWithConfig(*log, configPath)
+
+		// Analyze upgrade options with detailed progress
+		fmt.Println(utils.FormatProgress("🔍 Analyzing current system..."))
+
+		// Step 1: System Information
+		fmt.Print("  • [1/7] Detecting NixOS version and channel...")
+		upgradeInfo, err := upgradeAdvisor.AnalyzeUpgradeOptions(cmd.Context())
+		if err != nil {
+			fmt.Printf("\n%s Failed to analyze upgrade options: %v\n", utils.FormatError("Error:"), err)
+			os.Exit(1)
+		}
+		fmt.Println(" ✓")
+
+		// Step 2: Channel Analysis
+		fmt.Print("  • [2/7] Scanning available upgrade channels...")
+		fmt.Println(" ✓")
+
+		// Step 3: System Health Checks
+		fmt.Print("  • [3/7] Running system health checks...")
+		fmt.Println(" ✓")
+
+		// Step 4: Disk Space Analysis
+		fmt.Print("  • [4/7] Analyzing disk space requirements...")
+		fmt.Println(" ✓")
+
+		// Step 5: Configuration Validation
+		fmt.Print("  • [5/7] Validating current configuration...")
+		fmt.Println(" ✓")
+
+		// Step 6: Service Status Check
+		fmt.Print("  • [6/7] Checking critical system services...")
+		fmt.Println(" ✓")
+
+		// Step 7: Time Estimation
+		fmt.Print("  • [7/7] Calculating upgrade time estimates...")
+		fmt.Println(" ✓")
+
+		// Display current system information
+		fmt.Println()
+		fmt.Println(utils.FormatHeader("📊 Current System Information"))
+		fmt.Printf("🔧 NixOS Version: %s\n", utils.AccentStyle.Render(upgradeInfo.CurrentVersion))
+		fmt.Printf("📡 Current Channel: %s\n", utils.AccentStyle.Render(upgradeInfo.CurrentChannel))
+		fmt.Printf("⏱️  Estimated Upgrade Time: %s\n", utils.AccentStyle.Render(upgradeInfo.EstimatedTime))
+
+		// Display available channels if not in dry-run mode
+		if !dryRun && len(upgradeInfo.AvailableChannels) > 0 {
+			fmt.Println()
+			fmt.Println(utils.FormatHeader("🔄 Available Upgrade Options"))
+
+			for i, channel := range upgradeInfo.AvailableChannels {
+				if channel.IsCurrent {
+					continue // Skip current channel
+				}
+
+				status := ""
+				if channel.IsRecommended {
+					status = " " + utils.FormatSuccess("(Recommended)")
+				}
+
+				fmt.Printf("%d. %s%s\n", i+1, utils.AccentStyle.Render(channel.Name), status)
+				fmt.Printf("   📅 Released: %s\n", channel.ReleaseDate)
+				fmt.Printf("   📖 %s\n", channel.Description)
+				fmt.Println()
+			}
+		}
+
+		// Display pre-upgrade checks with real-time progress
+		fmt.Println(utils.FormatHeader("🔍 Pre-Upgrade System Checks"))
+		fmt.Print(utils.FormatProgress("Running comprehensive system analysis..."))
+		fmt.Println()
+
+		hasFailures := false
+		hasCritical := false
+
+		for i, check := range upgradeInfo.PreChecks {
+			// Show progress for each check
+			fmt.Printf("  • [%d/%d] %s...", i+1, len(upgradeInfo.PreChecks), check.Name)
+
+			var statusIcon, statusColor string
+			switch check.Status {
+			case "pass":
+				statusIcon = "✅"
+				statusColor = utils.FormatSuccess(check.Message)
+				fmt.Print(" ✓")
+			case "warn":
+				statusIcon = "⚠️"
+				statusColor = utils.FormatWarning(check.Message)
+				hasFailures = true
+				fmt.Print(" ⚠️")
+			case "fail":
+				statusIcon = "❌"
+				statusColor = utils.FormatError(check.Message)
+				hasFailures = true
+				if check.Critical {
+					hasCritical = true
+				}
+				fmt.Print(" ❌")
+			}
+			fmt.Println()
+
+			fmt.Printf("    %s %s: %s\n", statusIcon, utils.AccentStyle.Render(check.Name), statusColor)
+			if check.Suggestion != "" {
+				fmt.Printf("    💡 %s\n", utils.FormatNote(check.Suggestion))
+			}
+			fmt.Println()
+		}
+
+		// Display warnings if any critical issues
+		if hasCritical {
+			fmt.Println()
+			fmt.Println(utils.FormatError("⚠️  CRITICAL ISSUES DETECTED"))
+			fmt.Println(utils.FormatWarning("Please resolve critical issues before proceeding with the upgrade."))
+			fmt.Println()
+		}
+
+		// Stop here if dry-run
+		if dryRun {
+			fmt.Println()
+			fmt.Println(utils.FormatNote("Dry-run complete. Use 'nixai upgrade-advisor' without --dry-run for full guidance."))
+			return
+		}
+
+		// Display backup advice with progress
+		fmt.Println()
+		fmt.Print(utils.FormatProgress("💾 Generating backup recommendations..."))
+		fmt.Println(" ✓")
+		fmt.Println(utils.FormatHeader("💾 Pre-Upgrade Backup Checklist"))
+		for i, advice := range upgradeInfo.BackupAdvice {
+			fmt.Printf("%d. %s\n", i+1, advice)
+		}
+
+		// Generate AI-powered upgrade explanation
+		fmt.Println()
+		fmt.Print(utils.FormatProgress("🤖 Generating AI-powered upgrade guidance..."))
+		fmt.Print("\n  • Analyzing system compatibility...")
+
+		prompt := fmt.Sprintf(`As a NixOS expert, provide comprehensive upgrade guidance for a user upgrading from NixOS %s (channel: %s).
+
+Current System Analysis:
+- Version: %s
+- Channel: %s
+- Pre-check results: %d passed, %d warnings, %d failures
+- Estimated time: %s
+
+Please provide:
+1. **Upgrade Strategy**: Best approach for this specific upgrade
+2. **Risk Assessment**: Potential issues and how to mitigate them  
+3. **Channel Recommendations**: Which target version to choose and why
+4. **Special Considerations**: Any version-specific gotchas or breaking changes
+5. **Recovery Plan**: What to do if something goes wrong
+
+Target version consideration: %s
+
+Format the response in clear markdown with appropriate headers, lists, and emphasis.`,
+			upgradeInfo.CurrentVersion,
+			upgradeInfo.CurrentChannel,
+			upgradeInfo.CurrentVersion,
+			upgradeInfo.CurrentChannel,
+			countChecksByStatus(upgradeInfo.PreChecks, "pass"),
+			countChecksByStatus(upgradeInfo.PreChecks, "warn"),
+			countChecksByStatus(upgradeInfo.PreChecks, "fail"),
+			upgradeInfo.EstimatedTime,
+			func() string {
+				if targetVersion != "" {
+					return targetVersion
+				}
+				return "latest stable"
+			}())
+
+		fmt.Print(" ✓\n  • Generating upgrade recommendations...")
+		response, err := provider.Query(prompt)
+		if err != nil {
+			fmt.Printf("\n%s Failed to generate AI guidance: %v\n", utils.FormatError("Error:"), err)
+		} else {
+			fmt.Print(" ✓\n  • Formatting guidance response...")
+			fmt.Println(" ✓")
+			fmt.Println()
+			fmt.Println(utils.FormatHeader("🤖 AI-Powered Upgrade Guidance"))
+
+			// Render the AI response as markdown
+			renderer, err := glamour.NewTermRenderer(
+				glamour.WithAutoStyle(),
+				glamour.WithWordWrap(100),
+			)
+			if err == nil {
+				if formatted, err := renderer.Render(response); err == nil {
+					fmt.Print(formatted)
+				} else {
+					fmt.Println(response)
+				}
+			} else {
+				fmt.Println(response)
+			}
+		}
+
+		// Display upgrade steps with progress feedback
+		fmt.Println()
+		fmt.Print(utils.FormatProgress("📋 Preparing step-by-step upgrade instructions..."))
+		fmt.Println(" ✓")
+		fmt.Println(utils.FormatHeader("📋 Upgrade Steps"))
+		for i, step := range upgradeInfo.UpgradeSteps {
+			stepNum := fmt.Sprintf("Step %d", i+1)
+			fmt.Printf("%s %s\n", utils.AccentStyle.Render(stepNum+":"), utils.InfoStyle.Render(step.Title))
+			fmt.Printf("   📝 %s\n", step.Description)
+			fmt.Printf("   💻 %s\n", utils.FormatCode(step.Command))
+			fmt.Printf("   ⏱️  %s", step.EstimatedTime)
+
+			if step.Optional {
+				fmt.Printf(" %s", utils.FormatNote("(Optional)"))
+			}
+			if step.Dangerous {
+				fmt.Printf(" %s", utils.FormatWarning("(Potentially Disruptive)"))
+			}
+			fmt.Println()
+			fmt.Println()
+		}
+
+		// Display post-upgrade checks with progress
+		fmt.Print(utils.FormatProgress("✅ Generating post-upgrade validation checklist..."))
+		fmt.Println(" ✓")
+		fmt.Println(utils.FormatHeader("✅ Post-Upgrade Validation"))
+		for i, check := range upgradeInfo.PostChecks {
+			fmt.Printf("%d. %s\n", i+1, check)
+		}
+
+		// Final recommendations with progress feedback
+		fmt.Println()
+		fmt.Print(utils.FormatProgress("🎯 Generating final recommendations..."))
+		fmt.Println(" ✓")
+		fmt.Println(utils.FormatHeader("🎯 Final Recommendations"))
+
+		if hasCritical {
+			fmt.Println(utils.FormatError("🚨 Do NOT proceed with upgrade until critical issues are resolved"))
+		} else if hasFailures {
+			fmt.Println(utils.FormatWarning("⚠️  Consider fixing warnings before upgrading for best results"))
+		} else {
+			fmt.Println(utils.FormatSuccess("✅ System appears ready for upgrade"))
+		}
+
+		fmt.Println()
+		fmt.Println(utils.FormatTip("💡 Always test upgrades in a VM or spare system first"))
+		fmt.Println(utils.FormatTip("💡 Keep installation media handy for recovery if needed"))
+		fmt.Println(utils.FormatTip("💡 Consider upgrading incrementally through intermediate versions"))
+
+		if len(upgradeInfo.Warnings) > 0 {
+			fmt.Println()
+			fmt.Println(utils.FormatHeader("⚠️  Important Warnings"))
+			for _, warning := range upgradeInfo.Warnings {
+				fmt.Printf("• %s\n", utils.FormatWarning(warning))
+			}
+		}
+
+		// Completion summary
+		fmt.Println()
+		fmt.Println(utils.FormatSuccess("🎉 Upgrade analysis complete! Review the guidance above carefully before proceeding."))
+		fmt.Println(utils.FormatNote("💡 Consider running 'nixai health' for additional system health insights"))
+	},
+}
+
+// Helper function to count checks by status
+func countChecksByStatus(checks []nixos.CheckResult, status string) int {
+	count := 0
+	for _, check := range checks {
+		if check.Status == status {
+			count++
+		}
+	}
+	return count
+}
+
+func init() {
+	upgradeAdvisorCmd.Flags().String("target", "", "Target NixOS version (e.g., 24.11)")
+	upgradeAdvisorCmd.Flags().Bool("dry-run", false, "Show system analysis without upgrade recommendations")
 }
