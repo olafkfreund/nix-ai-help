@@ -24,6 +24,7 @@ A console-based Linux application to help solve NixOS configuration problems and
 - 🆕 **Robust flake input parser** (supports both `name.url = ...;` and `name = { url = ...; ... };` forms)
 - 🆕 **AI-powered flake input explanation** (`nixai flake explain-inputs` and `nixai flake explain <input>`) with upstream README/flake.nix summarization
 - 🆕 **Beautiful terminal output**: colorized, Markdown/HTML rendered with ANSI colors
+- ✅ **AI-Powered NixOS Option Explainer**: `nixai explain-option <option>` provides structured documentation with AI-generated explanations
 
 ---
 
@@ -61,6 +62,7 @@ A console-based Linux application to help solve NixOS configuration problems and
 - [x] Robust flake input parser for all input forms
 - [x] AI-powered flake input explanation and upstream summarization
 - [x] Terminal markdown/HTML formatting for explain output
+- [x] **AI-Powered NixOS Option Explainer** with Elasticsearch backend integration
 - [x] (Optional) Use config path for context-aware features everywhere
 - [x] (Optional) Automate service option lookup further
 - [x] (Optional) Enhance user guidance and error handling for config path
@@ -94,6 +96,83 @@ A console-based Linux application to help solve NixOS configuration problems and
   - Optionally, allow users to select an input for more details (full README, flake.nix, usage examples)
 - **Benefits:** Users get instant, AI-powered insight into their flake inputs, best practices, and potential improvements for reproducibility and maintainability
 - **Implementation:** Local flake.nix parsing, remote README.md/flake.nix fetching, AI summarization, and terminal rendering are all complete
+
+---
+
+## 🚦 Planned: Advanced NixOS User Features
+
+### 1. AI-Powered NixOS Option Explainer ✅ **COMPLETED**
+
+- **Description:** Users can ask about any NixOS option (e.g., `services.nginx.enable`) and get a concise, AI-generated explanation, including type, default, and best practices.
+
+- **Implementation:** ✅ **COMPLETED**
+  - ✅ Added `nixai explain-option <option>` command (CLI/interactive).
+  - ✅ Integrated MCP server with Elasticsearch backend for structured NixOS option documentation.
+  - ✅ AI provider integration for generating human-readable explanations.
+  - ✅ Beautiful terminal output with colorized, readable formatting using glamour.
+  - ✅ Robust error handling for non-existent options with graceful fallbacks.
+  - ✅ Comprehensive testing and debugging completed.
+
+- **Usage:**
+  ```bash
+  nixai explain-option services.nginx.enable
+  nixai explain-option networking.firewall.enable
+  nixai explain-option boot.loader.systemd-boot.enable
+  ```
+
+### 2. AI-Driven NixOS Error Decoder
+
+- **Description:** Paste or pipe in a NixOS error message and get a human-friendly explanation and actionable next steps.
+
+- **Implementation:**
+  - Enhance diagnostics to recognize more error patterns.
+  - Use AI to generate explanations and fixes.
+  - Link to docs or wiki as needed.
+
+### 3. Interactive NixOS Health Check
+
+- **Description:** `nixai health-check` runs a series of system checks (config validity, service status, disk space, channel status, etc.), summarizes findings, and suggests improvements.
+
+- **Implementation:**
+  - New CLI/interactive command.
+  - Use executor to run checks (`nixos-rebuild dry-run`, `systemctl`, etc.).
+  - Parse and summarize results, highlight warnings/errors.
+  - Use AI for suggestions.
+
+### 4. NixOS Upgrade Advisor
+
+- **Description:** Guides users through upgrading NixOS, including pre-upgrade checks, backup advice, and post-upgrade validation.
+
+- **Implementation:**
+  - Add `nixai upgrade-advisor` command.
+  - Check for updates, channel status, config compatibility.
+  - Use AI to explain steps and warn about pitfalls.
+
+### 5. NixOS Service Usage Examples
+
+- **Description:** For any service, show real-world config examples and explain them.
+
+- **Implementation:**
+  - Add `nixai service-examples <service>` command.
+  - Fetch examples from docs/community via MCP.
+  - Summarize and explain with AI.
+
+### 6. Reverse Option Lookup
+
+- **Description:** Users describe what they want in plain English (e.g., "enable SSH access") and nixai suggests relevant NixOS options and config snippets.
+
+- **Implementation:**
+  - Add `nixai find-option <description>` command.
+  - Use AI to map description to NixOS options.
+  - Show config snippets and doc links.
+
+### 7. NixOS Config Linter & Formatter
+
+- **Description:** Lint and auto-format NixOS config files, suggesting improvements and flagging anti-patterns.
+
+- **Implementation:**
+  - Add `nixai lint-config <file>` command.
+  - Use a Nix parser and AI to analyze and suggest fixes.
 
 ---
 

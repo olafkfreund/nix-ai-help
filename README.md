@@ -9,6 +9,7 @@
 - [🚀 Project Overview](#-project-overview)
 - [✨ Features](#-features)
 - [🧩 Flake Input Analysis & AI Explanations](#-flake-input-analysis--ai-explanations)
+- [🔧 NixOS Option Explainer](#-nixos-option-explainer)
 - [🎨 Terminal Output Formatting](#-terminal-output-formatting)
 - [🛠️ Installation & Usage](#%EF%B8%8F-installation--usage)
 - [📝 Commands & Usage](#-commands--usage)
@@ -57,6 +58,8 @@
 
 - **NEW:** 🎨 **Beautiful Terminal Output** — All Markdown/HTML output is colorized and formatted for readability using [glamour](https://github.com/charmbracelet/glamour) and [termenv](https://github.com/muesli/termenv).
 
+- **NEW:** ✅ **AI-Powered NixOS Option Explainer** — Get detailed, AI-generated explanations for any NixOS option with `nixai explain-option <option>`, including type, default, description, and best practices.
+
 ---
 
 ## 🚀 What’s New (May 2025)
@@ -77,6 +80,27 @@ Easily analyze your `flake.nix` inputs and get AI-powered explanations for each 
 ```sh
 nixai flake explain --flake /path/to/flake.nix
 ```
+
+---
+
+## 🔧 NixOS Option Explainer
+
+Get detailed explanations for any NixOS option:
+
+```sh
+nixai explain-option services.nginx.enable
+
+nixai explain-option networking.firewall.enable
+
+nixai explain-option boot.loader.systemd-boot.enable
+```
+
+The Option Explainer provides:
+- **Type**: The data type of the option (boolean, string, list, etc.)
+- **Default Value**: What the option defaults to if not set
+- **Description**: Official documentation from NixOS
+- **Source**: The module file where the option is defined
+- **AI Explanation**: Context, purpose, and best practices
 
 ---
 
@@ -151,6 +175,16 @@ nixai search service <query>
 - Clean, numbered results.
 
 - Select a result to see config/test options and available `nixos-option` settings.
+
+### Explain NixOS Options
+
+```sh
+nixai explain-option <option>
+```
+
+- Get AI-powered explanations for any NixOS option.
+- Includes type, default value, description, and best practices.
+- Uses official NixOS documentation from Elasticsearch backend.
 
 ### Interactive Mode
 

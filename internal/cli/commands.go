@@ -3,13 +3,17 @@ package cli
 import (
 	"bufio"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/mcp"
 	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/utils"
 
@@ -54,6 +58,8 @@ func init() {
 	rootCmd.AddCommand(configCmd)
 	rootCmd.AddCommand(buildCmd)
 	rootCmd.AddCommand(flakeCmd)
+	rootCmd.AddCommand(explainOptionCmd)
+	rootCmd.AddCommand(mcpServerCmd) // Register the MCP server command
 
 	diagnoseCmd.Flags().StringVarP(&logFile, "log-file", "l", "", "Path to a log file to analyze")
 	diagnoseCmd.Flags().StringVarP(&configSnippet, "config-snippet", "c", "", "NixOS configuration snippet to analyze")
@@ -61,6 +67,10 @@ func init() {
 	searchCmd.Flags().StringVarP(&nixosConfigPath, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
 	rootCmd.PersistentFlags().StringVarP(&nixosConfigPathGlobal, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
 	configCmd.AddCommand(showUserConfig)
+	mcpServerCmd.AddCommand(mcpServerStartCmd)
+	mcpServerCmd.AddCommand(mcpServerStopCmd)
+	mcpServerCmd.AddCommand(mcpServerStatusCmd)
+	mcpServerStartCmd.Flags().BoolP("background", "d", false, "Run MCP server in background (daemon mode)")
 }
 
 // Diagnose command to analyze NixOS configuration issues
@@ -802,6 +812,100 @@ func Execute() {
 	}
 }
 
+// MCP server command
+var mcpServerCmd = &cobra.Command{
+	Use:   "mcp-server",
+	Short: "Manage the MCP documentation/query server",
+	Long:  `Manage the Model Context Protocol (MCP) server for NixOS documentation and option queries. Use start/stop/status subcommands.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		_ = cmd.Help()
+	},
+}
+
+// MCP server start command
+var mcpServerStartCmd = &cobra.Command{
+	Use:   "start",
+	Short: "Start the MCP server",
+	Run: func(cmd *cobra.Command, args []string) {
+		background, _ := cmd.Flags().GetBool("background")
+		if background {
+			absPath, err := os.Executable()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Could not determine nixai binary path: %v\n", err)
+				os.Exit(1)
+			}
+			cmdStr := fmt.Sprintf("nohup %s mcp-server start > mcp.log 2>&1 &", absPath)
+			fmt.Println("Starting MCP server in background...")
+			shCmd := exec.Command("sh", "-c", cmdStr)
+			if err := shCmd.Start(); err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to start MCP server in background: %v\n", err)
+				os.Exit(1)
+			}
+			fmt.Println("MCP server started in background. Logs: mcp.log")
+			return
+		}
+		// Foreground
+		server, err := mcp.NewServerFromConfig("configs/default.yaml")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to create MCP server: %v\n", err)
+			os.Exit(1)
+		}
+		if err := server.Start(); err != nil {
+			fmt.Fprintf(os.Stderr, "MCP server error: %v\n", err)
+			os.Exit(1)
+		}
+	},
+}
+
+// MCP server stop command
+var mcpServerStopCmd = &cobra.Command{
+	Use:   "stop",
+	Short: "Stop the running MCP server",
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := config.LoadYAMLConfig("configs/default.yaml")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+			os.Exit(1)
+		}
+		addr := fmt.Sprintf("http://%s:%d/shutdown", cfg.MCPServer.Host, cfg.MCPServer.Port)
+		resp, err := http.Get(addr)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to contact MCP server: %v\n", err)
+			os.Exit(1)
+		}
+		defer resp.Body.Close()
+		msg, _ := io.ReadAll(resp.Body)
+		fmt.Print(string(msg))
+	},
+}
+
+// MCP server status command
+var mcpServerStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show MCP server status",
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := config.LoadYAMLConfig("configs/default.yaml")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+			os.Exit(1)
+		}
+		addr := fmt.Sprintf("http://%s:%d/healthz", cfg.MCPServer.Host, cfg.MCPServer.Port)
+		client := http.Client{Timeout: 2 * time.Second}
+		resp, err := client.Get(addr)
+		if err != nil {
+			fmt.Println("MCP server is NOT running.")
+			os.Exit(1)
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode == 200 && strings.TrimSpace(string(body)) == "ok" {
+			fmt.Println("MCP server is running.")
+		} else {
+			fmt.Println("MCP server is NOT running.")
+		}
+	},
+}
+
 // Show user config command
 var showUserConfig = &cobra.Command{
 	Use:   "show-user",
@@ -814,5 +918,90 @@ var showUserConfig = &cobra.Command{
 		}
 		out, _ := yaml.Marshal(cfg)
 		fmt.Println(string(out))
+	},
+}
+
+// extractNixOSOption attempts to extract a NixOS option from a natural language query.
+func extractNixOSOption(input string) string {
+	// Try to find a pattern like services.nginx.enable or similar
+	re := regexp.MustCompile(`([a-zA-Z0-9_.-]+\.[a-zA-Z0-9_.-]+(\.[a-zA-Z0-9_.-]+)*)`)
+	matches := re.FindAllString(input, -1)
+	if len(matches) > 0 {
+		return matches[0]
+	}
+	// Fallback: return the input as-is (may be a direct option)
+	return strings.TrimSpace(input)
+}
+
+// Explain option command for AI-powered NixOS option explanation
+var explainOptionCmd = &cobra.Command{
+	Use:   "explain-option <option|question>",
+	Short: "Explain a NixOS option using AI and documentation",
+	Long:  `Get a concise, AI-generated explanation for any NixOS option, including type, default, and best practices. Accepts natural language queries.`,
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		query := args[0]
+		option := extractNixOSOption(query)
+		fmt.Printf("Explaining NixOS option: %s\n", option)
+
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error loading user config: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Check MCP server status before querying
+		mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
+		statusResp, err := http.Get(mcpURL + "/healthz")
+		if err != nil || statusResp.StatusCode != 200 {
+			fmt.Fprintln(os.Stderr, "MCP server is not running. Please start it with 'nixai mcp-server start' or 'nixai mcp-server start -d'.")
+			os.Exit(1)
+		}
+		if statusResp != nil {
+			statusResp.Body.Close()
+		}
+
+		mcpClient := mcp.NewMCPClient(mcpURL)
+		doc, err := mcpClient.QueryDocumentation(option)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error querying documentation: %v\n", err)
+			os.Exit(1)
+		}
+		if strings.TrimSpace(doc) == "" || strings.Contains(doc, "No relevant documentation found") {
+			fmt.Println("No relevant documentation found for this option.")
+			return
+		}
+
+		// Select AI provider
+		var provider ai.AIProvider
+		switch cfg.AIProvider {
+		case "ollama":
+			provider = ai.NewOllamaProvider(cfg.AIModel)
+		case "gemini":
+			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
+		case "openai":
+			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		default:
+			provider = ai.NewOllamaProvider("llama3")
+		}
+
+		prompt := "Summarize and explain the following NixOS option documentation for a user. Include the option's purpose, type, default, and best practices.\nOption: '" + option + "'\nDocumentation:\n" + doc
+		aiResp, aiErr := provider.Query(prompt)
+		if aiErr != nil {
+			fmt.Fprintf(os.Stderr, "AI error: %v\n", aiErr)
+			os.Exit(1)
+		}
+		if strings.TrimSpace(aiResp) == "" {
+			fmt.Println("AI did not return an explanation.")
+			return
+		}
+
+		// Render output as markdown in terminal
+		out, err := glamour.Render(aiResp, "dark")
+		if err != nil {
+			fmt.Println(aiResp)
+		} else {
+			fmt.Print(out)
+		}
 	},
 }

@@ -10,6 +10,8 @@ default:
             - https://nixos.org/manual/nixpkgs/stable/
             - https://nix.dev/manual/nix/2.28/language/
             - https://nix-community.github.io/home-manager/
+            - https://search.nixos.org/options
+            - https://home-manager-options.extranix.com/
     nixos:
         config_path: /etc/nixos/configuration.nix
         log_path: /var/log/nixos.log
