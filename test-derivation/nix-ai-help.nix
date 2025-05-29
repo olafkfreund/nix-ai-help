@@ -1,0 +1,1 @@
+{ stdenv, go, fetchFromGitHub, buildGoModule, glm ? false, lgp ? false }:

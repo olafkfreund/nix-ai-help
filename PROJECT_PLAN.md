@@ -26,6 +26,7 @@ A console-based Linux application to help solve NixOS configuration problems and
 - 🆕 **Beautiful terminal output**: colorized, Markdown/HTML rendered with ANSI colors
 - ✅ **AI-Powered NixOS Option Explainer**: `nixai explain-option <option>` provides structured documentation with AI-generated explanations
 - ✅ **Home Manager Option Support**: `nixai explain-home-option <option>` with visual distinction and dedicated documentation sources
+- ✅ **AI-Powered Package Repository Analysis**: `nixai package-repo <path>` automatically analyzes repositories and generates Nix derivations
 
 ---
 
@@ -46,6 +47,7 @@ A console-based Linux application to help solve NixOS configuration problems and
 - ✅ **Enhanced justfile** with 40+ comprehensive development commands and categorized help
 - ✅ **Fixed interactive mode EOF handling** for proper graceful exit with piped input
 - ✅ **Comprehensive testing** with MCP server integration and all features validated
+- ✅ **NEW: AI-Powered Package Repository Analysis** with `package-repo` command for automated Nix derivation generation
 
 ---
 
@@ -333,6 +335,46 @@ A console-based Linux application to help solve NixOS configuration problems and
   nixai lint-config ./flake.nix
   nixai lint-config /home/user/.config/nixpkgs/home.nix
   ```
+
+### 10. AI-Powered Package Repository Analysis ✅ **COMPLETED**
+
+- **Description:** Automatically analyze Git repositories and generate Nix derivations using AI-powered build system detection, dependency analysis, and template generation.
+
+- **Implementation:** ✅ **COMPLETED**
+  - ✅ Added `nixai package-repo <path>` command (CLI/interactive).
+  - ✅ **Multi-Language Support**: Detects and analyzes Go, Python, Node.js, and Rust projects
+  - ✅ **Build System Detection**: Automatically identifies build files (go.mod, package.json, Cargo.toml, etc.)
+  - ✅ **Dependency Analysis**: Parses and analyzes project dependencies for accurate Nix packaging
+  - ✅ **AI-Powered Generation**: Uses AI to generate complete, valid Nix derivations with proper structure
+  - ✅ **Git Integration**: Fetches repository metadata (URL, commit, branch) for source specifications
+  - ✅ **Validation System**: Comprehensive validation of generated derivations for completeness
+  - ✅ **Analyze-Only Mode**: `--analyze-only` flag for repository analysis without derivation generation
+  - ✅ **Path Resolution**: Supports both relative and absolute paths with proper resolution
+  - ✅ **Enhanced AI Prompts**: Structured examples and best practices for accurate derivation generation
+  - ✅ **Debug Infrastructure**: Comprehensive debugging and logging for troubleshooting
+  - ✅ **Output Management**: Saves generated derivations to organized output directories
+
+- **Usage:**
+
+  ```bash
+  # Analyze repository and generate Nix derivation
+  nixai package-repo /path/to/project
+  nixai package-repo . --local   # Analyze current directory
+  
+  # Analyze only (no derivation generation)
+  nixai package-repo . --analyze-only
+  
+  # Remote repository analysis
+  nixai package-repo https://github.com/user/project
+  ```
+
+- **Key Features:**
+  - **Build System Detection**: Automatically identifies Go modules, npm packages, Python projects, Rust crates
+  - **Dependency Analysis**: Extracts and analyzes project dependencies for accurate Nix inputs
+  - **AI Generation**: Creates complete derivations with proper structure, metadata, and build instructions
+  - **Validation**: Ensures generated derivations include all required attributes (pname, version, src, meta)
+  - **Git Integration**: Automatically extracts repository information for source specifications
+  - **Multi-Output**: Supports different project types with appropriate Nix builders and helpers
 
 ---
 

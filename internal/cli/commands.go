@@ -16,6 +16,7 @@ import (
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/mcp"
 	"nix-ai-help/internal/nixos"
+	"nix-ai-help/internal/packaging"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
@@ -69,6 +70,7 @@ func init() {
 	rootCmd.AddCommand(serviceExamplesCmd)   // Register the service-examples command
 	rootCmd.AddCommand(lintConfigCmd)        // Register the lint-config command
 	rootCmd.AddCommand(explainHomeOptionCmd) // Register the explain-home-option command
+	rootCmd.AddCommand(packageRepoCmd)       // Register the package-repo command
 
 	diagnoseCmd.Flags().StringVarP(&logFile, "log-file", "l", "", "Path to a log file to analyze")
 	diagnoseCmd.Flags().StringVarP(&configSnippet, "config-snippet", "c", "", "NixOS configuration snippet to analyze")
@@ -81,6 +83,13 @@ func init() {
 	mcpServerCmd.AddCommand(mcpServerStopCmd)
 	mcpServerCmd.AddCommand(mcpServerStatusCmd)
 	mcpServerStartCmd.Flags().BoolP("background", "d", false, "Run MCP server in background (daemon mode)")
+
+	// Package repository command flags
+	packageRepoCmd.Flags().StringP("local", "l", "", "Local path to repository (instead of cloning)")
+	packageRepoCmd.Flags().StringP("output", "o", "", "Output directory for generated derivation file")
+	packageRepoCmd.Flags().String("name", "", "Override package name")
+	packageRepoCmd.Flags().BoolP("quiet", "q", false, "Suppress progress output")
+	packageRepoCmd.Flags().Bool("analyze-only", false, "Only analyze repository without generating derivation")
 }
 
 // Diagnose command to analyze NixOS configuration issues
@@ -2299,6 +2308,212 @@ func countChecksByStatus(checks []nixos.CheckResult, status string) int {
 func init() {
 	upgradeAdvisorCmd.Flags().String("target", "", "Target NixOS version (e.g., 24.11)")
 	upgradeAdvisorCmd.Flags().Bool("dry-run", false, "Show system analysis without upgrade recommendations")
+}
+
+// Package repository command for generating Nix derivations from Git repositories
+var packageRepoCmd = &cobra.Command{
+	Use:   "package-repo <git-url>",
+	Short: "Generate Nix derivations from Git repositories using AI",
+	Long: `Automatically analyze a Git repository and generate a Nix derivation for packaging it in nixpkgs.
+
+This command performs:
+- Repository analysis to detect build systems, dependencies, and project structure
+- AI-powered derivation generation with nixpkgs best practices
+- Dependency mapping to nixpkgs equivalents
+- Validation and suggestions for the generated derivation
+
+Examples:
+  nixai package-repo https://github.com/user/project
+  nixai package-repo https://github.com/user/rust-app --output ./derivations
+  nixai package-repo /path/to/local/repo --local --name my-package
+
+The generated derivation will follow nixpkgs conventions and include:
+- Appropriate fetcher (fetchFromGitHub, fetchgit, etc.)
+- Correct build function (buildGoModule, buildRustPackage, etc.)
+- Proper dependency declarations and build phases
+- Meta attributes with license, description, and maintainer info`,
+	Args: cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		// Load configuration
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Create logger
+		log := logger.NewLoggerWithLevel(cfg.LogLevel)
+
+		// Get flags
+		localPath, _ := cmd.Flags().GetString("local")
+		outputPath, _ := cmd.Flags().GetString("output")
+		packageName, _ := cmd.Flags().GetString("name")
+		quiet, _ := cmd.Flags().GetBool("quiet")
+		analyzeOnly, _ := cmd.Flags().GetBool("analyze-only")
+
+		// Initialize AI provider
+		var aiProvider ai.AIProvider
+		switch cfg.AIProvider {
+		case "ollama":
+			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+		case "gemini":
+			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
+		case "openai":
+			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		default:
+			aiProvider = ai.NewOllamaProvider("llama3")
+		}
+
+		// Initialize MCP client
+		var mcpClient *mcp.MCPClient
+		mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
+		mcpClient = mcp.NewMCPClient(mcpURL)
+
+		// Create packaging service
+		tempDir := "/tmp/nixai-packaging"
+		packagingService := packaging.NewPackagingService(aiProvider, mcpClient, tempDir, log)
+		defer packagingService.Cleanup()
+
+		// Prepare package request
+		request := &packaging.PackageRequest{
+			LocalPath:   localPath,
+			OutputPath:  outputPath,
+			PackageName: packageName,
+			Quiet:       quiet,
+		}
+
+		// Set repository URL or local path
+		if localPath != "" {
+			// Resolve relative path to absolute path
+			absPath, err := filepath.Abs(localPath)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to resolve path: %v\n", err)
+				os.Exit(1)
+			}
+			if !utils.IsDirectory(absPath) {
+				fmt.Fprintf(os.Stderr, "Local path does not exist or is not a directory: %s\n", absPath)
+				os.Exit(1)
+			}
+			request.LocalPath = absPath
+		} else if len(args) > 0 {
+			request.RepoURL = args[0]
+		} else {
+			fmt.Fprintf(os.Stderr, "Either provide a Git URL as argument or use --local flag with a path\n")
+			os.Exit(1)
+		}
+
+		if !quiet {
+			fmt.Println("🔍 Analyzing repository for Nix packaging...")
+		}
+
+		// If analyze-only mode, just do analysis
+		if analyzeOnly {
+			var analysis *packaging.RepoAnalysis
+			var err error
+
+			if request.LocalPath != "" {
+				analysis, err = packagingService.AnalyzeLocalRepository(request.LocalPath)
+			} else {
+				// For analyze-only with remote repo, we still need to clone temporarily
+				result, err := packagingService.PackageRepository(cmd.Context(), request)
+				if err == nil {
+					analysis = result.Analysis
+				}
+			}
+
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to analyze repository: %v\n", err)
+				os.Exit(1)
+			}
+
+			// Display analysis results
+			fmt.Println("\n📊 Repository Analysis Results:")
+			fmt.Printf("Project Name: %s\n", analysis.ProjectName)
+			fmt.Printf("Build System: %s\n", analysis.BuildSystem)
+			fmt.Printf("Language: %s\n", analysis.Language)
+			fmt.Printf("Dependencies: %d\n", len(analysis.Dependencies))
+			fmt.Printf("Has Tests: %t\n", analysis.HasTests)
+			if analysis.License != "" {
+				fmt.Printf("License: %s\n", analysis.License)
+			}
+			if analysis.Description != "" {
+				fmt.Printf("Description: %s\n", analysis.Description)
+			}
+
+			if len(analysis.Dependencies) > 0 {
+				fmt.Println("\nDependencies:")
+				for _, dep := range analysis.Dependencies {
+					depType := "runtime"
+					if dep.Type != "" {
+						depType = dep.Type
+					}
+					fmt.Printf("  - %s (%s)", dep.Name, depType)
+					if dep.Version != "" {
+						fmt.Printf(" v%s", dep.Version)
+					}
+					if dep.System {
+						fmt.Printf(" [system]")
+					}
+					fmt.Println()
+				}
+			}
+
+			if len(analysis.BuildFiles) > 0 {
+				fmt.Println("\nBuild Files:")
+				for _, file := range analysis.BuildFiles {
+					fmt.Printf("  - %s\n", file)
+				}
+			}
+			return
+		}
+
+		// Generate derivation
+		result, err := packagingService.PackageRepository(cmd.Context(), request)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Failed to package repository: %v\n", err)
+			os.Exit(1)
+		}
+
+		if !quiet {
+			fmt.Println("✅ Repository analysis complete!")
+			fmt.Printf("📦 Generated derivation for: %s\n", result.Analysis.ProjectName)
+			fmt.Printf("🔧 Build system: %s\n", result.Analysis.BuildSystem)
+			fmt.Printf("📝 Language: %s\n", result.Analysis.Language)
+		}
+
+		// Display validation issues if any
+		if len(result.ValidationIssues) > 0 {
+			fmt.Println("\n⚠️  Validation Issues:")
+			for _, issue := range result.ValidationIssues {
+				fmt.Printf("  - %s\n", issue)
+			}
+		}
+
+		// Display nixpkgs mappings if available
+		if len(result.NixpkgsMappings) > 0 {
+			fmt.Println("\n🔗 Suggested nixpkgs mappings:")
+			for dep, nixpkg := range result.NixpkgsMappings {
+				fmt.Printf("  %s → %s\n", dep, nixpkg)
+			}
+		}
+
+		// Save or display derivation
+		if result.OutputFile != "" {
+			fmt.Printf("\n💾 Derivation saved to: %s\n", result.OutputFile)
+		} else {
+			fmt.Println("\n📄 Generated Nix derivation:")
+			fmt.Println("```nix")
+			fmt.Println(result.Derivation)
+			fmt.Println("```")
+		}
+
+		if !quiet {
+			fmt.Println("\n💡 Next steps:")
+			fmt.Println("  1. Review the generated derivation")
+			fmt.Println("  2. Test building with: nix-build -E 'with import <nixpkgs> {}; callPackage ./your-derivation.nix {}'")
+			fmt.Println("  3. Submit to nixpkgs following contribution guidelines")
+		}
+	},
 }
 
 // Service examples command for showing real-world config examples

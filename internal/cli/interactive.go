@@ -69,6 +69,7 @@ func handleCommand(command string) {
 			"find-option <description>  - Find NixOS options from natural language description",
 			"service-examples <service> - Get AI-powered service configuration examples",
 			"lint-config <file>         - AI-powered configuration file analysis and linting",
+			"package-repo <path>        - Analyze repositories and generate Nix derivations",
 			"config <subcommand>        - AI-assisted Nix configuration management",
 			"  config show               - Show current configuration with AI analysis",
 			"  config set <key> <value>  - Set configuration option with AI guidance",
@@ -256,6 +257,19 @@ func handleCommand(command string) {
 			}
 			return
 		}
+	case "package-repo":
+		if len(fields) < 2 {
+			fmt.Println("Usage: package-repo <path>")
+			fmt.Println("Examples:")
+			fmt.Println("  package-repo . --local")
+			fmt.Println("  package-repo /path/to/project")
+			fmt.Println("  package-repo . --analyze-only")
+			fmt.Println("  package-repo https://github.com/user/project")
+			return
+		}
+		// Pass all arguments after 'package-repo' to the CLI command
+		packageRepoCmd.Run(packageRepoCmd, fields[1:])
+		return
 	case "show":
 		if len(fields) > 1 && fields[1] == "config" {
 			showConfig()

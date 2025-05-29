@@ -9,7 +9,8 @@ Before using or developing nixai, ensure## 🚀 What's New (May 2025)
 - **Enhanced Error Handling:** If your config path is missing or invalid, nixai will print actionable instructions for setting it (CLI flag, config, or interactive command).
 - **🏠 Home Manager vs NixOS Visual Distinction:** Smart detection automatically shows `🖥️ NixOS Option` or `🏠 Home Manager Option` headers with appropriate documentation sources.
 - **🆕 Dedicated Home Manager Command:** New `explain-home-option` command specifically for Home Manager configuration options.
-- **More Tests:** New tests cover service option lookup, diagnostics, and error handling for robust reliability.ave the following installed:
+- **🆕 AI-Powered Package Repository Analysis:** New `package-repo` command automatically analyzes Git repositories and generates complete Nix derivations using AI-powered build system detection and dependency analysis.
+- **More Tests:** New tests cover service option lookup, diagnostics, error handling, and packaging features for robust reliability.ave the following installed:
 
 - **Ollama** (for local LLM inference)
   - You must have the `llama3` model pulled and available in Ollama:
@@ -36,6 +37,7 @@ All other dependencies are managed by the Nix flake and justfile.
 - [✨ Features](#-features)
 - [🧩 Flake Input Analysis & AI Explanations](#-flake-input-analysis--ai-explanations)
 - [🔧 NixOS Option Explainer](#-nixos-option-explainer)
+- [📦 AI-Powered Package Repository Analysis](#-ai-powered-package-repository-analysis)
 - [🎨 Terminal Output Formatting](#-terminal-output-formatting)
 - [🛠️ Installation & Usage](#%EF%B8%8F-installation--usage)
 - [📝 Commands & Usage](#-commands--usage)
@@ -89,6 +91,8 @@ All other dependencies are managed by the Nix flake and justfile.
 - **NEW:** ✅ **AI-Powered NixOS Option Explainer** — Get detailed, AI-generated explanations for any NixOS option with `nixai explain-option <option>`, including type, default, description, and best practices.
 
 - **NEW:** 🏠 **Home Manager Option Support** — Dedicated `nixai explain-home-option <option>` command with visual distinction between Home Manager and NixOS options.
+
+- **NEW:** 📦 **AI-Powered Package Repository Analysis** — Automatically analyze Git repositories and generate Nix derivations with `nixai package-repo <path>`, supporting Go, Python, Node.js, and Rust projects.
 
 ---
 
@@ -173,6 +177,51 @@ The Option Explainer provides:
 - **AI Explanation**: Context, purpose, and best practices
 - **Usage Examples**: Practical configuration examples (basic, common, advanced)
 - **Related Options**: Other options that work well together
+
+---
+
+## 📦 AI-Powered Package Repository Analysis
+
+Automatically analyze Git repositories and generate complete Nix derivations using AI-powered build system detection and dependency analysis. nixai supports multiple programming languages and automatically generates proper Nix packaging files.
+
+**Example:**
+
+```sh
+# Analyze current directory and generate derivation
+nixai package-repo . --local
+
+# Analyze specific project
+nixai package-repo /path/to/project
+
+# Analyze only (no derivation generation)
+nixai package-repo . --analyze-only
+
+# Remote repository analysis
+nixai package-repo https://github.com/user/project
+```
+
+**Supported Languages & Build Systems:**
+- **Go**: Detects go.mod, analyzes dependencies, generates buildGoModule derivations
+- **Python**: Detects setup.py/pyproject.toml, analyzes pip dependencies
+- **Node.js**: Detects package.json, analyzes npm dependencies, generates buildNpmPackage derivations
+- **Rust**: Detects Cargo.toml, analyzes crate dependencies, generates buildRustPackage derivations
+
+**What you get with each analysis:**
+
+- 🔍 **Build System Detection**: Automatically identifies project type and build files
+- 📊 **Dependency Analysis**: Extracts and analyzes all project dependencies
+- 🤖 **AI-Generated Derivations**: Complete, valid Nix derivations with proper structure
+- ✅ **Validation**: Ensures generated derivations include all required attributes
+- 📝 **Metadata Extraction**: Project name, version, license, and description detection
+- 🔗 **Git Integration**: Automatic source URL and commit information extraction
+
+**Key Features:**
+- **Multi-Language Support**: Works with Go, Python, Node.js, and Rust projects
+- **Build System Detection**: Automatically identifies build files and project structure
+- **AI-Powered Generation**: Uses advanced AI to generate complete, working derivations
+- **Comprehensive Validation**: Validates generated derivations for completeness and correctness
+- **Path Resolution**: Supports both relative and absolute paths
+- **Debug Mode**: Comprehensive logging for troubleshooting and development
 
 ---
 
@@ -400,6 +449,43 @@ nixai explain-home-option <option>
 - Dedicated command for user-level configuration options.
 - Shows `🏠 Home Manager Option` headers with appropriate documentation sources.
 - Perfect for understanding programs, services, and home directory management.
+
+### AI-Powered Package Repository Analysis
+
+```sh
+nixai package-repo <path>
+```
+
+- Automatically analyze Git repositories and generate Nix derivations.
+- Supports Go, Python, Node.js, and Rust projects with intelligent build system detection.
+- AI-powered derivation generation with nixpkgs best practices.
+- Comprehensive dependency analysis and nixpkgs mapping.
+
+**Examples:**
+
+```sh
+# Analyze current directory and generate derivation
+nixai package-repo . --local
+
+# Analyze specific project
+nixai package-repo /path/to/project
+
+# Analyze only (no derivation generation)
+nixai package-repo . --analyze-only
+
+# Remote repository analysis
+nixai package-repo https://github.com/user/project
+
+# Custom output directory and package name
+nixai package-repo https://github.com/user/rust-app --output ./derivations --name my-package
+```
+
+**Key Features:**
+- **Multi-Language Support**: Detects Go modules, npm packages, Python projects, Rust crates
+- **Build System Detection**: Automatically identifies build files and project structure
+- **AI Generation**: Creates complete, valid derivations with proper structure and metadata
+- **Validation**: Ensures generated derivations include all required attributes
+- **Git Integration**: Automatic source URL and commit information extraction
 
 ### System Health Check
 
