@@ -11,7 +11,7 @@ default:
             - https://nix.dev/manual/nix/2.28/language/
             - https://nix-community.github.io/home-manager/
             - https://search.nixos.org/options
-            - https://home-manager-options.extranix.com/
+            - https://home-manager-options.extranix.com/options.json
     nixos:
         config_path: /etc/nixos/configuration.nix
         log_path: /var/log/nixos.log

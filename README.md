@@ -2,7 +2,14 @@
 
 ## Prerequisites
 
-Before using or developing nixai, ensure you have the following installed:
+Before using or developing nixai, ensure## 🚀 What's New (May 2025)
+
+- **Config Path Awareness Everywhere:** All features now respect the NixOS config path, settable via `--nixos-path`, config file, or interactively. If unset or invalid, you'll get clear guidance on how to fix it.
+- **Automated Service Option Lookup:** When searching for services, nixai now lists all available options for a service using `nixos-option --find services.<name>`, not just the top-level enable flag.
+- **Enhanced Error Handling:** If your config path is missing or invalid, nixai will print actionable instructions for setting it (CLI flag, config, or interactive command).
+- **🏠 Home Manager vs NixOS Visual Distinction:** Smart detection automatically shows `🖥️ NixOS Option` or `🏠 Home Manager Option` headers with appropriate documentation sources.
+- **🆕 Dedicated Home Manager Command:** New `explain-home-option` command specifically for Home Manager configuration options.
+- **More Tests:** New tests cover service option lookup, diagnostics, and error handling for robust reliability.ave the following installed:
 
 - **Ollama** (for local LLM inference)
   - You must have the `llama3` model pulled and available in Ollama:
@@ -81,6 +88,8 @@ All other dependencies are managed by the Nix flake and justfile.
 
 - **NEW:** ✅ **AI-Powered NixOS Option Explainer** — Get detailed, AI-generated explanations for any NixOS option with `nixai explain-option <option>`, including type, default, description, and best practices.
 
+- **NEW:** 🏠 **Home Manager Option Support** — Dedicated `nixai explain-home-option <option>` command with visual distinction between Home Manager and NixOS options.
+
 ---
 
 ## 🚀 What’s New (May 2025)
@@ -137,19 +146,29 @@ nixai explain-option services.postgresql.settings.shared_preload_libraries
 **Available in both CLI and interactive modes:**
 
 ```sh
-# CLI mode
-nixai explain-option <option>
+# CLI mode - NixOS options
+nixai explain-option services.nginx.enable
+nixai explain-option networking.firewall.enable
+
+# CLI mode - Home Manager options  
+nixai explain-home-option programs.git.enable
+nixai explain-home-option home.username
 
 # Interactive mode
 nixai interactive
 > explain-option <option>
+> explain-home-option <option>
 ```
+
+**🎯 Smart Visual Distinction**: nixai automatically detects and displays the appropriate headers:
+- `🖥️ NixOS Option` for system-level configuration options
+- `🏠 Home Manager Option` for user-level configuration options
 
 The Option Explainer provides:
 
 - **Type**: The data type of the option (boolean, string, list, etc.)
 - **Default Value**: What the option defaults to if not set
-- **Description**: Official documentation from NixOS
+- **Description**: Official documentation from NixOS/Home Manager
 - **Source**: The module file where the option is defined
 - **AI Explanation**: Context, purpose, and best practices
 - **Usage Examples**: Practical configuration examples (basic, common, advanced)
@@ -369,6 +388,18 @@ nixai explain-option <option>
 - Get AI-powered explanations for any NixOS option.
 - Includes type, default value, description, and best practices.
 - Uses official NixOS documentation from Elasticsearch backend.
+- Automatically detects and displays `🖥️ NixOS Option` headers for system-level options.
+
+### Explain Home Manager Options
+
+```sh
+nixai explain-home-option <option>
+```
+
+- Get AI-powered explanations for Home Manager options.
+- Dedicated command for user-level configuration options.
+- Shows `🏠 Home Manager Option` headers with appropriate documentation sources.
+- Perfect for understanding programs, services, and home directory management.
 
 ### System Health Check
 

@@ -25,6 +25,7 @@ A console-based Linux application to help solve NixOS configuration problems and
 - 🆕 **AI-powered flake input explanation** (`nixai flake explain-inputs` and `nixai flake explain <input>`) with upstream README/flake.nix summarization
 - 🆕 **Beautiful terminal output**: colorized, Markdown/HTML rendered with ANSI colors
 - ✅ **AI-Powered NixOS Option Explainer**: `nixai explain-option <option>` provides structured documentation with AI-generated explanations
+- ✅ **Home Manager Option Support**: `nixai explain-home-option <option>` with visual distinction and dedicated documentation sources
 
 ---
 
@@ -40,6 +41,8 @@ A console-based Linux application to help solve NixOS configuration problems and
 - ✅ **NEW: AI-powered service examples** with `service-examples` command for real-world configurations
 - ✅ **NEW: AI-powered config linting** with `lint-config` command for comprehensive analysis
 - ✅ **NEW: Enhanced error decoder** with `decode-error` command for human-friendly error explanations
+- ✅ **NEW: Home Manager vs NixOS option visual distinction** with smart detection and separate headers
+- ✅ **NEW: Dedicated Home Manager option explainer** with `explain-home-option` command
 - ✅ **Enhanced justfile** with 40+ comprehensive development commands and categorized help
 - ✅ **Fixed interactive mode EOF handling** for proper graceful exit with piped input
 - ✅ **Comprehensive testing** with MCP server integration and all features validated
@@ -110,10 +113,13 @@ A console-based Linux application to help solve NixOS configuration problems and
 
 ### 1. AI-Powered NixOS Option Explainer ✅ **COMPLETED**
 
-- **Description:** Users can ask about any NixOS option (e.g., `services.nginx.enable`) and get a concise, AI-generated explanation, including type, default, and best practices.
+- **Description:** Users can ask about any NixOS option (e.g., `services.nginx.enable`) and get a concise, AI-generated explanation, including type, default, and best practices. Now includes Home Manager support with visual distinction.
 
 - **Implementation:** ✅ **COMPLETED** & **ENHANCED**
   - ✅ Added `nixai explain-option <option>` command (CLI/interactive).
+  - ✅ Added `nixai explain-home-option <option>` command for dedicated Home Manager support.
+  - ✅ **Smart visual distinction**: Options show either `🖥️ NixOS Option` or `🏠 Home Manager Option` headers.
+  - ✅ **Intelligent detection logic**: Automatically distinguishes between NixOS and Home Manager options.
   - ✅ Integrated MCP server with Elasticsearch backend for structured NixOS option documentation.
   - ✅ AI provider integration for generating human-readable explanations.
   - ✅ Beautiful terminal output with colorized, readable formatting using glamour.
@@ -130,9 +136,15 @@ A console-based Linux application to help solve NixOS configuration problems and
 - **Usage:**
 
   ```bash
+  # NixOS options (system-level)
   nixai explain-option services.nginx.enable
   nixai explain-option networking.firewall.enable
   nixai explain-option boot.loader.systemd-boot.enable
+  
+  # Home Manager options (user-level)
+  nixai explain-home-option programs.git.enable
+  nixai explain-home-option home.username
+  nixai explain-home-option programs.zsh.enable
   ```
 
 ### 8. AI-Assisted Nix Configuration Management ✅ **COMPLETED**

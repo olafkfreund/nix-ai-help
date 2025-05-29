@@ -61,13 +61,14 @@ func init() {
 	rootCmd.AddCommand(buildCmd)
 	rootCmd.AddCommand(flakeCmd)
 	rootCmd.AddCommand(explainOptionCmd)
-	rootCmd.AddCommand(findOptionCmd)      // Register the find-option command
-	rootCmd.AddCommand(mcpServerCmd)       // Register the MCP server command
-	rootCmd.AddCommand(healthCheckCmd)     // Register the health check command
-	rootCmd.AddCommand(decodeErrorCmd)     // Register the decode-error command
-	rootCmd.AddCommand(upgradeAdvisorCmd)  // Register the upgrade-advisor command
-	rootCmd.AddCommand(serviceExamplesCmd) // Register the service-examples command
-	rootCmd.AddCommand(lintConfigCmd)      // Register the lint-config command
+	rootCmd.AddCommand(findOptionCmd)        // Register the find-option command
+	rootCmd.AddCommand(mcpServerCmd)         // Register the MCP server command
+	rootCmd.AddCommand(healthCheckCmd)       // Register the health check command
+	rootCmd.AddCommand(decodeErrorCmd)       // Register the decode-error command
+	rootCmd.AddCommand(upgradeAdvisorCmd)    // Register the upgrade-advisor command
+	rootCmd.AddCommand(serviceExamplesCmd)   // Register the service-examples command
+	rootCmd.AddCommand(lintConfigCmd)        // Register the lint-config command
+	rootCmd.AddCommand(explainHomeOptionCmd) // Register the explain-home-option command
 
 	diagnoseCmd.Flags().StringVarP(&logFile, "log-file", "l", "", "Path to a log file to analyze")
 	diagnoseCmd.Flags().StringVarP(&configSnippet, "config-snippet", "c", "", "NixOS configuration snippet to analyze")
@@ -1010,6 +1011,45 @@ func suggestSimilarOptions(option string) []string {
 	return suggestions
 }
 
+// isHomeManagerOption determines if documentation refers to a Home Manager option
+func isHomeManagerOption(doc string) bool {
+	// Strong indicators of Home Manager documentation
+	if strings.Contains(doc, "home-manager-options.extranix.com") ||
+		strings.Contains(doc, "Location:") ||
+		strings.Contains(doc, "home-manager/modules") ||
+		strings.Contains(doc, "nix-community.github.io/home-manager") {
+		return true
+	}
+
+	// Check for Home Manager context keywords
+	if strings.Contains(doc, "Home Manager") {
+		return true
+	}
+
+	// Check for common Home Manager option prefixes but be more specific
+	// Only consider it Home Manager if it starts with home. prefix
+	if strings.Contains(doc, "home.") {
+		return true
+	}
+
+	// For programs.* options, we need more context to distinguish
+	// NixOS programs.* from Home Manager programs.*
+	if strings.Contains(doc, "programs.") {
+		// If it mentions nixos modules path, it's likely NixOS
+		if strings.Contains(doc, "nixos/modules") {
+			return false
+		}
+		// If it mentions user-specific configuration, it might be Home Manager
+		if strings.Contains(doc, "user configuration") ||
+			strings.Contains(doc, "user's home") ||
+			strings.Contains(doc, "per-user") {
+			return true
+		}
+	}
+
+	return false
+}
+
 // buildExplainOptionPrompt creates a comprehensive prompt for AI to explain NixOS options with usage examples
 func buildExplainOptionPrompt(option, documentation string) string {
 	return fmt.Sprintf(`You are a NixOS expert helping users understand configuration options. Please explain the following NixOS option in a clear, practical manner.
@@ -1086,6 +1126,21 @@ var explainOptionCmd = &cobra.Command{
 		}
 		fmt.Println(utils.FormatSuccess("Documentation found!"))
 
+		// Determine if this is a Home Manager or NixOS option
+		isHomeManager := isHomeManagerOption(doc)
+
+		// Display appropriate header and info box
+		if strings.Contains(doc, "Option:") {
+			if isHomeManager {
+				fmt.Println(utils.FormatHeader("🏠 Home Manager Option"))
+				fmt.Println(utils.FormatBox("Home Manager Option", "This option is managed by Home Manager. See: https://nix-community.github.io/home-manager/options.html"))
+			} else {
+				fmt.Println(utils.FormatHeader("🖥️ NixOS Option"))
+				fmt.Println(utils.FormatBox("NixOS Option", "This option is managed by NixOS. See: https://search.nixos.org/options"))
+			}
+		}
+		fmt.Println(doc)
+
 		// Select AI provider
 		fmt.Print(utils.FormatProgress("Generating explanation with " + cfg.AIProvider + "..."))
 		var provider ai.AIProvider
@@ -1112,8 +1167,14 @@ var explainOptionCmd = &cobra.Command{
 		}
 		fmt.Println(utils.FormatSuccess("Complete!"))
 
-		// Create a beautiful header for the explanation
-		fmt.Println("\n" + utils.FormatHeader("📋 NixOS Option Explanation"))
+		// Create dynamic header based on option type
+		var explanationHeader string
+		if isHomeManager {
+			explanationHeader = "🏠 Home Manager Option Explanation"
+		} else {
+			explanationHeader = "🖥️ NixOS Option Explanation"
+		}
+		fmt.Println("\n" + utils.FormatHeader(explanationHeader))
 		fmt.Println(utils.FormatKeyValue("Option", option))
 		fmt.Println(utils.FormatDivider())
 
@@ -1131,6 +1192,84 @@ var explainOptionCmd = &cobra.Command{
 		// Enhanced tips section
 		fmt.Println(utils.FormatTip("Use 'nixai search service <name>' to find related services"))
 		fmt.Println(utils.FormatNote("Run 'nixai mcp-server query <option>' for raw documentation"))
+	},
+}
+
+// explainHomeOptionCmd provides explanations for Home Manager options
+var explainHomeOptionCmd = &cobra.Command{
+	Use:   "explain-home-option <option>",
+	Short: "Explain a Home Manager option using AI and documentation",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		option := args[0]
+		fmt.Println(utils.FormatProgress("Analyzing Home Manager option: " + option))
+
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading user config: "+err.Error()))
+			os.Exit(1)
+		}
+
+		// Check MCP server status before querying
+		fmt.Print(utils.FormatProgress("Fetching official documentation..."))
+		mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
+		statusResp, err := http.Get(mcpURL + "/healthz")
+		if err != nil || statusResp.StatusCode != 200 {
+			fmt.Println(utils.FormatError("MCP server is not running"))
+			fmt.Println(utils.FormatInfo("Please start it with 'nixai mcp-server start' or 'nixai mcp-server start -d'"))
+			os.Exit(1)
+		}
+		if statusResp != nil {
+			statusResp.Body.Close()
+		}
+
+		mcpClient := mcp.NewMCPClient(mcpURL)
+		doc, err := mcpClient.QueryDocumentation(option)
+		if err != nil {
+			fmt.Println(utils.FormatError("Error querying documentation: " + err.Error()))
+			os.Exit(1)
+		}
+		if strings.TrimSpace(doc) == "" || strings.Contains(doc, "No relevant documentation found") {
+			fmt.Println(utils.FormatWarning("No relevant documentation found for this option"))
+			return
+		}
+		fmt.Println(utils.FormatSuccess("Documentation found!"))
+
+		// After fetching documentation from MCP, determine the source and label the result
+		if strings.Contains(doc, "Option:") {
+			if strings.Contains(doc, "Location:") || strings.Contains(doc, "home-manager-options.extranix.com") || strings.Contains(doc, "Home Manager") || strings.Contains(doc, "programs.") || strings.Contains(doc, "home.") {
+				fmt.Println(utils.FormatHeader("🏠 Home Manager Option"))
+				fmt.Println(utils.FormatBox("Home Manager Option", "This option is managed by Home Manager. See: https://nix-community.github.io/home-manager/options.html"))
+			} else {
+				fmt.Println(utils.FormatHeader("🖥️ NixOS Option"))
+				fmt.Println(utils.FormatBox("NixOS Option", "This option is managed by NixOS. See: https://search.nixos.org/options"))
+			}
+		}
+		fmt.Println(doc)
+
+		// Select AI provider
+		fmt.Print(utils.FormatProgress("Generating explanation with " + cfg.AIProvider + "..."))
+		var provider ai.AIProvider
+		switch cfg.AIProvider {
+		case "ollama":
+			provider = ai.NewOllamaProvider(cfg.AIModel)
+		case "gemini":
+			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
+		case "openai":
+			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		default:
+			provider = ai.NewOllamaProvider("llama3")
+		}
+
+		response, err := provider.Query("Explain this Home Manager option in detail, including type, default, best practices, and usage examples.\n" + doc)
+		if err != nil {
+			fmt.Println(utils.FormatError("Error getting AI response: " + err.Error()))
+			os.Exit(1)
+		}
+
+		// Render the response with markdown formatting
+		rendered := renderForTerminal(response)
+		fmt.Println(rendered)
 	},
 }
 
