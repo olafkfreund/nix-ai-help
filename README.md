@@ -49,6 +49,7 @@ All other dependencies are managed by the Nix flake and justfile.
 - [🤝 Contributing](#-contributing)
 - [📄 License](#-license)
 - [🙏 Acknowledgments](#-acknowledgments)
+- [📸 Screenshots](#-screenshots)
 
 ---
 
@@ -769,6 +770,22 @@ This project is licensed under the MIT License. See the LICENSE file for details
 - Thanks to the NixOS community and documentation authors.
 
 - Special thanks to the creators of the AI models used in this project.
+
+---
+
+## 📸 Screenshots
+
+Below are example screenshots of `nixai` in action:
+
+| Example | Screenshot |
+|---------|------------|
+| Option Explanation | ![Option Explanation](./screenshots/swappy-20250529_173003.png) |
+| Package Analysis   | ![Package Analysis](./screenshots/swappy-20250529_173101.png) |
+| Derivation Output  | ![Derivation Output](./screenshots/swappy-20250529_173153.png) |
+| Health Check       | ![Health Check](./screenshots/swappy-20250529_173239.png) |
+| Service Example    | ![Service Example](./screenshots/swappy-20250529_173502.png) |
+| Interactive Mode   | ![Interactive Mode](./screenshots/swappy-20250529_173529.png) |
+| Error Decoder      | ![Error Decoder](./screenshots/swappy-20250529_173532.png) |
 
 ---
 
