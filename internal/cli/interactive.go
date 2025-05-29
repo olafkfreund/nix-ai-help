@@ -139,12 +139,12 @@ func handleCommand(command string) {
 		fmt.Printf("  environment.systemPackages = with pkgs; [ %s ];\n", pkg.Name)
 		fmt.Println("Home Manager (home.nix):")
 		fmt.Printf("  home.packages = with pkgs; [ %s ];\n", pkg.Name)
-		fmt.Println("\nFetching available options with nixos-option...")
-		optOut, err := executor.ShowNixOSOptions(pkg.Name)
+		fmt.Println("\nFetching available options with nixos-option --find...")
+		optOut, err := executor.ListServiceOptions(pkg.Name)
 		if err == nil && strings.TrimSpace(optOut) != "" {
 			fmt.Println(optOut)
 		} else {
-			fmt.Println("No additional options found or nixos-option failed.")
+			fmt.Println("No additional options found or nixos-option --find failed.")
 		}
 		fmt.Print("\nTest this package in a temporary shell? [y/N]: ")
 		yn, _ := reader.ReadString('\n')

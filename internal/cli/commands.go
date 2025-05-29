@@ -11,6 +11,7 @@ import (
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/nixos"
+	"nix-ai-help/pkg/utils"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/spf13/cobra"
@@ -205,6 +206,13 @@ var searchCmd = &cobra.Command{
 		} else if cfg != nil && cfg.NixosFolder != "" {
 			configPath = cfg.NixosFolder
 		}
+		if configPath == "" || !utils.IsDirectory(configPath) {
+			fmt.Fprintf(os.Stderr, "[Error] NixOS config path is not set or does not exist: '%s'\n", configPath)
+			fmt.Fprintln(os.Stderr, "Set the config path with --nixos-path/-n or in your config file. Example:")
+			fmt.Fprintln(os.Stderr, "  nixai search --nixos-path /etc/nixos pkg <query>")
+			fmt.Fprintln(os.Stderr, "Or set it interactively with 'set-nixos-path' in interactive mode.")
+			os.Exit(1)
+		}
 		var output string
 		var err error
 		executor := nixos.NewExecutor(configPath)
@@ -290,13 +298,13 @@ var searchCmd = &cobra.Command{
 		// executor already defined above
 		if searchType == "service" {
 			fmt.Printf("  services.%s.enable = true;\n", item.Name)
-			fmt.Println("  # For more options, see the NixOS manual or run: nixos-option services.", item.Name)
-			fmt.Println("\nFetching available options with nixos-option...")
-			optOut, err := executor.ShowNixOSOptions("services." + item.Name)
+			fmt.Println("  # For more options, see the NixOS manual or run: nixos-option --find services.", item.Name)
+			fmt.Println("\nFetching available options with nixos-option --find...")
+			optOut, err := executor.ListServiceOptions(item.Name)
 			if err == nil && strings.TrimSpace(optOut) != "" {
 				fmt.Println(optOut)
 			} else {
-				fmt.Println("No additional options found or nixos-option failed.")
+				fmt.Println("No additional options found or nixos-option --find failed.")
 			}
 		} else {
 			fmt.Println("NixOS (configuration.nix):")

@@ -59,6 +59,15 @@
 
 ---
 
+## 🚀 What’s New (May 2025)
+
+- **Config Path Awareness Everywhere:** All features now respect the NixOS config path, settable via `--nixos-path`, config file, or interactively. If unset or invalid, you’ll get clear guidance on how to fix it.
+- **Automated Service Option Lookup:** When searching for services, nixai now lists all available options for a service using `nixos-option --find services.<name>`, not just the top-level enable flag.
+- **Enhanced Error Handling:** If your config path is missing or invalid, nixai will print actionable instructions for setting it (CLI flag, config, or interactive command).
+- **More Tests:** New tests cover service option lookup, diagnostics, and error handling for robust reliability.
+
+---
+
 ## 🧩 Flake Input Analysis & AI Explanations
 
 Easily analyze your `flake.nix` inputs and get AI-powered explanations for each input, including upstream README and flake.nix summaries. nixai supports both `name.url = ...;` and `name = { url = ...; ... };` forms, robustly handling comments and whitespace.
@@ -152,6 +161,46 @@ nixai interactive
 - Supports all search and diagnose features.
 
 - Use `set-nixos-path` to specify your config folder interactively.
+
+---
+
+## 📝 How to Use the Latest Features
+
+### Set or Fix Your NixOS Config Path
+
+- **CLI:**
+
+  ```sh
+  nixai search --nixos-path /etc/nixos pkg <query>
+  ```
+
+- **Config File:**
+
+  Edit `~/.config/nixai/config.yaml` and set `nixos_folder: /etc/nixos`.
+
+- **Interactive:**
+
+  Start with `nixai interactive` and use `set-nixos-path`.
+
+If the path is missing or invalid, nixai will show you exactly how to fix it.
+
+### Automated Service Option Lookup
+
+- When you search for a service (e.g., `nixai search service nginx`), nixai will now display all available options for that service, not just the enable flag. This uses `nixos-option --find` for comprehensive results.
+
+### Error Guidance
+
+- If you run a command and the config path is not set or is invalid, nixai will print a clear error and suggest how to set it.
+
+### Testing
+
+- All new features are covered by tests. Run them with:
+
+  ```sh
+  just test
+  # or
+  go test ./...
+  ```
 
 ---
 

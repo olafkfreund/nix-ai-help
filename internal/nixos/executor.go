@@ -60,3 +60,11 @@ func (e *Executor) InstallNixPackage(attr string) (string, error) {
 func (e *Executor) ShowNixOSOptions(option string) (string, error) {
 	return e.ExecuteCommand("nixos-option", option)
 }
+
+// ListServiceOptions lists all available options for a given NixOS service using 'nixos-option --find services.<name>'.
+func (e *Executor) ListServiceOptions(service string) (string, error) {
+	if strings.TrimSpace(service) == "" {
+		return "", fmt.Errorf("service name is required")
+	}
+	return e.ExecuteCommand("nixos-option", "--find", fmt.Sprintf("services.%s", service))
+}
