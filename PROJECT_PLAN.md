@@ -181,14 +181,25 @@ A console-based Linux application to help solve NixOS configuration problems and
   - Fetch examples from docs/community via MCP.
   - Summarize and explain with AI.
 
-### 6. Reverse Option Lookup
+### 6. Reverse Option Lookup ✅ **COMPLETED**
 
 - **Description:** Users describe what they want in plain English (e.g., "enable SSH access") and nixai suggests relevant NixOS options and config snippets.
 
-- **Implementation:**
-  - Add `nixai find-option <description>` command.
-  - Use AI to map description to NixOS options.
-  - Show config snippets and doc links.
+- **Implementation:** ✅ **COMPLETED**
+  - ✅ Added `nixai find-option <description>` command (CLI/interactive).
+  - ✅ AI integration to map natural language descriptions to NixOS options.
+  - ✅ Comprehensive AI prompts for suggesting relevant options, examples, and best practices.
+  - ✅ Beautiful terminal output with markdown rendering.
+  - ✅ Interactive mode support with full functionality.
+
+- **Usage:**
+
+  ```bash
+  nixai find-option "enable SSH access"
+  nixai find-option "configure firewall"
+  nixai find-option "set up automatic updates"
+  nixai find-option "enable docker"
+  ```
 
 ### 7. NixOS Config Linter & Formatter
 

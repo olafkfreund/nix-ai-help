@@ -58,8 +58,10 @@ func handleCommand(command string) {
 
 		commands := []string{
 			"diagnose <log/config>      - Diagnose NixOS issues",
+			"decode-error <error>       - AI-powered error decoder and fix generator",
 			"search <package>           - Search for and install Nix packages",
 			"explain-option <option>    - Get AI-powered explanations for NixOS options",
+			"find-option <description>  - Find NixOS options from natural language description",
 			"show config                - Show current configuration and MCP sources",
 			"set ai <provider> [model]  - Set AI provider (ollama, gemini, openai) and model (optional)",
 			"set-nixos-path <path>      - Set path to NixOS config folder",
@@ -68,6 +70,18 @@ func handleCommand(command string) {
 		}
 
 		fmt.Println(utils.FormatList(commands))
+	case "decode-error":
+		if len(fields) < 2 {
+			fmt.Println("Usage: decode-error <error_message>")
+			fmt.Println("Examples:")
+			fmt.Println("  decode-error \"syntax error at line 42\"")
+			fmt.Println("  decode-error \"error: function 'buildNodePackage' called without required argument\"")
+			return
+		}
+		errorMessage := strings.Join(fields[1:], " ")
+		// Use the same logic as the CLI command by calling it directly
+		decodeErrorCmd.Run(decodeErrorCmd, []string{errorMessage})
+		return
 	case "search":
 		if len(fields) < 2 {
 			fmt.Println("Usage: search <package>")
@@ -239,6 +253,20 @@ func handleCommand(command string) {
 		option := strings.Join(fields[1:], " ")
 		// Use the same logic as the CLI command
 		explainOptionCmd.Run(explainOptionCmd, []string{option})
+		return
+	case "find-option":
+		if len(fields) < 2 {
+			fmt.Println("Usage: find-option <description>")
+			fmt.Println("Examples:")
+			fmt.Println("  find-option \"enable SSH access\"")
+			fmt.Println("  find-option \"configure firewall\"")
+			fmt.Println("  find-option \"set up automatic updates\"")
+			fmt.Println("  find-option \"enable docker\"")
+			return
+		}
+		description := strings.Join(fields[1:], " ")
+		// Use the same logic as the CLI command
+		findOptionCmd.Run(findOptionCmd, []string{description})
 		return
 	case "exit":
 		fmt.Println("Exiting nixai. Goodbye!")

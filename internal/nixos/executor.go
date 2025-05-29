@@ -35,15 +35,12 @@ func (e *Executor) ExecuteNixCommand(command string) (string, error) {
 func (e *Executor) SearchNixPackages(query string) (string, error) {
 	args := []string{"search", "nixpkgs"}
 	if strings.TrimSpace(query) != "" {
-		qargs := strings.Fields(query)
-		fmt.Printf("[DEBUG] SearchNixPackages: args = %v\n", append(args, qargs...))
-		args = append(args, qargs...)
-	} else {
-		fmt.Printf("[DEBUG] SearchNixPackages: args = %v\n", args)
+		// For multi-word queries, join them as a single search term
+		// This is more effective than separate args for nix search
+		queryTerm := strings.ReplaceAll(strings.TrimSpace(query), " ", ".*")
+		args = append(args, queryTerm)
 	}
-	output, err := e.ExecuteCommand("nix", args...)
-	fmt.Printf("[DEBUG] SearchNixPackages: raw output =\n%s\n", output)
-	return output, err
+	return e.ExecuteCommand("nix", args...)
 }
 
 // SearchNixServices searches for NixOS services using `nix search nixos` and returns the output.

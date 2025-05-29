@@ -13,12 +13,12 @@ func TestDiagnose_SyntaxError(t *testing.T) {
 	d := Diagnose("syntax error: unexpected token", "", nil)
 	found := false
 	for _, diag := range d {
-		if diag.Issue == "NixOS syntax error" {
+		if diag.Issue == "NixOS configuration syntax error" {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("expected NixOS syntax error diagnostic")
+		t.Error("expected NixOS configuration syntax error diagnostic")
 	}
 }
 
@@ -26,12 +26,12 @@ func TestDiagnose_MissingPackage(t *testing.T) {
 	d := Diagnose("cannot find package: foo", "", nil)
 	found := false
 	for _, diag := range d {
-		if diag.Issue == "Missing package" {
+		if diag.Issue == "Missing package or attribute" {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("expected Missing package diagnostic")
+		t.Error("expected Missing package or attribute diagnostic")
 	}
 }
 

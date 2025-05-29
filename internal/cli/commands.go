@@ -59,12 +59,15 @@ func init() {
 	rootCmd.AddCommand(buildCmd)
 	rootCmd.AddCommand(flakeCmd)
 	rootCmd.AddCommand(explainOptionCmd)
+	rootCmd.AddCommand(findOptionCmd)  // Register the find-option command
 	rootCmd.AddCommand(mcpServerCmd)   // Register the MCP server command
 	rootCmd.AddCommand(healthCheckCmd) // Register the health check command
+	rootCmd.AddCommand(decodeErrorCmd) // Register the decode-error command
 
 	diagnoseCmd.Flags().StringVarP(&logFile, "log-file", "l", "", "Path to a log file to analyze")
 	diagnoseCmd.Flags().StringVarP(&configSnippet, "config-snippet", "c", "", "NixOS configuration snippet to analyze")
 	diagnoseCmd.Flags().StringVarP(&nixLogTarget, "nix-log", "g", "", "Run 'nix log' (optionally with a path or derivation) and analyze the output") // New flag
+	decodeErrorCmd.Flags().StringP("log-file", "l", "", "Path to a log file containing error messages to analyze")
 	searchCmd.Flags().StringVarP(&nixosConfigPath, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
 	rootCmd.PersistentFlags().StringVarP(&nixosConfigPathGlobal, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
 	configCmd.AddCommand(showUserConfig)
@@ -1133,6 +1136,109 @@ var explainOptionCmd = &cobra.Command{
 	},
 }
 
+// Find option command for reverse NixOS option lookup
+var findOptionCmd = &cobra.Command{
+	Use:   "find-option <description>",
+	Short: "Find NixOS options from natural language description",
+	Long: `Find relevant NixOS options and configuration snippets based on what you want to achieve.
+Describe your goal in plain English and get suggested options, examples, and documentation.
+
+Examples:
+  nixai find-option "enable SSH access"
+  nixai find-option "configure firewall"
+  nixai find-option "set up automatic updates"
+  nixai find-option "enable docker"`,
+	Args: cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		description := strings.Join(args, " ")
+
+		fmt.Println(utils.FormatHeader("🔍 Finding NixOS Options"))
+		fmt.Println(utils.FormatKeyValue("Looking for", description))
+		fmt.Println(utils.FormatDivider())
+
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading user config: "+err.Error()))
+			os.Exit(1)
+		}
+
+		// Select AI provider
+		fmt.Print(utils.FormatProgress("Analyzing your request with AI..."))
+		var provider ai.AIProvider
+		switch cfg.AIProvider {
+		case "ollama":
+			provider = ai.NewOllamaProvider(cfg.AIModel)
+		case "gemini":
+			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
+		case "openai":
+			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		default:
+			provider = ai.NewOllamaProvider("llama3")
+		}
+
+		prompt := buildFindOptionPrompt(description)
+		aiResp, err := provider.Query(prompt)
+		if err != nil {
+			fmt.Println(utils.FormatError("AI error: " + err.Error()))
+			os.Exit(1)
+		}
+		if strings.TrimSpace(aiResp) == "" {
+			fmt.Println("\n" + utils.FormatError("AI did not return any suggestions."))
+			return
+		}
+		fmt.Println(" ✓")
+
+		fmt.Println("\n" + utils.FormatHeader("💡 Suggested NixOS Options"))
+		fmt.Println(utils.FormatDivider())
+
+		// Render output as markdown in terminal with enhanced styling
+		out, err := glamour.Render(aiResp, "dark")
+		if err != nil {
+			// Fallback to plain text with basic formatting
+			fmt.Println(utils.FormatSection("Suggestions", aiResp))
+		} else {
+			fmt.Print(out)
+		}
+
+		fmt.Println("\n" + utils.FormatDivider())
+
+		// Enhanced tips section
+		fmt.Println(utils.FormatTip("Use 'nixai explain-option <option>' to learn more about specific options"))
+		fmt.Println(utils.FormatTip("Use 'nixai search service <name>' to find related services"))
+		fmt.Println(utils.FormatNote("Always test configuration changes in a safe environment first"))
+	},
+}
+
+// buildFindOptionPrompt creates a comprehensive prompt for AI to find relevant NixOS options
+func buildFindOptionPrompt(description string) string {
+	return fmt.Sprintf(`You are a NixOS expert helping users find the right configuration options for their needs. 
+
+**User Request:** "%s"
+
+Please provide a helpful response with:
+
+1. **Primary Options**: The main NixOS option(s) that address this request
+2. **Configuration Examples**: Complete, working configuration snippets
+3. **Related Options**: Additional options that work well together or provide enhanced functionality
+4. **Best Practices**: Important tips, warnings, or recommendations
+5. **Alternative Approaches**: If applicable, mention different ways to achieve the same goal
+
+**Format your response using Markdown with:**
+- Clear headings (##)
+- Code blocks for configuration examples (use `+"`"+`nix code blocks`+"`"+`)
+- Bullet points for lists
+- **Bold** text for emphasis on option names
+
+**Important Guidelines:**
+- Provide complete, working configuration examples
+- Focus on the most common and recommended approaches
+- Include any security considerations or best practices
+- Mention if the option requires system rebuilds or service restarts
+- If the request is vague, provide multiple relevant options
+
+Make it practical and actionable for someone configuring their NixOS system.`, description)
+}
+
 // Health check command for comprehensive system checks
 var healthCheckCmd = &cobra.Command{
 	Use:   "health",
@@ -1568,4 +1674,131 @@ Be specific and actionable. Focus on NixOS-specific solutions.`
 	}
 
 	return response, nil
+}
+
+// Decode Error command - specialized AI-driven error analysis
+var decodeErrorCmd = &cobra.Command{
+	Use:   "decode-error [error_message]",
+	Short: "AI-powered NixOS error decoder and fix generator",
+	Long: `Analyze NixOS error messages using AI to provide detailed explanations,
+root cause analysis, and step-by-step fix instructions.
+
+The command can accept error messages in multiple ways:
+  - As a command line argument
+  - Through stdin (pipe or redirect)
+  - From a log file using --log-file
+  - Interactively when no input is provided
+
+Examples:
+  nixai decode-error "syntax error at line 42"
+  journalctl -u nginx | nixai decode-error
+  nixai decode-error --log-file /var/log/nixos-rebuild.log
+  nixos-rebuild switch 2>&1 | nixai decode-error`,
+	Args: cobra.ArbitraryArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		var errorInput string
+
+		// 1. Check for log file input
+		logFile, _ := cmd.Flags().GetString("log-file")
+		if logFile != "" {
+			data, err := os.ReadFile(logFile)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to read log file: %v\n", err)
+				os.Exit(1)
+			}
+			errorInput = tailLines(string(data), 100) // Get last 100 lines
+		}
+
+		// 2. Check for stdin input
+		if errorInput == "" {
+			stat, _ := os.Stdin.Stat()
+			if (stat.Mode() & os.ModeCharDevice) == 0 {
+				stdinData, _ := os.ReadFile("/dev/stdin")
+				errorInput = tailLines(string(stdinData), 100)
+			}
+		}
+
+		// 3. Check for command line arguments
+		if errorInput == "" && len(args) > 0 {
+			errorInput = strings.Join(args, " ")
+		}
+
+		// 4. Interactive mode if no input provided
+		if errorInput == "" {
+			fmt.Println(utils.FormatHeader("🔍 NixOS Error Decoder"))
+			fmt.Println(utils.FormatInfo("Please paste your NixOS error message below (press Ctrl+D when done):"))
+			fmt.Println()
+
+			var lines []string
+			scanner := bufio.NewScanner(os.Stdin)
+			for scanner.Scan() {
+				lines = append(lines, scanner.Text())
+			}
+
+			if len(lines) == 0 {
+				fmt.Fprintln(os.Stderr, utils.FormatError("No error message provided"))
+				os.Exit(1)
+			}
+
+			errorInput = strings.Join(lines, "\n")
+		}
+
+		if strings.TrimSpace(errorInput) == "" {
+			fmt.Fprintln(os.Stderr, utils.FormatError("No error message to analyze"))
+			os.Exit(1)
+		}
+
+		// Load configuration and initialize AI provider
+		fmt.Print(utils.FormatProgress("Loading configuration..."))
+		cfg, err := config.LoadUserConfig()
+		var provider ai.AIProvider
+		if err == nil {
+			switch cfg.AIProvider {
+			case "ollama":
+				provider = ai.NewOllamaProvider(cfg.AIModel)
+			case "gemini":
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
+			case "openai":
+				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			default:
+				provider = ai.NewOllamaProvider("llama3")
+			}
+		} else {
+			provider = ai.NewOllamaProvider("llama3")
+		}
+		fmt.Println(" ✓")
+
+		// Perform enhanced diagnostics
+		fmt.Print(utils.FormatProgress("Analyzing error patterns..."))
+		diagnostics := nixos.Diagnose(errorInput, "", provider)
+		fmt.Println(" ✓")
+
+		// Display results with enhanced formatting
+		fmt.Println()
+		result := nixos.FormatDiagnostics(diagnostics)
+		fmt.Print(result)
+
+		// Provide additional context and suggestions
+		if len(diagnostics) > 0 {
+			fmt.Println()
+			fmt.Println(utils.FormatHeader("💡 Additional Recommendations"))
+
+			// Check for common follow-up actions
+			hasHighSeverity := false
+			for _, diag := range diagnostics {
+				if diag.Severity == "high" || diag.Severity == "critical" {
+					hasHighSeverity = true
+					break
+				}
+			}
+
+			if hasHighSeverity {
+				fmt.Println(utils.FormatWarning("High severity issues detected - prioritize fixing these first"))
+			}
+
+			fmt.Println(utils.FormatTip("Use 'nixai explain-option <option>' to understand specific NixOS options"))
+			fmt.Println(utils.FormatTip("Run 'nixai health-check' for a comprehensive system analysis"))
+			fmt.Println(utils.FormatNote("Join the NixOS community for additional help: https://discourse.nixos.org/"))
+		}
+	},
 }
