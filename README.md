@@ -1,5 +1,24 @@
 # nixai: NixOS AI Assistant
 
+## Prerequisites
+
+Before using or developing nixai, ensure you have the following installed:
+
+- **Ollama** (for local LLM inference)
+  - You must have the `llama3` model pulled and available in Ollama:
+
+```sh
+ollama pull llama3
+```
+
+- **Nix** (with flakes enabled)
+- **Go** (if developing outside Nix shell)
+- **just** (for development tasks)
+- **git**
+- (Optional) API keys for OpenAI or Gemini if you want to use cloud LLMs
+
+All other dependencies are managed by the Nix flake and justfile.
+
 ![nixai logo](./nix-ai2.png)
 
 ---
@@ -153,6 +172,7 @@ All Markdown and HTML output from nixai is rendered as beautiful, colorized term
 ### Using Nix (Recommended)
 
 **For Development Environment:**
+
 ```sh
 # Enter development environment (includes Go, just, golangci-lint, etc.)
 nix develop
@@ -163,6 +183,7 @@ just build
 ```
 
 **For Direct Nix Build:**
+
 ```sh
 # Note: Nix direct build currently has some packaging issues
 # Use the development environment + just build instead
@@ -207,15 +228,18 @@ This project uses **Nix flakes** for reproducible development environments. Here
 ### Quick Start
 
 1. **Clone the repository:**
+
    ```sh
    git clone <repository-url>
    cd nix-ai-help
    ```
 
 2. **Enter the development environment:**
+
    ```sh
    nix develop
    ```
+
    This automatically provides:
    - Go 1.24.3
    - just (task runner)
@@ -223,17 +247,20 @@ This project uses **Nix flakes** for reproducible development environments. Here
    - All required development tools
 
 3. **Clean and install dependencies:**
+
    ```sh
    go clean -modcache  # Clean any cached modules
    go mod tidy         # Download and organize dependencies
    ```
 
 4. **Build the project:**
+
    ```sh
    just build
    ```
 
 5. **Test the application:**
+
    ```sh
    ./nixai --help      # Verify the build works
    just test           # Run the test suite
@@ -278,11 +305,13 @@ go mod tidy                              # Update dependencies
 ### Testing Your Changes
 
 1. **Unit tests:**
+
    ```sh
    just test
    ```
 
 2. **Integration testing:**
+
    ```sh
    # Test specific functionality
    ./nixai --help
@@ -291,6 +320,7 @@ go mod tidy                              # Update dependencies
    ```
 
 3. **Code quality:**
+
    ```sh
    just lint  # Check for code quality issues
    just fmt   # Format code automatically
