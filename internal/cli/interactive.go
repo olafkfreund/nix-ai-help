@@ -18,11 +18,11 @@ var currentModel string = "llama3"
 // InteractiveMode starts the interactive command-line interface for nixai.
 func InteractiveMode() {
 	reader := bufio.NewReader(os.Stdin)
-	
+
 	// Enhanced welcome message
 	fmt.Println(utils.FormatHeader("🚀 Welcome to nixai Interactive Mode"))
 	fmt.Println(utils.FormatInfo("Type 'help' for commands, 'exit' to quit."))
-	
+
 	if nixosConfigPath != "" {
 		fmt.Println(utils.FormatKeyValue("NixOS Config Path", nixosConfigPath))
 	}
@@ -55,10 +55,10 @@ func handleCommand(command string) {
 	switch fields[0] {
 	case "help":
 		fmt.Println(utils.FormatHeader("📚 Available Commands"))
-		
+
 		commands := []string{
 			"diagnose <log/config>      - Diagnose NixOS issues",
-			"search <package>           - Search for and install Nix packages", 
+			"search <package>           - Search for and install Nix packages",
 			"explain-option <option>    - Get AI-powered explanations for NixOS options",
 			"show config                - Show current configuration and MCP sources",
 			"set ai <provider> [model]  - Set AI provider (ollama, gemini, openai) and model (optional)",
@@ -66,7 +66,7 @@ func handleCommand(command string) {
 			"flake <subcommand>         - Manage Nix flakes (show, update, check, explain-inputs, explain <input>, ...)",
 			"exit                       - Exit interactive mode",
 		}
-		
+
 		fmt.Println(utils.FormatList(commands))
 	case "search":
 		if len(fields) < 2 {

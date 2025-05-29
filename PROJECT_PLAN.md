@@ -137,15 +137,31 @@ A console-based Linux application to help solve NixOS configuration problems and
   - Use AI to generate explanations and fixes.
   - Link to docs or wiki as needed.
 
-### 3. Interactive NixOS Health Check
+### 3. Interactive NixOS Health Check ✅ **COMPLETED**
 
-- **Description:** `nixai health-check` runs a series of system checks (config validity, service status, disk space, channel status, etc.), summarizes findings, and suggests improvements.
+- **Description:** `nixai health` runs a series of comprehensive system checks (config validity, service status, disk space, channel status, boot integrity, network connectivity, Nix store health), summarizes findings with beautiful colorized output, and provides AI-powered analysis and recommendations.
 
-- **Implementation:**
-  - New CLI/interactive command.
-  - Use executor to run checks (`nixos-rebuild dry-run`, `systemctl`, etc.).
-  - Parse and summarize results, highlight warnings/errors.
-  - Use AI for suggestions.
+- **Implementation:** ✅ **COMPLETED**
+  - ✅ Added `nixai health` command (CLI/interactive).
+  - ✅ Comprehensive system health checks including:
+    - **Configuration Validation**: Checks NixOS config validity with dry-run
+    - **System Services**: Monitors critical service status and failed services
+    - **Disk Space Analysis**: Checks disk usage with warnings for high usage
+    - **Nix Channels**: Verifies channel configuration and update status
+    - **Boot System Integrity**: Validates boot configuration and generations
+    - **Network Connectivity**: Tests connectivity to NixOS cache and channels
+    - **Nix Store Health**: Verifies store integrity and garbage collection recommendations
+  - ✅ **AI-Powered Analysis**: Provides root cause analysis, priority assessment, step-by-step solutions, and prevention tips
+  - ✅ **Beautiful Terminal Output**: Progress indicators, colorized status messages, and markdown-rendered reports
+  - ✅ **Error Handling**: Graceful handling of missing tools or permissions
+  - ✅ **Comprehensive Reporting**: Generates detailed health reports with actionable recommendations
+
+- **Usage:**
+
+  ```bash
+  nixai health
+  # Runs comprehensive system health check with AI analysis
+  ```
 
 ### 4. NixOS Upgrade Advisor
 

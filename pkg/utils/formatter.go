@@ -10,76 +10,76 @@ import (
 // Color and style definitions using lipgloss for consistent, beautiful formatting
 var (
 	// Color palette
-	primaryColor   = lipgloss.Color("#7C3AED") // Purple
-	successColor   = lipgloss.Color("#10B981") // Green
-	warningColor   = lipgloss.Color("#F59E0B") // Orange
-	errorColor     = lipgloss.Color("#EF4444") // Red
-	infoColor      = lipgloss.Color("#3B82F6") // Blue
-	mutedColor     = lipgloss.Color("#6B7280") // Gray
-	accentColor    = lipgloss.Color("#EC4899") // Pink
-	
+	primaryColor = lipgloss.Color("#7C3AED") // Purple
+	successColor = lipgloss.Color("#10B981") // Green
+	warningColor = lipgloss.Color("#F59E0B") // Orange
+	errorColor   = lipgloss.Color("#EF4444") // Red
+	infoColor    = lipgloss.Color("#3B82F6") // Blue
+	mutedColor   = lipgloss.Color("#6B7280") // Gray
+	accentColor  = lipgloss.Color("#EC4899") // Pink
+
 	// Base styles
 	HeaderStyle = lipgloss.NewStyle().
-		Foreground(primaryColor).
-		Bold(true).
-		Padding(1, 0)
-	
+			Foreground(primaryColor).
+			Bold(true).
+			Padding(1, 0)
+
 	TitleStyle = lipgloss.NewStyle().
-		Foreground(primaryColor).
-		Bold(true).
-		MarginTop(1).
-		MarginBottom(1)
-	
+			Foreground(primaryColor).
+			Bold(true).
+			MarginTop(1).
+			MarginBottom(1)
+
 	SubtitleStyle = lipgloss.NewStyle().
-		Foreground(infoColor).
-		Bold(true)
-	
+			Foreground(infoColor).
+			Bold(true)
+
 	SuccessStyle = lipgloss.NewStyle().
-		Foreground(successColor).
-		Bold(true)
-	
+			Foreground(successColor).
+			Bold(true)
+
 	WarningStyle = lipgloss.NewStyle().
-		Foreground(warningColor).
-		Bold(true)
-	
+			Foreground(warningColor).
+			Bold(true)
+
 	ErrorStyle = lipgloss.NewStyle().
-		Foreground(errorColor).
-		Bold(true)
-	
+			Foreground(errorColor).
+			Bold(true)
+
 	InfoStyle = lipgloss.NewStyle().
-		Foreground(infoColor)
-	
+			Foreground(infoColor)
+
 	MutedStyle = lipgloss.NewStyle().
-		Foreground(mutedColor).
-		Italic(true)
-	
+			Foreground(mutedColor).
+			Italic(true)
+
 	AccentStyle = lipgloss.NewStyle().
-		Foreground(accentColor).
-		Bold(true)
-	
+			Foreground(accentColor).
+			Bold(true)
+
 	CodeStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#A3A3A3")).
-		Background(lipgloss.Color("#1F2937")).
-		Padding(0, 1).
-		Margin(0, 1)
-	
+			Foreground(lipgloss.Color("#A3A3A3")).
+			Background(lipgloss.Color("#1F2937")).
+			Padding(0, 1).
+			Margin(0, 1)
+
 	BorderStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(mutedColor).
-		Padding(1, 2).
-		Margin(1, 0)
-	
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(mutedColor).
+			Padding(1, 2).
+			Margin(1, 0)
+
 	BoxStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(primaryColor).
-		Padding(1, 2).
-		Margin(1, 0)
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(primaryColor).
+			Padding(1, 2).
+			Margin(1, 0)
 )
 
 // FormatHeader creates a prominent header with decorative borders
 func FormatHeader(title string) string {
 	border := strings.Repeat("━", len(title)+4)
-	return fmt.Sprintf("%s\n  %s  \n%s", 
+	return fmt.Sprintf("%s\n  %s  \n%s",
 		HeaderStyle.Render(border),
 		HeaderStyle.Render(title),
 		HeaderStyle.Render(border))
@@ -131,16 +131,16 @@ func FormatCodeBlock(code, language string) string {
 	if language != "" {
 		header = MutedStyle.Render(fmt.Sprintf("┌─ %s", language)) + "\n"
 	}
-	
+
 	lines := strings.Split(strings.TrimSpace(code), "\n")
 	var formattedLines []string
-	
+
 	for _, line := range lines {
 		formattedLines = append(formattedLines, CodeStyle.Render(line))
 	}
-	
+
 	footer := MutedStyle.Render("└" + strings.Repeat("─", 40))
-	
+
 	return header + strings.Join(formattedLines, "\n") + "\n" + footer
 }
 
@@ -164,8 +164,8 @@ func FormatNumberedList(items []string) string {
 
 // FormatKeyValue creates a key-value pair display
 func FormatKeyValue(key, value string) string {
-	return fmt.Sprintf("%s %s", 
-		AccentStyle.Render(key+":"), 
+	return fmt.Sprintf("%s %s",
+		AccentStyle.Render(key+":"),
 		InfoStyle.Render(value))
 }
 
@@ -174,19 +174,19 @@ func FormatBox(title, content string) string {
 	if title != "" {
 		titleLine := AccentStyle.Render("┌─ " + title + " ")
 		titleLine += MutedStyle.Render(strings.Repeat("─", max(0, 60-len(title)-3)) + "┐")
-		
+
 		lines := strings.Split(content, "\n")
 		var boxedLines []string
 		boxedLines = append(boxedLines, titleLine)
-		
+
 		for _, line := range lines {
 			boxedLines = append(boxedLines, MutedStyle.Render("│ ")+line)
 		}
-		
+
 		boxedLines = append(boxedLines, MutedStyle.Render("└"+strings.Repeat("─", 60)+"┘"))
 		return strings.Join(boxedLines, "\n")
 	}
-	
+
 	return BoxStyle.Render(content)
 }
 
@@ -195,13 +195,13 @@ func FormatTable(headers []string, rows [][]string) string {
 	if len(headers) == 0 || len(rows) == 0 {
 		return ""
 	}
-	
+
 	// Calculate column widths
 	colWidths := make([]int, len(headers))
 	for i, header := range headers {
 		colWidths[i] = len(header)
 	}
-	
+
 	for _, row := range rows {
 		for i, cell := range row {
 			if i < len(colWidths) && len(cell) > colWidths[i] {
@@ -209,9 +209,9 @@ func FormatTable(headers []string, rows [][]string) string {
 			}
 		}
 	}
-	
+
 	var result strings.Builder
-	
+
 	// Header
 	result.WriteString(AccentStyle.Render("┌"))
 	for i, width := range colWidths {
@@ -221,17 +221,17 @@ func FormatTable(headers []string, rows [][]string) string {
 		}
 	}
 	result.WriteString(AccentStyle.Render("┐\n"))
-	
+
 	// Header row
 	result.WriteString(AccentStyle.Render("│"))
 	for i, header := range headers {
-		result.WriteString(fmt.Sprintf(" %s%s ", 
+		result.WriteString(fmt.Sprintf(" %s%s ",
 			AccentStyle.Render(header),
 			strings.Repeat(" ", colWidths[i]-len(header))))
 		result.WriteString(AccentStyle.Render("│"))
 	}
 	result.WriteString("\n")
-	
+
 	// Separator
 	result.WriteString(AccentStyle.Render("├"))
 	for i, width := range colWidths {
@@ -241,13 +241,13 @@ func FormatTable(headers []string, rows [][]string) string {
 		}
 	}
 	result.WriteString(AccentStyle.Render("┤\n"))
-	
+
 	// Data rows
 	for _, row := range rows {
 		result.WriteString(AccentStyle.Render("│"))
 		for i, cell := range row {
 			if i < len(colWidths) {
-				result.WriteString(fmt.Sprintf(" %s%s ", 
+				result.WriteString(fmt.Sprintf(" %s%s ",
 					InfoStyle.Render(cell),
 					strings.Repeat(" ", colWidths[i]-len(cell))))
 				result.WriteString(AccentStyle.Render("│"))
@@ -255,7 +255,7 @@ func FormatTable(headers []string, rows [][]string) string {
 		}
 		result.WriteString("\n")
 	}
-	
+
 	// Footer
 	result.WriteString(AccentStyle.Render("└"))
 	for i, width := range colWidths {
@@ -265,7 +265,7 @@ func FormatTable(headers []string, rows [][]string) string {
 		}
 	}
 	result.WriteString(AccentStyle.Render("┘"))
-	
+
 	return result.String()
 }
 

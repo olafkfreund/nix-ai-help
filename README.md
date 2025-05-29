@@ -40,6 +40,8 @@
 
 - Show configuration options for packages/services (integrates with `nixos-option`).
 
+- **System Health Check**: Run comprehensive NixOS system health checks with AI-powered analysis.
+
 - Specify your NixOS config folder with `--nixos-path`/`-n`.
 
 - Execute and parse local NixOS commands.
@@ -218,13 +220,24 @@ nixai explain-option <option>
 - Includes type, default value, description, and best practices.
 - Uses official NixOS documentation from Elasticsearch backend.
 
+### System Health Check
+
+```sh
+nixai health
+```
+
+- Run comprehensive NixOS system health checks.
+- Validates configuration, checks service status, disk space, and more.
+- Provides AI-powered analysis and actionable recommendations.
+- Beautiful, colorized terminal output with progress indicators.
+
 ### Interactive Mode
 
 ```sh
 nixai interactive
 ```
 
-- Supports all search and diagnose features.
+- Supports all search, diagnose, and health check features.
 
 - Use `set-nixos-path` to specify your config folder interactively.
 

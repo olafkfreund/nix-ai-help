@@ -122,29 +122,29 @@ func FormatDiagnostics(diags []Diagnostic) string {
 	}
 
 	var sb strings.Builder
-	
+
 	// Add a header for the diagnostics
 	sb.WriteString(utils.FormatHeader("🔍 NixOS Diagnostics Report"))
 	sb.WriteString("\n\n")
-	
+
 	for i, d := range diags {
 		// Create a formatted diagnostic entry
 		title := fmt.Sprintf("Issue %d: %s", i+1, d.Issue)
-		
+
 		// Format the diagnostic as a box with details and suggestions
-		content := fmt.Sprintf("%s\n\n%s\n%s", 
+		content := fmt.Sprintf("%s\n\n%s\n%s",
 			utils.FormatKeyValue("Details", d.Details),
 			utils.FormatSubsection("Suggested Fix", SuggestFix(d)),
 			"")
-		
+
 		sb.WriteString(utils.FormatBox(title, content))
 		sb.WriteString("\n")
 	}
-	
+
 	// Add a helpful footer
 	sb.WriteString(utils.FormatDivider())
 	sb.WriteString("\n")
 	sb.WriteString(utils.FormatTip("Run 'nixai interactive' for more detailed troubleshooting"))
-	
+
 	return sb.String()
 }

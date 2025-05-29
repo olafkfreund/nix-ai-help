@@ -59,7 +59,8 @@ func init() {
 	rootCmd.AddCommand(buildCmd)
 	rootCmd.AddCommand(flakeCmd)
 	rootCmd.AddCommand(explainOptionCmd)
-	rootCmd.AddCommand(mcpServerCmd) // Register the MCP server command
+	rootCmd.AddCommand(mcpServerCmd)   // Register the MCP server command
+	rootCmd.AddCommand(healthCheckCmd) // Register the health check command
 
 	diagnoseCmd.Flags().StringVarP(&logFile, "log-file", "l", "", "Path to a log file to analyze")
 	diagnoseCmd.Flags().StringVarP(&configSnippet, "config-snippet", "c", "", "NixOS configuration snippet to analyze")
@@ -283,18 +284,18 @@ var searchCmd = &cobra.Command{
 			fmt.Println(utils.FormatWarning("No matches found. Please refine your query or check the spelling."))
 			return
 		}
-		
+
 		// Display search results with enhanced formatting
 		fmt.Println(utils.FormatHeader("🔍 Search Results"))
 		fmt.Println(utils.FormatKeyValue("Query", query))
 		fmt.Println(utils.FormatKeyValue("Type", searchType))
 		fmt.Println(utils.FormatDivider())
-		
+
 		for i, item := range items {
 			title := fmt.Sprintf("%d. %s", i+1, item.Name)
 			fmt.Println(utils.FormatSubsection(title, utils.MutedStyle.Render(item.Desc)))
 		}
-		
+
 		fmt.Print(utils.FormatInfo("Enter the number of the " + searchType + " to see configuration options (or leave blank to exit): "))
 		var sel string
 		scan := bufio.NewScanner(os.Stdin)
@@ -311,13 +312,13 @@ var searchCmd = &cobra.Command{
 			return
 		}
 		item := items[idx-1]
-		
+
 		// Display selected item with enhanced formatting
 		fmt.Println(utils.FormatHeader("📦 Selected " + strings.Title(searchType)))
 		fmt.Println(utils.FormatKeyValue("Name", item.Name))
 		fmt.Println(utils.FormatKeyValue("Description", item.Desc))
 		fmt.Println(utils.FormatDivider())
-		
+
 		// Show config options (placeholder or MCP/doc search)
 		// executor already defined above
 		if searchType == "service" {
@@ -333,15 +334,15 @@ var searchCmd = &cobra.Command{
 			}
 		} else {
 			fmt.Println(utils.FormatSection("Configuration Examples", ""))
-			
+
 			nixosConfig := fmt.Sprintf("environment.systemPackages = with pkgs; [ %s ];", item.Name)
 			hmConfig := fmt.Sprintf("home.packages = with pkgs; [ %s ];", item.Name)
-			
+
 			fmt.Println(utils.FormatSubsection("NixOS (configuration.nix)", ""))
 			fmt.Println(utils.FormatCodeBlock(nixosConfig, "nix"))
 			fmt.Println(utils.FormatSubsection("Home Manager (home.nix)", ""))
 			fmt.Println(utils.FormatCodeBlock(hmConfig, "nix"))
-			
+
 			fmt.Println(utils.FormatProgress("Fetching available options with nixos-option..."))
 			optOut, err := executor.ShowNixOSOptions(item.Name)
 			if err == nil && strings.TrimSpace(optOut) != "" {
@@ -888,7 +889,7 @@ var mcpServerStopCmd = &cobra.Command{
 			fmt.Println(utils.FormatError("Failed to load config: " + err.Error()))
 			os.Exit(1)
 		}
-		
+
 		fmt.Println(utils.FormatProgress("Stopping MCP server..."))
 		addr := fmt.Sprintf("http://%s:%d/shutdown", cfg.MCPServer.Host, cfg.MCPServer.Port)
 		resp, err := http.Get(addr)
@@ -898,7 +899,7 @@ var mcpServerStopCmd = &cobra.Command{
 		}
 		defer resp.Body.Close()
 		msg, _ := io.ReadAll(resp.Body)
-		
+
 		if strings.TrimSpace(string(msg)) != "" {
 			fmt.Println(utils.FormatSuccess("MCP server stopped successfully"))
 			fmt.Println(utils.InfoStyle.Render(string(msg)))
@@ -918,7 +919,7 @@ var mcpServerStatusCmd = &cobra.Command{
 			fmt.Println(utils.FormatError("Failed to load config: " + err.Error()))
 			os.Exit(1)
 		}
-		
+
 		fmt.Println(utils.FormatProgress("Checking MCP server status..."))
 		addr := fmt.Sprintf("http://%s:%d/healthz", cfg.MCPServer.Host, cfg.MCPServer.Port)
 		client := http.Client{Timeout: 2 * time.Second}
@@ -930,7 +931,7 @@ var mcpServerStatusCmd = &cobra.Command{
 		}
 		defer resp.Body.Close()
 		body, _ := io.ReadAll(resp.Body)
-		
+
 		if resp.StatusCode == 200 && strings.TrimSpace(string(body)) == "ok" {
 			fmt.Println(utils.FormatSuccess("MCP server is running"))
 			fmt.Println(utils.FormatKeyValue("Address", addr))
@@ -1070,7 +1071,7 @@ var explainOptionCmd = &cobra.Command{
 		mcpClient := mcp.NewMCPClient(mcpURL)
 		doc, err := mcpClient.QueryDocumentation(option)
 		if err != nil {
-			fmt.Println(utils.FormatError("Error querying documentation: "+err.Error()))
+			fmt.Println(utils.FormatError("Error querying documentation: " + err.Error()))
 			os.Exit(1)
 		}
 		if strings.TrimSpace(doc) == "" || strings.Contains(doc, "No relevant documentation found") {
@@ -1101,7 +1102,7 @@ var explainOptionCmd = &cobra.Command{
 		prompt := buildExplainOptionPrompt(option, doc)
 		aiResp, aiErr := provider.Query(prompt)
 		if aiErr != nil {
-			fmt.Println(utils.FormatError("AI error: "+aiErr.Error()))
+			fmt.Println(utils.FormatError("AI error: " + aiErr.Error()))
 			os.Exit(1)
 		}
 		if strings.TrimSpace(aiResp) == "" {
@@ -1125,9 +1126,446 @@ var explainOptionCmd = &cobra.Command{
 		}
 
 		fmt.Println("\n" + utils.FormatDivider())
-		
+
 		// Enhanced tips section
 		fmt.Println(utils.FormatTip("Use 'nixai search service <name>' to find related services"))
 		fmt.Println(utils.FormatNote("Run 'nixai mcp-server query <option>' for raw documentation"))
 	},
+}
+
+// Health check command for comprehensive system checks
+var healthCheckCmd = &cobra.Command{
+	Use:   "health",
+	Short: "Run comprehensive NixOS system health check",
+	Long: `Performs a comprehensive health check of your NixOS system including:
+- Configuration validation
+- System services status
+- Disk space analysis
+- Nix channels status
+- Boot system integrity
+- Network connectivity
+- Nix store health
+- AI-powered analysis and recommendations`,
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Printf("Error loading configuration: %v\n", err)
+			return
+		}
+
+		fmt.Print(utils.FormatProgress("🔍 Starting NixOS health check"))
+		fmt.Println()
+
+		runHealthCheck(cfg)
+	},
+}
+
+// runHealthCheck performs comprehensive system health checks
+func runHealthCheck(cfg *config.UserConfig) {
+	var healthReport []string
+	var issues []string
+	var warnings []string
+
+	fmt.Print(utils.FormatProgress("⚙️ Checking NixOS configuration validity"))
+	fmt.Println()
+
+	// 1. Check configuration validity with dry-run
+	executor := nixos.NewExecutor(utils.ExpandHome(cfg.NixosFolder))
+	configValid, configOutput, err := checkConfigurationValidity(executor)
+	if err != nil {
+		issues = append(issues, fmt.Sprintf("Configuration validation error: %v", err))
+	} else if !configValid {
+		issues = append(issues, fmt.Sprintf("Configuration validation failed:\n%s", configOutput))
+	} else {
+		healthReport = append(healthReport, "✅ **Configuration**: Valid and ready for deployment")
+	}
+
+	fmt.Print(utils.FormatProgress("🔧 Analyzing system services"))
+	fmt.Println()
+
+	// 2. Check critical system services
+	serviceStatus, serviceIssues := checkSystemServices(executor)
+	healthReport = append(healthReport, serviceStatus...)
+	issues = append(issues, serviceIssues...)
+
+	fmt.Print(utils.FormatProgress("💾 Checking disk space"))
+	fmt.Println()
+
+	// 3. Check disk space
+	diskStatus, diskWarnings := checkDiskSpace(executor)
+	healthReport = append(healthReport, diskStatus...)
+	warnings = append(warnings, diskWarnings...)
+
+	fmt.Print(utils.FormatProgress("📡 Checking Nix channels"))
+	fmt.Println()
+
+	// 4. Check Nix channels
+	channelStatus, channelIssues := checkNixChannels(executor)
+	healthReport = append(healthReport, channelStatus...)
+	issues = append(issues, channelIssues...)
+
+	fmt.Print(utils.FormatProgress("🚀 Checking boot system"))
+	fmt.Println()
+
+	// 5. Check boot system integrity
+	bootStatus, bootIssues := checkBootSystem(executor)
+	healthReport = append(healthReport, bootStatus...)
+	issues = append(issues, bootIssues...)
+
+	fmt.Print(utils.FormatProgress("🌐 Testing network connectivity"))
+	fmt.Println()
+
+	// 6. Check network connectivity
+	networkStatus, networkIssues := checkNetworkConnectivity()
+	healthReport = append(healthReport, networkStatus...)
+	issues = append(issues, networkIssues...)
+
+	fmt.Print(utils.FormatProgress("📦 Checking Nix store health"))
+	fmt.Println()
+
+	// 7. Check Nix store health
+	storeStatus, storeIssues := checkNixStore(executor)
+	healthReport = append(healthReport, storeStatus...)
+	issues = append(issues, storeIssues...)
+
+	// Generate comprehensive report
+	fmt.Print(utils.FormatProgress("🤖 Generating AI-powered analysis"))
+	fmt.Println()
+
+	report := generateHealthReport(healthReport, warnings, issues)
+
+	// Get AI analysis if there are issues or warnings
+	if len(issues) > 0 || len(warnings) > 0 {
+		aiAnalysis, err := getAIHealthAnalysis(cfg, issues, warnings)
+		if err == nil {
+			report += "\n\n" + utils.FormatSection("🤖 AI Analysis & Recommendations", aiAnalysis)
+		}
+	}
+
+	// Render the report with glamour
+	r, err := glamour.NewTermRenderer(
+		glamour.WithAutoStyle(),
+		glamour.WithWordWrap(80),
+	)
+	if err != nil {
+		fmt.Println(report)
+		return
+	}
+
+	output, err := r.Render(report)
+	if err != nil {
+		fmt.Println(report)
+		return
+	}
+
+	fmt.Print(output)
+}
+
+// checkConfigurationValidity checks if the NixOS configuration is valid
+func checkConfigurationValidity(executor *nixos.Executor) (bool, string, error) {
+	output, err := executor.ExecuteCommand("sudo", "nixos-rebuild", "dry-run", "--show-trace")
+	if err != nil {
+		return false, output, err
+	}
+
+	// Check for common error patterns
+	errorPatterns := []string{
+		"error:",
+		"assertion failed",
+		"infinite recursion",
+		"stack overflow",
+		"syntax error",
+	}
+
+	outputLower := strings.ToLower(output)
+	for _, pattern := range errorPatterns {
+		if strings.Contains(outputLower, pattern) {
+			return false, output, nil
+		}
+	}
+
+	return true, output, nil
+}
+
+// checkSystemServices checks the status of critical system services
+func checkSystemServices(executor *nixos.Executor) ([]string, []string) {
+	var status []string
+	var issues []string
+
+	// Critical services to check
+	criticalServices := []string{
+		"systemd-networkd",
+		"sshd",
+		"dbus",
+		"systemd-resolved",
+		"systemd-timesyncd",
+	}
+
+	for _, service := range criticalServices {
+		output, err := executor.ExecuteCommand("systemctl", "is-active", service)
+		if err != nil || strings.TrimSpace(output) != "active" {
+			issues = append(issues, fmt.Sprintf("Service **%s** is not active: %s", service, strings.TrimSpace(output)))
+		} else {
+			status = append(status, fmt.Sprintf("✅ **Service %s**: Active", service))
+		}
+	}
+
+	// Check failed services
+	output, err := executor.ExecuteCommand("systemctl", "list-units", "--failed", "--no-pager")
+	if err == nil && strings.Contains(output, "0 loaded units listed") {
+		status = append(status, "✅ **Failed Services**: None detected")
+	} else if err == nil {
+		issues = append(issues, fmt.Sprintf("Failed services detected:\n```\n%s\n```", output))
+	}
+
+	return status, issues
+}
+
+// checkDiskSpace checks available disk space
+func checkDiskSpace(executor *nixos.Executor) ([]string, []string) {
+	var status []string
+	var warnings []string
+
+	output, err := executor.ExecuteCommand("df", "-h", "/", "/nix", "/tmp", "/var")
+	if err != nil {
+		warnings = append(warnings, fmt.Sprintf("Could not check disk space: %v", err))
+		return status, warnings
+	}
+
+	lines := strings.Split(output, "\n")
+	for _, line := range lines[1:] { // Skip header
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) >= 5 {
+			mountPoint := fields[5]
+			usage := fields[4]
+
+			// Parse usage percentage
+			usageStr := strings.TrimSuffix(usage, "%")
+			if usageStr != usage { // Has % sign
+				if usageStr >= "90" {
+					warnings = append(warnings, fmt.Sprintf("**%s**: High disk usage (%s)", mountPoint, usage))
+				} else if usageStr >= "80" {
+					warnings = append(warnings, fmt.Sprintf("**%s**: Moderate disk usage (%s)", mountPoint, usage))
+				} else {
+					status = append(status, fmt.Sprintf("✅ **%s**: Good disk space (%s used)", mountPoint, usage))
+				}
+			}
+		}
+	}
+
+	return status, warnings
+}
+
+// checkNixChannels checks the status of Nix channels
+func checkNixChannels(executor *nixos.Executor) ([]string, []string) {
+	var status []string
+	var issues []string
+
+	// Check system channels
+	output, err := executor.ExecuteCommand("sudo", "nix-channel", "--list")
+	if err != nil {
+		issues = append(issues, fmt.Sprintf("Could not list system channels: %v", err))
+	} else if strings.TrimSpace(output) == "" {
+		issues = append(issues, "No system channels configured")
+	} else {
+		status = append(status, "✅ **System Channels**: Configured")
+		// Check if channels are up to date
+		updateOutput, updateErr := executor.ExecuteCommand("sudo", "nix-channel", "--update", "--dry-run")
+		if updateErr == nil && !strings.Contains(updateOutput, "updating") {
+			status = append(status, "✅ **System Channels**: Up to date")
+		}
+	}
+
+	// Check user channels
+	userOutput, err := executor.ExecuteCommand("nix-channel", "--list")
+	if err == nil && strings.TrimSpace(userOutput) != "" {
+		status = append(status, "✅ **User Channels**: Configured")
+	}
+
+	return status, issues
+}
+
+// checkBootSystem checks boot system integrity
+func checkBootSystem(executor *nixos.Executor) ([]string, []string) {
+	var status []string
+	var issues []string
+
+	// Check if current generation is bootable
+	_, err := executor.ExecuteCommand("sudo", "nixos-rebuild", "boot", "--dry-run")
+	if err != nil {
+		issues = append(issues, fmt.Sprintf("Boot configuration check failed: %v", err))
+	} else {
+		status = append(status, "✅ **Boot System**: Configuration is bootable")
+	}
+
+	// Check available generations
+	genOutput, err := executor.ExecuteCommand("sudo", "nix-env", "--list-generations", "-p", "/nix/var/nix/profiles/system")
+	if err == nil {
+		generations := strings.Split(strings.TrimSpace(genOutput), "\n")
+		if len(generations) > 0 {
+			status = append(status, fmt.Sprintf("✅ **System Generations**: %d available", len(generations)))
+		}
+	}
+
+	return status, issues
+}
+
+// checkNetworkConnectivity checks basic network connectivity
+func checkNetworkConnectivity() ([]string, []string) {
+	var status []string
+	var issues []string
+
+	// Test basic connectivity
+	client := &http.Client{Timeout: 5 * time.Second}
+	_, err := client.Get("https://cache.nixos.org")
+	if err != nil {
+		issues = append(issues, fmt.Sprintf("Cannot reach NixOS cache: %v", err))
+	} else {
+		status = append(status, "✅ **Network**: NixOS cache reachable")
+	}
+
+	_, err = client.Get("https://channels.nixos.org")
+	if err != nil {
+		issues = append(issues, fmt.Sprintf("Cannot reach NixOS channels: %v", err))
+	} else {
+		status = append(status, "✅ **Network**: NixOS channels reachable")
+	}
+
+	return status, issues
+}
+
+// checkNixStore checks Nix store health
+func checkNixStore(executor *nixos.Executor) ([]string, []string) {
+	var status []string
+	var issues []string
+
+	// Check store integrity
+	output, err := executor.ExecuteCommand("nix-store", "--verify", "--check-contents")
+	if err != nil {
+		issues = append(issues, fmt.Sprintf("Nix store verification failed: %v", err))
+	} else if strings.Contains(output, "error") {
+		issues = append(issues, fmt.Sprintf("Nix store has integrity issues:\n```\n%s\n```", output))
+	} else {
+		status = append(status, "✅ **Nix Store**: Integrity verified")
+	}
+
+	// Check for garbage collection recommendations
+	output, err = executor.ExecuteCommand("nix-store", "--gc", "--dry-run")
+	if err == nil && strings.Contains(output, "bytes would be freed") {
+		// Extract the amount that would be freed
+		re := regexp.MustCompile(`(\d+(?:\.\d+)?)\s*([KMGT]B)?\s*bytes would be freed`)
+		matches := re.FindStringSubmatch(output)
+		if len(matches) > 0 {
+			status = append(status, fmt.Sprintf("💡 **Garbage Collection**: %s can be freed", matches[0]))
+		}
+	}
+
+	return status, issues
+}
+
+// generateHealthReport creates a formatted health report
+func generateHealthReport(healthReport, warnings, issues []string) string {
+	var report strings.Builder
+
+	report.WriteString(utils.FormatHeader("🏥 NixOS System Health Check Report"))
+	report.WriteString("\n\n")
+
+	// Overall status
+	if len(issues) == 0 && len(warnings) == 0 {
+		report.WriteString(utils.FormatSuccess("🎉 System is healthy! No issues detected."))
+	} else if len(issues) == 0 {
+		report.WriteString(utils.FormatInfo("ℹ️ System is mostly healthy with some minor warnings."))
+	} else {
+		report.WriteString(utils.FormatWarning("⚠️ System has issues that need attention."))
+	}
+
+	report.WriteString("\n\n")
+
+	// Health status section
+	if len(healthReport) > 0 {
+		report.WriteString(utils.FormatSection("✅ Health Status", strings.Join(healthReport, "\n")))
+		report.WriteString("\n\n")
+	}
+
+	// Warnings section
+	if len(warnings) > 0 {
+		report.WriteString(utils.FormatSection("⚠️ Warnings", strings.Join(warnings, "\n")))
+		report.WriteString("\n\n")
+	}
+
+	// Issues section
+	if len(issues) > 0 {
+		report.WriteString(utils.FormatSection("❌ Issues Requiring Attention", strings.Join(issues, "\n")))
+		report.WriteString("\n\n")
+	}
+
+	// Add helpful tips
+	tips := []string{
+		"Run `sudo nixos-rebuild switch` to apply pending configuration changes",
+		"Use `nix-store --gc` to free up disk space by removing unused packages",
+		"Check system logs with `journalctl -xe` for detailed error information",
+		"Update channels with `sudo nix-channel --update` for latest packages",
+	}
+
+	report.WriteString(utils.FormatSection("💡 General Tips", strings.Join(tips, "\n")))
+
+	return report.String()
+}
+
+// getAIHealthAnalysis gets AI analysis of health issues
+func getAIHealthAnalysis(cfg *config.UserConfig, issues, warnings []string) (string, error) {
+	var analysisInput strings.Builder
+
+	analysisInput.WriteString("NixOS System Health Check Analysis Request:\n\n")
+
+	if len(issues) > 0 {
+		analysisInput.WriteString("ISSUES DETECTED:\n")
+		for i, issue := range issues {
+			analysisInput.WriteString(fmt.Sprintf("%d. %s\n", i+1, issue))
+		}
+		analysisInput.WriteString("\n")
+	}
+
+	if len(warnings) > 0 {
+		analysisInput.WriteString("WARNINGS:\n")
+		for i, warning := range warnings {
+			analysisInput.WriteString(fmt.Sprintf("%d. %s\n", i+1, warning))
+		}
+		analysisInput.WriteString("\n")
+	}
+
+	prompt := `You are a NixOS system administrator expert. Analyze the health check results above and provide:
+
+1. **Root Cause Analysis**: Explain what's causing each issue
+2. **Priority Assessment**: Rank issues by urgency (Critical/High/Medium/Low)
+3. **Step-by-Step Solutions**: Provide specific commands and actions to fix each issue
+4. **Prevention Tips**: How to avoid these issues in the future
+5. **Related Documentation**: Mention relevant NixOS wiki pages or manual sections
+
+Format your response in clear Markdown with proper headings and code blocks for commands.
+Be specific and actionable. Focus on NixOS-specific solutions.`
+
+	// Select AI provider based on config
+	var provider ai.AIProvider
+	switch cfg.AIProvider {
+	case "ollama":
+		provider = ai.NewOllamaProvider(cfg.AIModel)
+	case "gemini":
+		provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://api.gemini.com")
+	case "openai":
+		provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+	default:
+		provider = ai.NewOllamaProvider("llama3")
+	}
+
+	response, err := provider.Query(analysisInput.String() + "\n\n" + prompt)
+	if err != nil {
+		return "", fmt.Errorf("AI analysis failed: %w", err)
+	}
+
+	return response, nil
 }
