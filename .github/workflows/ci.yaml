@@ -27,6 +27,10 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
+      - name: Install Nix
+        run: |
+          sh <(curl -L https://nixos.org/nix/install) --no-daemon
+          . /home/runner/.nix-profile/etc/profile.d/nix.sh
       - name: Lint
         run: go fmt ./... && go vet ./...
       - name: Build
@@ -37,7 +41,9 @@ jobs:
           ./mcp-server &
           sleep 2
       - name: Test
-        run: go test -v ./...
+        run: |
+          . /home/runner/.nix-profile/etc/profile.d/nix.sh
+          go test -v ./...
 
   release:
     if: github.event_name == 'release' && github.event.action == 'published'
