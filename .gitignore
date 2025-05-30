@@ -1,5 +1,5 @@
 # Go build artifacts
-nixai
+# nixai
 *.exe
 *.out
 *.test
