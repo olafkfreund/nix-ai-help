@@ -22,22 +22,26 @@
         maintainers = [];
       };
     };
-    apps.${system}.nixai = {
-      type = "app";
-      program = "${self.packages.${system}.nixai}/bin/nixai";
+    apps.${system} = {
+      nixai = {
+        type = "app";
+        program = "${self.packages.${system}.nixai}/bin/nixai";
+        meta = {
+          description = "Run nixai from the command line";
+        };
+      };
+      default = self.apps.${system}.nixai;
     };
-    defaultPackage.${system} = self.packages.${system}.nixai;
-    defaultApp.${system} = self.apps.${system}.nixai;
+    packages.${system}.default = self.packages.${system}.nixai;
 
     # NixOS module
     nixosModules.default = import ./modules/nixos.nix;
 
     # Home Manager module
-    homeManagerModules.default = import ./modules/home-manager.nix;
+    homeConfigurations = {}; # Placeholder for home manager configs
 
     # Legacy names for backward compatibility
     nixosModule = self.nixosModules.default;
-    homeManagerModule = self.homeManagerModules.default;
 
     devShells.${system} = {
       # Default development shell for local development
@@ -77,22 +81,22 @@
           tree # Directory listing
         ];
         shellHook = ''
-          echo "🐳 [nixai] Docker development environment ready!"
-          echo "📁 Working in isolated container with cloned repository"
+          echo "🐳 [nixai] Docker isolated environment ready!"
+          echo "📁 Working with cloned repository (no host mounting)"
           echo "🔧 Available tools: go $(go version | cut -d' ' -f3), just $(just --version)"
-          
+
           # Set up Ollama host for Docker environment
           if [ -z "$OLLAMA_HOST" ]; then
             export OLLAMA_HOST="http://host.docker.internal:11434"
             echo "🤖 Ollama host set to: $OLLAMA_HOST"
           fi
-          
-          # Set up working directory if available
-          if [ -d "/workspace" ]; then
-            cd /workspace
-            echo "📂 Changed to workspace directory: $(pwd)"
+
+          # Change to cloned nixai directory
+          if [ -d "/home/nixuser/nixai" ]; then
+            cd /home/nixuser/nixai
+            echo "📂 Changed to cloned nixai directory: $(pwd)"
           fi
-          
+
           # Display available justfile commands
           echo ""
           echo "🚀 Available Docker commands:"
