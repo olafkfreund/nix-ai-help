@@ -1,6 +1,6 @@
 # nixai: NixOS AI Assistant
 
-![Build Status](https://github.com/${{ github.repository }}/actions/workflows/ci.yaml/badge.svg?branch=main)
+![Build Status](https://github.com/olafkfreund/nix-ai-help/actions/workflows/ci.yaml/badge.svg?branch=main)
 
 ## Prerequisites
 
