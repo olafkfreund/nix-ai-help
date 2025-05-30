@@ -2,13 +2,17 @@
 
 Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, documentation, and automation from the command line. This manual covers all major features, with real-world usage examples for both beginners and advanced users.
 
-> **Latest Update (May 2025)**: All three AI providers (Ollama, Gemini, OpenAI) have been comprehensively tested and verified working. MCP server integration provides enhanced documentation retrieval from official NixOS sources.
+> **Latest Update (May 2025)**: Direct question functionality has been added! Ask questions directly with `nixai "your question"` or `nixai --ask "question"`. All three AI providers (Ollama, Gemini, OpenAI) have been comprehensively tested and verified working. MCP server integration provides enhanced documentation retrieval from official NixOS sources.
 
 ---
 
 ## Table of Contents
 
 - [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Basic Setup](#basic-setup)
+  - [MCP Server for Documentation](#mcp-server-for-documentation)
+  - [Direct Question Assistant](#direct-question-assistant)
 - [Diagnosing NixOS Issues](#diagnosing-nixos-issues)
 - [Explaining NixOS and Home Manager Options](#explaining-nixos-and-home-manager-options)
 - [Searching for Packages and Services](#searching-for-packages-and-services)
@@ -67,6 +71,42 @@ The MCP server queries official documentation sources including:
 - Home Manager Manual
 
 **Note**: The MCP server runs on `localhost:8081` by default and provides enhanced documentation context for all AI providers.
+
+### Direct Question Assistant
+
+The simplest and most direct way to use nixai is by asking questions about NixOS directly from the command line:
+
+```sh
+# Ask questions directly by providing them as arguments
+./nixai "how do I enable SSH in NixOS?"
+./nixai "what is a Nix flake?"
+./nixai "how to configure services.postgresql in NixOS?"
+
+# Alternative: use the --ask or -a flag
+./nixai --ask "how do I update packages in NixOS?"
+./nixai -a "what are NixOS generations?"
+```
+
+Both methods are equivalent and provide the same functionality:
+
+1. The question is sent to your configured AI provider (Ollama, Gemini, or OpenAI)
+2. If the MCP server is running, it queries relevant NixOS documentation to provide context
+3. The AI generates a comprehensive response with practical examples and best practices
+4. The response is formatted with proper Markdown rendering in your terminal
+
+**Tips for getting the best results:**
+
+- Be specific in your questions for more targeted responses
+- Start the MCP server for documentation-enriched answers
+- For complex questions, try to break them down into specific parts
+- Use quotes around your question to prevent shell interpretation of special characters
+
+When using the direct question functionality, nixai will:
+
+- Show a progress indicator while retrieving documentation and generating a response
+- Format the output as readable, colorized Markdown in your terminal
+- Include proper code syntax highlighting for configuration snippets
+- Provide links to official documentation when relevant
 
 ---
 

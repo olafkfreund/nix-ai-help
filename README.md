@@ -10,17 +10,22 @@ See the full [nixai User Manual](docs/MANUAL.md) for comprehensive feature docum
 
 ---
 
-## Prerequisites
+### This is development code. Things may not work or are broken. I'm changing the code all the time. Don't expect something production ready
 
-Before using or developing nixai, ensure## 🚀 What's New (May 2025)
+## 🚀 What's New (May 2025)
 
+- **🆕 Direct Question Assistant**: Ask questions instantly with `nixai "your question"` or `nixai --ask "question"` for immediate AI-powered NixOS help with documentation context.
 - **Config Path Awareness Everywhere:** All features now respect the NixOS config path, settable via `--nixos-path`, config file, or interactively. If unset or invalid, you'll get clear guidance on how to fix it.
 - **Automated Service Option Lookup:** When searching for services, nixai now lists all available options for a service using `nixos-option --find services.<name>`, not just the top-level enable flag.
 - **Enhanced Error Handling:** If your config path is missing or invalid, nixai will print actionable instructions for setting it (CLI flag, config, or interactive command).
 - **🏠 Home Manager vs NixOS Visual Distinction:** Smart detection automatically shows `🖥️ NixOS Option` or `🏠 Home Manager Option` headers with appropriate documentation sources.
 - **🆕 Dedicated Home Manager Command:** New `explain-home-option` command specifically for Home Manager configuration options.
 - **🆕 AI-Powered Package Repository Analysis:** New `package-repo` command automatically analyzes Git repositories and generates complete Nix derivations using AI-powered build system detection and dependency analysis.
-- **More Tests:** New tests cover service option lookup, diagnostics, error handling, and packaging features for robust reliability.ave the following installed:
+- **More Tests:** New tests cover service option lookup, diagnostics, error handling, and packaging features for robust reliability.
+
+## Prerequisites
+
+Before using or developing nixai, ensure you have the following installed:
 
 - **Ollama** (for local LLM inference)
   - You must have the `llama3` model pulled and available in Ollama:
@@ -65,11 +70,13 @@ All other dependencies are managed by the Nix flake and justfile.
 
 ## 🚀 Project Overview
 
-**nixai** is a powerful, console-based Linux application designed to help you solve NixOS configuration problems, create and configure NixOS systems, and diagnose issues—all from the command line. It leverages advanced Large Language Models (LLMs) like Gemini, OpenAI, and Ollama, with a strong preference for local Ollama models to ensure your privacy. nixai integrates an MCP server to query NixOS documentation from multiple official and community sources, and provides interactive and scriptable diagnostics, log parsing, and command execution.
+**nixai** is a powerful, console-based Linux application designed to help you solve NixOS configuration problems, create and configure NixOS systems, and diagnose issues—all from the command line. Simply ask questions like `nixai "how do I enable SSH?"` for instant AI-powered help. It leverages advanced Large Language Models (LLMs) like Gemini, OpenAI, and Ollama, with a strong preference for local Ollama models to ensure your privacy. nixai integrates an MCP server to query NixOS documentation from multiple official and community sources, and provides interactive and scriptable diagnostics, log parsing, and command execution.
 
 ---
 
 ## ✨ Features
+
+- **🤖 Direct Question Assistant**: Ask questions directly with `nixai "your question"` or `nixai --ask "question"` for instant AI-powered NixOS help.
 
 - Diagnose NixOS issues from logs, config snippets, or `nix log` output.
 
@@ -176,6 +183,7 @@ nixai interactive
 ```
 
 **🎯 Smart Visual Distinction**: nixai automatically detects and displays the appropriate headers:
+
 - `🖥️ NixOS Option` for system-level configuration options
 - `🏠 Home Manager Option` for user-level configuration options
 
@@ -212,6 +220,7 @@ nixai package-repo https://github.com/user/project
 ```
 
 **Supported Languages & Build Systems:**
+
 - **Go**: Detects go.mod, analyzes dependencies, generates buildGoModule derivations
 - **Python**: Detects setup.py/pyproject.toml, analyzes pip dependencies
 - **Node.js**: Detects package.json, analyzes npm dependencies, generates buildNpmPackage derivations
@@ -227,6 +236,7 @@ nixai package-repo https://github.com/user/project
 - 🔗 **Git Integration**: Automatic source URL and commit information extraction
 
 **Key Features:**
+
 - **Multi-Language Support**: Works with Go, Python, Node.js, and Rust projects
 - **Build System Detection**: Automatically identifies build files and project structure
 - **AI-Powered Generation**: Uses advanced AI to generate complete, working derivations
@@ -415,6 +425,33 @@ go mod tidy                              # Update dependencies
 
 ## 📝 Commands & Usage
 
+### Ask Questions Directly
+
+The quickest way to get help with NixOS configuration is to ask questions directly:
+
+```sh
+# Ask questions directly (most common usage)
+nixai "how do I enable SSH in NixOS?"
+nixai "what is a Nix flake?"
+nixai "how do I configure nginx with SSL?"
+
+# Alternative: use the --ask flag
+nixai --ask "how do I update packages in NixOS?"
+nixai -a "what's the difference between NixOS and other Linux distributions?"
+
+# Both methods work identically and provide:
+# - AI-powered answers with examples
+# - Context from official NixOS documentation  
+# - Best practices and recommendations
+# - Beautiful formatted terminal output
+```
+
+**Features:**
+- 🤖 **AI-Powered Responses**: Get comprehensive answers using Ollama, Gemini, or OpenAI
+- 📚 **Documentation Context**: Automatic querying of official NixOS docs via MCP server
+- 🎨 **Beautiful Output**: Colorized markdown with syntax highlighting
+- ⚡ **Fast & Simple**: Just ask your question naturally
+
 ### Diagnose NixOS Issues
 
 ```sh
@@ -492,6 +529,7 @@ nixai package-repo https://github.com/user/rust-app --output ./derivations --nam
 ```
 
 **Key Features:**
+
 - **Multi-Language Support**: Detects Go modules, npm packages, Python projects, Rust crates
 - **Build System Detection**: Automatically identifies build files and project structure
 - **AI Generation**: Creates complete, valid derivations with proper structure and metadata

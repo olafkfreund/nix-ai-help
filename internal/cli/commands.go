@@ -42,6 +42,118 @@ var rootCmd = &cobra.Command{
 You can also ask questions directly, e.g.:
   nixai "how can I configure curl?"`,
 	Args: cobra.ArbitraryArgs,
+	Run: func(cmd *cobra.Command, args []string) {
+		// Check if --ask flag was used
+		askFlag, _ := cmd.Flags().GetString("ask")
+
+		var question string
+		if askFlag != "" {
+			// Use the question from the --ask flag
+			question = askFlag
+		} else if len(args) > 0 {
+			// Join all arguments into a single question
+			question = strings.Join(args, " ")
+		} else {
+			// If no arguments provided and no --ask flag, show help
+			cmd.Help()
+			return
+		}
+
+		fmt.Println(utils.FormatHeader("🤖 NixAI Question Assistant"))
+		fmt.Println(utils.FormatKeyValue("Question", question))
+		fmt.Println(utils.FormatDivider())
+
+		// Load configuration
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading user config: "+err.Error()))
+			os.Exit(1)
+		}
+
+		// Initialize AI provider
+		var provider ai.AIProvider
+		switch cfg.AIProvider {
+		case "ollama":
+			provider = ai.NewOllamaProvider(getOllamaModel(cfg.AIModel))
+		case "gemini":
+			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+		case "openai":
+			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		default:
+			provider = ai.NewOllamaProvider(getOllamaModel(""))
+		}
+
+		// Check MCP server status and query documentation if available
+		fmt.Print(utils.FormatProgress("Checking documentation server..."))
+		mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
+		var docContext string
+
+		statusResp, err := http.Get(mcpURL + "/healthz")
+		if err == nil && statusResp.StatusCode == 200 {
+			fmt.Print(utils.FormatProgress("Querying NixOS documentation..."))
+
+			// Query MCP server for relevant documentation
+			queryURL := fmt.Sprintf("%s/query?q=%s", mcpURL, question)
+			docResp, err := http.Get(queryURL)
+			if err == nil && docResp.StatusCode == 200 {
+				defer docResp.Body.Close()
+				body, err := io.ReadAll(docResp.Body)
+				if err == nil && len(body) > 50 {
+					docContext = string(body)
+					fmt.Println(utils.FormatSuccess("Documentation retrieved"))
+				}
+			}
+			statusResp.Body.Close()
+		}
+
+		// Prepare AI prompt with documentation context
+		prompt := fmt.Sprintf(`You are a NixOS expert assistant. Please provide a helpful, accurate answer to this question about NixOS configuration:
+
+Question: %s
+
+Please provide:
+1. A clear, practical answer
+2. Relevant configuration examples if applicable  
+3. Any important considerations or best practices
+4. Links to official documentation when relevant
+
+Keep the response concise but comprehensive.`, question)
+
+		if docContext != "" {
+			prompt += fmt.Sprintf(`
+
+Here is relevant documentation context to help inform your answer:
+
+%s`, docContext)
+		}
+
+		// Get AI response
+		fmt.Print(utils.FormatProgress("Generating answer..."))
+		response, err := provider.Query(prompt)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to generate response: "+err.Error()))
+			os.Exit(1)
+		}
+
+		fmt.Println(utils.FormatSuccess("Response generated"))
+		fmt.Println()
+
+		// Format and display the response
+		renderer, err := glamour.NewTermRenderer(
+			glamour.WithAutoStyle(),
+			glamour.WithWordWrap(100),
+		)
+		if err != nil {
+			fmt.Println(response)
+		} else {
+			formatted, err := renderer.Render(response)
+			if err != nil {
+				fmt.Println(response)
+			} else {
+				fmt.Print(formatted)
+			}
+		}
+	},
 }
 
 var logFile string
@@ -49,6 +161,7 @@ var configSnippet string
 var nixosConfigPath string
 var nixLogTarget string          // New: for --nix-log flag
 var nixosConfigPathGlobal string // Global path for build/flake context
+var askQuestion string           // New: for --ask/-a flag
 
 // Tail the last n lines of a string
 func tailLines(s string, n int) string {
@@ -86,6 +199,7 @@ func init() {
 	decodeErrorCmd.Flags().StringP("log-file", "l", "", "Path to a log file containing error messages to analyze")
 	searchCmd.Flags().StringVarP(&nixosConfigPath, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
 	rootCmd.PersistentFlags().StringVarP(&nixosConfigPathGlobal, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
+	rootCmd.Flags().StringVarP(&askQuestion, "ask", "a", "", "Ask a question about NixOS configuration")
 	configCmd.AddCommand(showUserConfig)
 	mcpServerCmd.AddCommand(mcpServerStartCmd)
 	mcpServerCmd.AddCommand(mcpServerStopCmd)
