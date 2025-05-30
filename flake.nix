@@ -39,21 +39,70 @@
     nixosModule = self.nixosModules.default;
     homeManagerModule = self.homeManagerModules.default;
 
-    devShells.${system}.default = pkgs.mkShell {
-      buildInputs = with pkgs; [
-        go
-        just
-        golangci-lint
-        git
-        curl
-        nix
-      ];
-      shellHook = ''
-        export GOPATH=$(pwd)/go
-        export PATH=$GOPATH/bin:$PATH
-        echo "🚀 Nix development environment ready!"
-        echo "Available tools: go $(go version | cut -d' ' -f3), just $(just --version)"
-      '';
+    devShells.${system} = {
+      # Default development shell for local development
+      default = pkgs.mkShell {
+        buildInputs = with pkgs; [
+          go
+          just
+          golangci-lint
+          git
+          curl
+          nix
+        ];
+        shellHook = ''
+          export GOPATH=$(pwd)/go
+          export PATH=$GOPATH/bin:$PATH
+          echo "🚀 Nix development environment ready!"
+          echo "Available tools: go $(go version | cut -d' ' -f3), just $(just --version)"
+        '';
+      };
+
+      # Docker development shell for isolated container environment
+      # This shell is used inside Docker containers with cloned nixai repository
+      docker = pkgs.mkShell {
+        name = "nixai-docker-devshell";
+        buildInputs = with pkgs; [
+          go
+          just
+          neovim
+          git
+          curl
+          python3
+          nodejs
+          alejandra # Nix formatter
+          nixos-install-tools
+          jq # JSON processing for config handling
+          htop # System monitoring
+          tree # Directory listing
+        ];
+        shellHook = ''
+          echo "🐳 [nixai] Docker development environment ready!"
+          echo "📁 Working in isolated container with cloned repository"
+          echo "🔧 Available tools: go $(go version | cut -d' ' -f3), just $(just --version)"
+          
+          # Set up Ollama host for Docker environment
+          if [ -z "$OLLAMA_HOST" ]; then
+            export OLLAMA_HOST="http://host.docker.internal:11434"
+            echo "🤖 Ollama host set to: $OLLAMA_HOST"
+          fi
+          
+          # Set up working directory if available
+          if [ -d "/workspace" ]; then
+            cd /workspace
+            echo "📂 Changed to workspace directory: $(pwd)"
+          fi
+          
+          # Display available justfile commands
+          echo ""
+          echo "🚀 Available Docker commands:"
+          echo "  just build-docker     - Build nixai in container"
+          echo "  just run-docker       - Run built nixai"
+          echo "  just install-docker   - Install nixai globally"
+          echo "  just help            - Show all available commands"
+          echo ""
+        '';
+      };
     };
   };
 }

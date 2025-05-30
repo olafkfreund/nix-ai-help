@@ -1,0 +1,3 @@
+ls
+nix develop
+exit

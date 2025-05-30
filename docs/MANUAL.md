@@ -19,6 +19,8 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 - [AI-Powered Package Repository Analysis](#ai-powered-package-repository-analysis)
 - [System Health Checks](#system-health-checks)
 - [Interactive Mode](#interactive-mode)
+- [Editor Integration](#editor-integration)
+  - [Neovim Integration](#neovim-integration)
 - [Advanced Usage](#advanced-usage)
 - [Configuration](#configuration)
 - [Tips & Troubleshooting](#tips--troubleshooting)
@@ -459,6 +461,124 @@ Interactive mode is ideal for:
 - New users who want a guided experience
 - Power users who want to chain commands and get instant feedback
 - Troubleshooting and exploring NixOS options, logs, and documentation in a conversational way
+
+---
+
+## Editor Integration
+
+### Neovim Integration
+
+nixai can be integrated with Neovim to provide AI-powered diagnostics, explanations, and suggestions directly within your editor.
+
+#### Setting up Neovim Integration
+
+The fastest way to set up Neovim integration is using the built-in command:
+
+```sh
+# Basic setup with default socket path
+nixai neovim-setup
+
+# With custom socket path (if you're using a non-default socket)
+nixai neovim-setup --socket-path=/path/to/socket
+
+# With custom Neovim config directory
+nixai neovim-setup --config-dir=/path/to/config
+```
+
+This command:
+
+1. Creates a `nixai.lua` module in your Neovim configuration
+2. Shows you the code to add to your `init.lua` or `init.vim`
+3. Sets up keymaps for NixOS documentation lookup and option explanations
+
+#### Using nixai in Neovim
+
+Once set up, you can use these default keybindings:
+
+- `<leader>nq` - Ask a NixOS question (opens prompt)
+- `<leader>ns` - Get context-aware suggestions based on your current file
+- `<leader>no` - Explain a NixOS option (opens prompt)
+- `<leader>nh` - Explain a Home Manager option (opens prompt)
+
+For example, when editing your NixOS configuration:
+
+1. Place your cursor on a line with a NixOS option like `services.nginx.enable = true;`
+2. Press `<leader>ns` to get context-aware suggestions about nginx configuration
+3. Or press `<leader>no` and type `services.nginx.enable` to get a detailed explanation
+
+#### Customizing Neovim Integration
+
+You can customize how nixai integrates with your Neovim setup by editing the `~/.config/nvim/lua/nixai.lua` file or modifying the setup call:
+
+```lua
+-- In your init.lua
+require('nixai').setup({
+  socket_path = "/custom/path/to/mcp.sock", -- Custom socket path
+  disable_keymaps = true,  -- Disable default keymaps if you want your own
+})
+
+-- Custom keymaps
+vim.keymap.set('n', '<leader>nx', require('nixai').ask_query, {desc = 'NixAI Query'})
+vim.keymap.set('n', '<leader>nr', require('nixai').show_suggestion, {desc = 'NixAI Suggestion'})
+```
+
+#### Telescope Integration
+
+You can create a Telescope integration for nixai queries:
+
+```lua
+local nixai_picker = function()
+  require('telescope.pickers').new({}, {
+    prompt_title = 'NixOS Query',
+    finder = require('telescope.finders').new_dynamic({
+      fn = function(prompt)
+        if #prompt > 0 then
+          local result = require('nixai').query_docs(prompt)
+          if result and result.content and result.content[1] then
+            return {{value = result.content[1].text, display = prompt}}
+          end
+        end
+        return {}
+      end,
+      entry_maker = function(entry)
+        return {
+          value = entry,
+          display = entry.display,
+          ordinal = entry.display,
+        }
+      end,
+    }),
+    sorter = require('telescope.config').values.generic_sorter({}),
+    attach_mappings = function(prompt_bufnr)
+      require('telescope.actions').select_default:replace(function()
+        require('telescope.actions').close(prompt_bufnr)
+        local selection = require('telescope.actions.state').get_selected_entry()
+        require('nixai').show_in_float({
+          content = {{text = selection.value.value}}
+        }, "NixOS: " .. selection.value.display)
+      end)
+      return true
+    end,
+  }):find()
+end
+
+vim.keymap.set('n', '<leader>nt', nixai_picker, {desc = 'Telescope NixOS Query'})
+```
+
+#### Benefits of Neovim Integration
+
+- Seamless workflow for NixOS users who prefer working in Neovim
+- Context-aware suggestions based on your current file and cursor position
+- Quick access to NixOS and Home Manager documentation and options
+- Floating windows with properly formatted markdown display
+- Works with your existing Neovim configuration
+
+#### Requirements
+
+- Running nixai MCP server (`nixai mcp-server start --background`)
+- socat installed (`nix-env -iA nixos.socat` or add to your system packages)
+
+For more details and advanced usage, see the [Neovim Integration](neovim-integration.md) documentation.
 
 ---
 

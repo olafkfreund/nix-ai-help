@@ -741,6 +741,30 @@ nixai mcp-server stop
 - Supports running as a background daemon process
 - Use environment variable `NIXAI_SOCKET_PATH` to set socket path system-wide
 
+### Editor Integration
+
+#### Neovim Integration
+
+```sh
+# Set up Neovim integration
+nixai neovim-setup
+
+# With custom socket path
+nixai neovim-setup --socket-path="/path/to/mcp.sock"
+
+# With custom Neovim config directory
+nixai neovim-setup --config-dir="/path/to/neovim/config"
+```
+
+Once set up, use these keybindings in Neovim:
+
+- `<leader>nq` - Ask a NixOS question
+- `<leader>ns` - Get context-aware suggestions
+- `<leader>no` - Explain a NixOS option
+- `<leader>nh` - Explain a Home Manager option
+
+See [Neovim Integration](docs/neovim-integration.md) for detailed setup instructions and advanced usage.
+
 ---
 
 ## 📝 How to Use the Latest Features
