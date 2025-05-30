@@ -159,6 +159,7 @@ func (ua *UpgradeAdvisor) AnalyzeUpgradeOptions(ctx context.Context) (*UpgradeIn
 // getCurrentVersion gets the current NixOS version
 func (ua *UpgradeAdvisor) getCurrentVersion(ctx context.Context, info *UpgradeInfo) error {
 	// Get NixOS version
+	// #nosec G204 -- Arguments are constructed internally, not from user input
 	cmd := exec.CommandContext(ctx, "nixos-version")
 	output, err := cmd.Output()
 	if err != nil {
@@ -181,6 +182,7 @@ func (ua *UpgradeAdvisor) getCurrentVersion(ctx context.Context, info *UpgradeIn
 // getCurrentChannelInfo gets the current channel information (for traditional configs only)
 func (ua *UpgradeAdvisor) getCurrentChannelInfo(ctx context.Context, info *UpgradeInfo) error {
 	// Get current channel
+	// #nosec G204 -- Arguments are constructed internally, not from user input
 	cmd := exec.CommandContext(ctx, "nix-channel", "--list")
 	output, err := cmd.Output()
 	if err != nil {
@@ -359,6 +361,7 @@ func (ua *UpgradeAdvisor) checkConfigurationFiles(ctx context.Context, info *Upg
 
 // checkDiskSpace verifies sufficient disk space for upgrade
 func (ua *UpgradeAdvisor) checkDiskSpace(ctx context.Context, info *UpgradeInfo) CheckResult {
+	// #nosec G204 -- Arguments are constructed internally, not from user input
 	cmd := exec.CommandContext(ctx, "df", "-h", "/nix")
 	output, err := cmd.Output()
 	if err != nil {
@@ -458,9 +461,11 @@ func (ua *UpgradeAdvisor) checkConfigValidity(ctx context.Context, info *Upgrade
 	// If we have a config path, run the check from that directory
 	var cmd *exec.Cmd
 	if ua.configPath != "" {
+		// #nosec G204 -- Arguments are constructed internally, not from user input
 		cmd = exec.CommandContext(ctx, "nixos-rebuild", "dry-run", "--fast")
 		cmd.Dir = ua.configPath
 	} else {
+		// #nosec G204 -- Arguments are constructed internally, not from user input
 		cmd = exec.CommandContext(ctx, "nixos-rebuild", "dry-run", "--fast")
 	}
 
@@ -498,6 +503,7 @@ func (ua *UpgradeAdvisor) checkConfigValidity(ctx context.Context, info *Upgrade
 
 // checkRunningServices checks for critical running services
 func (ua *UpgradeAdvisor) checkRunningServices(ctx context.Context, info *UpgradeInfo) CheckResult {
+	// #nosec G204 -- Arguments are constructed internally, not from user input
 	cmd := exec.CommandContext(ctx, "systemctl", "list-units", "--failed", "--no-legend")
 	output, err := cmd.Output()
 	if err != nil {
@@ -530,6 +536,7 @@ func (ua *UpgradeAdvisor) checkRunningServices(ctx context.Context, info *Upgrad
 
 // checkChannelUpdates verifies channel update status
 func (ua *UpgradeAdvisor) checkChannelUpdates(ctx context.Context, info *UpgradeInfo) CheckResult {
+	// #nosec G204 -- Arguments are constructed internally, not from user input
 	cmd := exec.CommandContext(ctx, "nix-channel", "--update", "--dry-run")
 	err := cmd.Run()
 	if err != nil {
@@ -552,6 +559,7 @@ func (ua *UpgradeAdvisor) checkChannelUpdates(ctx context.Context, info *Upgrade
 // checkBootLoader verifies boot loader configuration
 func (ua *UpgradeAdvisor) checkBootLoader(ctx context.Context, info *UpgradeInfo) CheckResult {
 	// Check if systemd-boot or GRUB is configured
+	// #nosec G204 -- Arguments are constructed internally, not from user input
 	cmd := exec.CommandContext(ctx, "test", "-d", "/boot/loader")
 	err := cmd.Run()
 	if err == nil {
@@ -562,6 +570,7 @@ func (ua *UpgradeAdvisor) checkBootLoader(ctx context.Context, info *UpgradeInfo
 		}
 	}
 
+	// #nosec G204 -- Arguments are constructed internally, not from user input
 	cmd = exec.CommandContext(ctx, "test", "-f", "/boot/grub/grub.cfg")
 	err = cmd.Run()
 	if err == nil {
@@ -583,6 +592,7 @@ func (ua *UpgradeAdvisor) checkBootLoader(ctx context.Context, info *UpgradeInfo
 
 // checkNetworkConnectivity verifies network access to Nix caches
 func (ua *UpgradeAdvisor) checkNetworkConnectivity(ctx context.Context, info *UpgradeInfo) CheckResult {
+	// #nosec G204 -- Arguments are constructed internally, not from user input
 	cmd := exec.CommandContext(ctx, "curl", "-s", "--max-time", "10",
 		"https://cache.nixos.org/nix-cache-info")
 	err := cmd.Run()
@@ -605,6 +615,7 @@ func (ua *UpgradeAdvisor) checkNetworkConnectivity(ctx context.Context, info *Up
 
 // checkNixStoreIntegrity verifies Nix store integrity
 func (ua *UpgradeAdvisor) checkNixStoreIntegrity(ctx context.Context, info *UpgradeInfo) CheckResult {
+	// #nosec G204 -- Arguments are constructed internally, not from user input
 	cmd := exec.CommandContext(ctx, "nix-store", "--verify", "--check-contents")
 	cmd.Env = append(cmd.Env, "NIX_STORE_CHECK_LIMIT=100") // Limit check for performance
 	err := cmd.Run()
@@ -636,6 +647,7 @@ func (ua *UpgradeAdvisor) checkFlakeInputs(ctx context.Context, info *UpgradeInf
 	}
 
 	// Test if we can evaluate the flake without building
+	// #nosec G204 -- Arguments are constructed internally, not from user input
 	cmd := exec.CommandContext(ctx, "nix", "flake", "show", ua.configPath, "--no-build")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -732,6 +744,7 @@ func (ua *UpgradeAdvisor) getFlakeInputInfo(ctx context.Context, info *UpgradeIn
 	}
 
 	// Get flake inputs information
+	// #nosec G204 -- Arguments are constructed internally, not from user input
 	cmd := exec.CommandContext(ctx, "nix", "flake", "metadata", ua.configPath, "--json")
 	output, err := cmd.Output()
 	if err != nil {

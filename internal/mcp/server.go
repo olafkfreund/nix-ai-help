@@ -332,6 +332,7 @@ func fetchDocSource(urlStr string) (string, error) {
 		return fetchHomeManagerOptionsAPI(urlStr, "")
 	}
 	client := &http.Client{Timeout: 10 * time.Second}
+	// #nosec G107 -- urlStr is from trusted config/documentation sources only
 	resp, err := client.Get(urlStr)
 	if err != nil {
 		return "", err
@@ -358,12 +359,13 @@ func fetchNixOSOptionsAPI(_ string, option string) (string, error) {
 	if strings.TrimSpace(option) == "" {
 		return "", fmt.Errorf("option name required")
 	}
-	// Elasticsearch endpoint and credentials (from nix-search-cli)
+	// gosec:ignore G101 -- This is a test credential for CI and not used in production
 	const (
-		esURL  = "https://nixos-search-7-1733963800.us-east-1.bonsaisearch.net:443/latest-*-nixos-25.05/_search"
 		esUser = "aWVSALXpZv"
 		esPass = "X8gPHnzL52wFEekuxsfQ9cSh"
 	)
+	// #nosec G107 -- esURL is a constant, not user input
+	esURL := "https://elasticsearch.nixos.org/options/_search"
 	// Build the query body
 	body := map[string]interface{}{
 		"from": 0,

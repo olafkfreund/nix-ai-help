@@ -150,7 +150,7 @@ func (ps *PackagingService) cloneRepository(repoURL string, quiet bool) (string,
 
 // saveDerivation saves the derivation to a file
 func (ps *PackagingService) saveDerivation(derivation, outputPath, projectName string) (string, error) {
-	// Ensure output directory exists
+	// #nosec G301 -- Output directory is user-controlled and not sensitive
 	if err := os.MkdirAll(outputPath, 0755); err != nil {
 		return "", fmt.Errorf("failed to create output directory: %w", err)
 	}
@@ -159,7 +159,7 @@ func (ps *PackagingService) saveDerivation(derivation, outputPath, projectName s
 	filename := fmt.Sprintf("%s.nix", projectName)
 	filepath := filepath.Join(outputPath, filename)
 
-	// Write derivation to file
+	// #nosec G306 -- Derivation output is not sensitive, 0644 is intentional for Nix usage
 	if err := os.WriteFile(filepath, []byte(derivation), 0644); err != nil {
 		return "", fmt.Errorf("failed to write derivation file: %w", err)
 	}

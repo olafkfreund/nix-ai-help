@@ -44,6 +44,7 @@ func (gc *GitCloner) CloneRepository(repoURL string) (string, error) {
 	}
 
 	// Clone the repository
+	// #nosec G204 -- repoURL and targetDir are validated/trusted or controlled by CLI logic
 	cmd := exec.Command("git", "clone", "--depth", "1", repoURL, targetDir)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -79,6 +80,7 @@ func (gc *GitCloner) CloneRepositoryQuiet(repoURL string) (string, error) {
 	}
 
 	// Clone the repository quietly
+	// #nosec G204 -- repoURL and targetDir are validated/trusted or controlled by CLI logic
 	cmd := exec.Command("git", "clone", "--depth", "1", "--quiet", repoURL, targetDir)
 
 	if err := cmd.Run(); err != nil {

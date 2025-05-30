@@ -14,6 +14,7 @@ func (ra *RepositoryAnalyzer) analyzeNpmDependencies(repoPath string) ([]Depende
 	var dependencies []Dependency
 
 	packageJSONPath := filepath.Join(repoPath, "package.json")
+	// #nosec G304 -- File paths are from trusted repo structure, not user input
 	content, err := os.ReadFile(packageJSONPath)
 	if err != nil {
 		return dependencies, nil // No package.json found
@@ -56,6 +57,7 @@ func (ra *RepositoryAnalyzer) analyzeCargoDependencies(repoPath string) ([]Depen
 	var dependencies []Dependency
 
 	cargoTomlPath := filepath.Join(repoPath, "Cargo.toml")
+	// #nosec G304 -- File paths are from trusted repo structure, not user input
 	content, err := os.ReadFile(cargoTomlPath)
 	if err != nil {
 		return dependencies, nil
@@ -124,6 +126,7 @@ func (ra *RepositoryAnalyzer) analyzeGoDependencies(repoPath string) ([]Dependen
 	var dependencies []Dependency
 
 	goModPath := filepath.Join(repoPath, "go.mod")
+	// #nosec G304 -- File paths are from trusted repo structure, not user input
 	content, err := os.ReadFile(goModPath)
 	if err != nil {
 		return dependencies, nil
@@ -200,6 +203,7 @@ func (ra *RepositoryAnalyzer) analyzePythonDependencies(repoPath string) ([]Depe
 func (ra *RepositoryAnalyzer) parseRequirementsTxt(filePath string) ([]Dependency, error) {
 	var dependencies []Dependency
 
+	// #nosec G304 -- File paths are from trusted repo structure, not user input
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
@@ -239,6 +243,7 @@ func (ra *RepositoryAnalyzer) parseRequirementsTxt(filePath string) ([]Dependenc
 func (ra *RepositoryAnalyzer) parseSetupPy(filePath string) ([]Dependency, error) {
 	var dependencies []Dependency
 
+	// #nosec G304 -- File paths are from trusted repo structure, not user input
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
@@ -277,6 +282,7 @@ func (ra *RepositoryAnalyzer) parseSetupPy(filePath string) ([]Dependency, error
 func (ra *RepositoryAnalyzer) parsePyprojectToml(filePath string) ([]Dependency, error) {
 	var dependencies []Dependency
 
+	// #nosec G304 -- File paths are from trusted repo structure, not user input
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
@@ -341,6 +347,7 @@ func (ra *RepositoryAnalyzer) analyzeCMakeDependencies(repoPath string) ([]Depen
 func (ra *RepositoryAnalyzer) parseCMakeFile(filePath string) ([]Dependency, error) {
 	var dependencies []Dependency
 
+	// #nosec G304 -- File paths are from trusted repo structure, not user input
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
@@ -380,6 +387,7 @@ func (ra *RepositoryAnalyzer) analyzeMesonDependencies(repoPath string) ([]Depen
 	var dependencies []Dependency
 
 	mesonFile := filepath.Join(repoPath, "meson.build")
+	// #nosec G304 -- File paths are from trusted repo structure, not user input
 	content, err := os.ReadFile(mesonFile)
 	if err != nil {
 		return nil, err
