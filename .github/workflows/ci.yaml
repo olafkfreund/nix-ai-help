@@ -31,6 +31,11 @@ jobs:
         run: go fmt ./... && go vet ./...
       - name: Build
         run: go build ./...
+      - name: Start MCP server
+        run: |
+          go build -o mcp-server ./internal/mcp/server.go
+          ./mcp-server &
+          sleep 2
       - name: Test
         run: go test -v ./...
 
