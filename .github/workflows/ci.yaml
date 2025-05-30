@@ -35,6 +35,10 @@ jobs:
         run: go fmt ./... && go vet ./...
       - name: Build
         run: go build ./...
+      - name: Build with flake.nix
+        run: |
+          . /home/runner/.nix-profile/etc/profile.d/nix.sh
+          nix build
 
   release:
     if: github.event_name == 'release' && github.event.action == 'published'

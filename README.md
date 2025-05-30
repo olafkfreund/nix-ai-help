@@ -1,5 +1,7 @@
 # nixai: NixOS AI Assistant
 
+![Build Status](https://github.com/${{ github.repository }}/actions/workflows/ci.yaml/badge.svg?branch=main)
+
 ## Prerequisites
 
 Before using or developing nixai, ensure## 🚀 What's New (May 2025)
