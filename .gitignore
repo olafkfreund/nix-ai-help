@@ -1,5 +1,6 @@
 # Go build artifacts
-# nixai
+nixai
+main
 *.exe
 *.out
 *.test
@@ -13,8 +14,17 @@ vendor/
 /result-bin
 /result*
 
+# Logs and debug files
+*.log
+*debug*.go
+*test*.go
+
 # Nix flake lock
 flake.lock
+
+# Temporary files
+*.tmp
+*.temp
 
 # Editor/project files
 .idea/
