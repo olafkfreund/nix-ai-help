@@ -722,14 +722,40 @@ nix develop
 just build
 
 # Run all tests
-just test
+just test-all
 
 # Check code quality
 just lint
 
 # Build using Nix directly
 nix build .#nixai
-./result/bin/nixai --help
+```
+
+### Test Structure
+
+Tests are organized in the `tests/` directory by category:
+
+- **MCP Tests**: `tests/mcp/` - Tests for MCP protocol and server
+- **VS Code Tests**: `tests/vscode/` - Tests for VS Code integration
+- **Provider Tests**: `tests/providers/` - Tests for AI provider integration
+
+Run specific test groups:
+
+```sh
+# MCP tests only
+just test-mcp
+
+# VS Code integration tests only
+just test-vscode
+
+# AI provider tests only
+just test-providers
+```
+
+Check test environment compatibility:
+
+```sh
+./tests/check-compatibility.sh
 ```
 
 ### Using Go Directly

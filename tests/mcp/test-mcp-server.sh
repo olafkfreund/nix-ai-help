@@ -2,15 +2,20 @@
 
 # Test script for MCP server functionality
 # Tests both HTTP and MCP protocol endpoints
+# Part of the NixAI test suite
 
 set -e
+
+# Determine path to nixai executable (handles running from any directory)
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$HOME/Source/NIX/nix-ai-help")
+NIXAI_BIN="$REPO_ROOT/nixai"
 
 echo "🧪 Testing nixai MCP Server Integration"
 echo "======================================="
 
 # Test 1: Server Status
 echo "📋 Test 1: Server Status"
-./nixai mcp-server status
+$NIXAI_BIN mcp-server status
 echo "✅ Server status check passed"
 echo
 
@@ -67,7 +72,7 @@ echo
 
 # Test 5: Test nixai CLI integration
 echo "📋 Test 5: CLI Integration"
-response=$(./nixai explain-option services.nginx.enable 2>&1 || true)
+response=$($NIXAI_BIN explain-option services.nginx.enable 2>&1 || true)
 if echo "$response" | grep -q -E "(nginx|Nginx|HTTP|web server)" && ! echo "$response" | grep -q "Error"; then
     echo "✅ CLI integration working with MCP server"
 else

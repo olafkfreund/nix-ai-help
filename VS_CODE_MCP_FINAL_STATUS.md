@@ -4,7 +4,8 @@
 
 After extensive testing, the nixai MCP server is working correctly:
 
-### ✅ Confirmed Working:
+### ✅ Confirmed Working
+
 - MCP server responds to protocol requests
 - Unix socket is accessible and functional  
 - JSON-RPC2 communication works perfectly
@@ -12,14 +13,16 @@ After extensive testing, the nixai MCP server is working correctly:
 - Both Python socket and socat connections work
 - Bridge scripts work correctly
 
-### 🔧 VS Code Integration Status:
+### 🔧 VS Code Integration Status
 
 **FINDING**: The MCP server is fully functional. VS Code integration requires **manual activation** of the extensions.
 
-## Manual VS Code Integration Steps:
+## Manual VS Code Integration Steps
 
 ### 1. Verify Configuration
+
 The following VS Code settings are configured in `.vscode/settings.json`:
+
 ```json
 {
   "mcp.servers": {
@@ -40,6 +43,7 @@ The following VS Code settings are configured in `.vscode/settings.json`:
 ```
 
 ### 2. Installed Extensions
+
 - ✅ `automatalabs.copilot-mcp` - MCP server manager
 - ✅ `zebradev.mcp-server-runner` - MCP server runner
 - ✅ `saoudrizwan.claude-dev` (Cline) - AI assistant with MCP support
@@ -48,6 +52,7 @@ The following VS Code settings are configured in `.vscode/settings.json`:
 ### 3. Manual Activation Methods
 
 #### Method A: Claude Dev (Cline)
+
 1. Open VS Code in this workspace: `code .`
 2. Open Command Palette (`Ctrl+Shift+P`)
 3. Search for "Cline" or "Claude Dev"
@@ -55,6 +60,7 @@ The following VS Code settings are configured in `.vscode/settings.json`:
 5. Try asking Cline: "Can you use the nixai MCP server to explain services.nginx.enable?"
 
 #### Method B: MCP Extension Commands
+
 1. Open Command Palette (`Ctrl+Shift+P`)
 2. Search for "MCP" to see available commands:
    - `MCP: List Servers`
@@ -62,11 +68,13 @@ The following VS Code settings are configured in `.vscode/settings.json`:
    - `MCP: Restart Servers`
 
 #### Method C: VS Code Developer Console
+
 1. Open `Help > Toggle Developer Tools`
 2. Check Console tab for MCP-related logs
 3. Look for connection attempts or errors
 
 #### Method D: Extension Settings
+
 1. Go to `File > Preferences > Settings`
 2. Search for "MCP" in settings
 3. Enable any MCP-related features found

@@ -1,0 +1,7 @@
+# Python test dependencies for NixAI
+# Required for running test scripts in tests/ directory
+
+# No external dependencies beyond standard library for basic tests
+# If future tests require additional packages, add them here:
+# Example: requests>=2.28.0
+# Example: pytest>=7.3.1

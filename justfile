@@ -49,6 +49,26 @@ test:
 	@echo "Running tests..."
 	go test ./...
 
+# Run all tests (including Go tests, MCP tests, VS Code integration tests, provider tests)
+test-all:
+	@echo "Running all tests..."
+	./tests/run_all.sh
+
+# Run only MCP tests
+test-mcp:
+	@echo "Running MCP tests..."
+	./tests/run_mcp.sh
+
+# Run only VS Code integration tests
+test-vscode:
+	@echo "Running VS Code integration tests..."
+	./tests/run_vscode.sh
+
+# Run only AI provider tests
+test-providers:
+	@echo "Running AI provider tests..."
+	./tests/run_providers.sh
+
 # Test with coverage
 test-coverage:
 	@echo "Running tests with coverage..."
@@ -233,6 +253,10 @@ help:
 	@echo ""
 	@echo "Testing:"
 	@echo "  test          - Run tests"
+	@echo "  test-all      - Run all tests (including Go tests, MCP tests, VS Code integration tests, provider tests)"
+	@echo "  test-mcp      - Run only MCP tests"
+	@echo "  test-vscode   - Run only VS Code integration tests"
+	@echo "  test-providers - Run only AI provider tests"
 	@echo "  test-coverage - Run tests with coverage"
 	@echo "  test-race     - Run tests with race detection"
 	@echo "  test-bench    - Run benchmark tests"
