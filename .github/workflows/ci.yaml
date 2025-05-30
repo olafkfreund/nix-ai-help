@@ -38,7 +38,7 @@ jobs:
       - name: Build with flake.nix
         run: |
           . /home/runner/.nix-profile/etc/profile.d/nix.sh
-          nix --extra-experimental-features nix-command build
+          nix --extra-experimental-features 'nix-command flakes' build
 
   release:
     if: github.event_name == 'release' && github.event.action == 'published'
