@@ -2,7 +2,7 @@
 
 ![Build Status](https://github.com/olafkfreund/nix-ai-help/actions/workflows/ci.yaml/badge.svg?branch=main)
 [![Lint Status](https://github.com/olafkfreund/nix-ai-help/actions/workflows/ci.yaml/badge.svg?branch=main&label=lint)](https://github.com/olafkfreund/nix-ai-help/actions/workflows/ci.yaml)
-[![Security Tested](https://github.com/olafkfreund/nix-ai-help/actions/workflows/ci.yaml/badge.svg?branch=main&label=security)](https://github.com/olafkfreund/nix-ai-help/actions/workflows/ci.yaml)
+<!-- [![Security Tested](https://github.com/olafkfreund/nix-ai-help/actions/workflows/ci.yaml/badge.svg?branch=main&label=security)](https://github.com/olafkfreund/nix-ai-help/actions/workflows/ci.yaml) -->
 
 ---
 

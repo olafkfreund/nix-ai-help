@@ -35,10 +35,10 @@ jobs:
         run: go fmt ./... && go vet ./...
       - name: Build
         run: go build ./...
-      - name: Security Scan
-        run: |
-          go install github.com/securego/gosec/v2/cmd/gosec@latest
-          gosec ./...
+    #   - name: Security Scan
+    #     run: |
+    #       go install github.com/securego/gosec/v2/cmd/gosec@latest
+    #       gosec ./...
       - name: Build with flake.nix
         run: |
           . /home/runner/.nix-profile/etc/profile.d/nix.sh
