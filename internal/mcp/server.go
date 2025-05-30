@@ -407,8 +407,8 @@ func (s *Server) Start() error {
 		errCh <- server.ListenAndServe()
 	}()
 
-	// Run MCP server in goroutine
-	mcpErrCh := make(chan error, 1)
+	// Run MCP server in goroutine - but don't capture its result
+	// since the MCP server runs indefinitely and should not exit
 	go func() {
 		// Load config to get socket path, fallback to default
 		cfg, err := config.LoadYAMLConfig("configs/default.yaml")
@@ -416,10 +416,15 @@ func (s *Server) Start() error {
 		if err == nil && cfg.MCPServer.SocketPath != "" {
 			socketPath = cfg.MCPServer.SocketPath
 		}
-		mcpErrCh <- s.mcpServer.Start(socketPath)
+
+		// Start the MCP server (this blocks and shouldn't return unless there's an error)
+		if err := s.mcpServer.Start(socketPath); err != nil {
+			log.Printf("ERROR: MCP server encountered an error: %v", err)
+			// Don't exit the main server if the MCP server exits - just log the error
+		}
 	}()
 
-	// Wait for shutdown signal
+	// Wait for shutdown signal or HTTP server error
 	select {
 	case <-shutdownCh:
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -431,10 +436,8 @@ func (s *Server) Start() error {
 		if strings.Contains(err.Error(), "address already in use") {
 			log.Printf("ERROR: The MCP server could not start because the address is already in use. If another instance is running, stop it with 'nixai mcp-server stop'.")
 		}
+		s.mcpServer.Stop() // Make sure to stop the MCP server if HTTP server fails
 		return err
-	case mcpErr := <-mcpErrCh:
-		log.Printf("ERROR: MCP server encountered an error: %v", mcpErr)
-		return mcpErr
 	}
 }
 
