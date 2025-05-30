@@ -10,17 +10,20 @@
     system = "x86_64-linux";
     pkgs = import nixpkgs {inherit system;};
   in {
-    packages.${system}.nixai = pkgs.buildGoModule {
-      pname = "nixai";
-      version = "0.1.0";
-      src = ./.;
-      vendorHash = "sha256-abbfa/rHLiGcA88anY9cLlFH8fGw/hcSmUOw+uN9kQ0=";
-      doCheck = false; # Disable tests in Nix build due to network/sandbox restrictions
-      meta = {
-        description = "A tool for diagnosing and configuring NixOS using AI.";
-        license = pkgs.lib.licenses.mit;
-        maintainers = [];
+    packages.${system} = {
+      nixai = pkgs.buildGoModule {
+        pname = "nixai";
+        version = "0.1.0";
+        src = ./.;
+        vendorHash = "sha256-abbfa/rHLiGcA88anY9cLlFH8fGw/hcSmUOw+uN9kQ0=";
+        doCheck = false; # Disable tests in Nix build due to network/sandbox restrictions
+        meta = {
+          description = "A tool for diagnosing and configuring NixOS using AI.";
+          license = pkgs.lib.licenses.mit;
+          maintainers = [];
+        };
       };
+      default = self.packages.${system}.nixai;
     };
     apps.${system} = {
       nixai = {
@@ -32,7 +35,6 @@
       };
       default = self.apps.${system}.nixai;
     };
-    packages.${system}.default = self.packages.${system}.nixai;
 
     # NixOS module
     nixosModules.default = import ./modules/nixos.nix;

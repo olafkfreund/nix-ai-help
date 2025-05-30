@@ -1,94 +1,83 @@
-# Dockerfile for NixOS 25.05 Testing Environment
-# This Dockerfile creates a fresh NixOS 25.05 container for testing nixai features, including MCP server, Neovim, and CLI integration.
-#
-# Usage:
-#   docker build -t nixai-nixos-test .
-#   docker run -it --rm nixai-nixos-test
-#
-# Note: Docker support for NixOS is experimental. This setup uses the official Nix installer and configures a minimal NixOS-like environment.
+# Dockerfile - NixOS Docker container for nixai testing
+# This uses an official NixOS Docker image with proper module system support
 
-FROM ubuntu:24.04
+FROM nixos/nix:latest
 
 LABEL maintainer="nixai contributors"
-LABEL description="NixOS 25.05 test environment for nixai project"
+LABEL description="NixOS environment for testing nixai functionality"
 
-# Install dependencies for Nix and Neovim
-RUN apt-get update && \
-    apt-get install -y curl sudo git locales neovim python3 python3-pip lsb-release && \
-    locale-gen en_US.UTF-8
+# Create working directory and set up environment
+# We'll run as root for simplicity in this test environment
+WORKDIR /root
 
-ENV LANG=en_US.UTF-8
-ENV LC_ALL=en_US.UTF-8
+# Enable experimental Nix features
+RUN mkdir -p /etc/nix && \
+    echo 'experimental-features = nix-command flakes' >> /etc/nix/nix.conf && \
+    echo 'trusted-users = root' >> /etc/nix/nix.conf
 
-# Install Nix (multi-user)
-RUN useradd -m nixuser && \
-    usermod -aG sudo nixuser && \
-    echo "nixuser ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
-    mkdir -p /nix && chown nixuser /nix && \
-    curl -L https://nixos.org/nix/install | sh -s -- --daemon && \
-    chown -R nixuser:root /nix
-
-# Enable experimental Nix features for all users
-RUN echo 'experimental-features = nix-command flakes' >> /etc/nix/nix.conf
-
-# Configure Git to trust the cloned repository directory
-RUN git config --system --add safe.directory /home/nixuser/nixai
-
-ENV USER=nixuser
-ENV HOME=/home/nixuser
-ENV NIX_PATH=nixpkgs=channel:nixos-25.05
-
-# Create AI keys placeholder
-RUN echo "# AI keys placeholder - add your keys here" > /etc/profile.d/ai_keys.sh && \
-    chmod 644 /etc/profile.d/ai_keys.sh
-
-# Set up Nix profile and channels for the user
-USER nixuser
-RUN . /etc/profile.d/nix.sh && \
-    nix-channel --add https://nixos.org/channels/nixos-25.05 nixpkgs && \
+# Set up Nix channels  
+RUN nix-channel --add https://nixos.org/channels/nixos-unstable nixpkgs && \
     nix-channel --update
 
-# Install NixOS tools, Neovim, Go, and other build dependencies
-RUN . /etc/profile.d/nix.sh && \
-    nix-env -iA nixpkgs.nixos-install-tools nixpkgs.neovim nixpkgs.git nixpkgs.curl nixpkgs.python3 nixpkgs.nodejs nixpkgs.alejandra nixpkgs.go
+# Install essential packages directly via nix-env (no Home Manager conflicts)
+RUN nix-env -iA nixpkgs.git \
+    nixpkgs.curl \
+    nixpkgs.go \
+    nixpkgs.alejandra \
+    nixpkgs.neovim \
+    nixpkgs.just \
+    nixpkgs.tree \
+    nixpkgs.jq
 
-# Clone the nixai repository into /home/nixuser/nixai
-RUN . /etc/profile.d/nix.sh && \
-    cd /home/nixuser && \
-    git clone https://github.com/olafkfreund/nix-ai-help.git nixai || \
-    (echo "Warning: Could not clone remote repo, creating test structure..." && \
-     mkdir -p nixai/cmd/nixai nixai/internal/config nixai/pkg/logger nixai/configs && \
-     cd nixai && \
-     echo 'package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("nixai test version")\n}' > cmd/nixai/main.go && \
-     echo 'module nixai\n\ngo 1.21' > go.mod && \
-     echo '# nixai Test Environment\n\nThis is a test environment for nixai development.' > README.md)
+# Copy nixai source code
+COPY . nixai
 
-# Build nixai (if we have a proper Go project structure)
-RUN . /etc/profile.d/nix.sh && \
-    cd /home/nixuser/nixai && \
-    if [ -f "go.mod" ]; then \
-        go mod tidy && \
-        go build -o ./nixai ./cmd/nixai/main.go && \
-        sudo cp ./nixai /usr/local/bin/nixai && \
-        sudo chmod +x /usr/local/bin/nixai; \
-    else \
-        echo "No go.mod found, skipping build"; \
-    fi
+# Set working directory
+WORKDIR /root/nixai
 
-# Set working directory to the cloned repository
-WORKDIR /home/nixuser/nixai
+# Build nixai
+RUN nix develop --command bash -c "go mod tidy && go build -o ./nixai ./cmd/nixai/main.go"
 
-# Ollama integration notes:
-# To access your local Ollama instance from inside this container, use the special hostname 'host.docker.internal' (default Ollama port: 11434).
-#
-# Example: set OLLAMA_HOST in your environment or config to 'http://host.docker.internal:11434'.
-#
-# On Linux, you may need to add the following flag when running the container:
-#   --add-host=host.docker.internal:host-gateway
-#
-# Example run command:
-#   docker run -it --rm --add-host=host.docker.internal:host-gateway nixai-nixos-test
+# Set up Ollama environment for Docker
 ENV OLLAMA_HOST=http://host.docker.internal:11434
 
-# Entrypoint: start a shell with Nix and AI keys available
-ENTRYPOINT ["/bin/bash", "-c", ". /etc/profile.d/nix.sh && . /etc/profile.d/ai_keys.sh && exec bash"]
+# Create entrypoint script
+RUN echo '#!/bin/sh' > /root/entrypoint.sh && \
+    echo 'set -e' >> /root/entrypoint.sh && \
+    echo '' >> /root/entrypoint.sh && \
+    echo 'echo "🚀 NixOS Docker Environment for nixai Testing"' >> /root/entrypoint.sh && \
+    echo 'echo "=============================================="' >> /root/entrypoint.sh && \
+    echo 'echo ""' >> /root/entrypoint.sh && \
+    echo 'echo "📦 Available components:"' >> /root/entrypoint.sh && \
+    echo 'echo "  • nixai binary: ~/nixai/nixai"' >> /root/entrypoint.sh && \
+    echo 'echo "  • Neovim editor"' >> /root/entrypoint.sh && \
+    echo 'echo "  • NixOS tools and packages"' >> /root/entrypoint.sh && \
+    echo 'echo "  • MCP server support"' >> /root/entrypoint.sh && \
+    echo 'echo ""' >> /root/entrypoint.sh && \
+    echo 'echo "🔧 Quick start:"' >> /root/entrypoint.sh && \
+    echo 'echo "  cd ~/nixai"' >> /root/entrypoint.sh && \
+    echo 'echo "  ./nixai --ask \"How do I configure NixOS?\""' >> /root/entrypoint.sh && \
+    echo 'echo "  ./nixai explain-option services.ssh.enable"' >> /root/entrypoint.sh && \
+    echo 'echo "  nvim  # Opens Neovim"' >> /root/entrypoint.sh && \
+    echo 'echo ""' >> /root/entrypoint.sh && \
+    echo 'echo "📝 Test commands:"' >> /root/entrypoint.sh && \
+    echo 'echo "  ./nixai --help"' >> /root/entrypoint.sh && \
+    echo 'echo "  ./nixai mcp-server start --help"' >> /root/entrypoint.sh && \
+    echo 'echo ""' >> /root/entrypoint.sh && \
+    echo '' >> /root/entrypoint.sh && \
+    echo '# Start MCP server in background' >> /root/entrypoint.sh && \
+    echo 'cd /root/nixai' >> /root/entrypoint.sh && \
+    echo 'echo "🖥️  Starting nixai MCP server..."' >> /root/entrypoint.sh && \
+    echo './nixai mcp-server start --socket-path=/root/.local/share/nixai/mcp.sock --background || echo "MCP server start failed (this is OK for testing)"' >> /root/entrypoint.sh && \
+    echo '' >> /root/entrypoint.sh && \
+    echo 'echo "🎉 Ready! Starting interactive shell..."' >> /root/entrypoint.sh && \
+    echo 'exec "$@"' >> /root/entrypoint.sh
+
+RUN chmod +x /root/entrypoint.sh
+
+# Set environment
+ENV HOME=/root
+ENV USER=root
+
+ENTRYPOINT ["/root/entrypoint.sh"]
+CMD ["/bin/bash"]
