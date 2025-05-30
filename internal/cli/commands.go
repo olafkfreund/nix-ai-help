@@ -1230,8 +1230,14 @@ var explainOptionCmd = &cobra.Command{
 		// Check MCP server status before querying
 		fmt.Print(utils.FormatProgress("Fetching official documentation..."))
 		mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
-		statusResp, err := http.Get(mcpURL + "/healthz")
-		if err != nil || statusResp.StatusCode != 200 {
+		client := http.Client{Timeout: 5 * time.Second}
+		statusResp, err := client.Get(mcpURL + "/healthz")
+		if err != nil {
+			fmt.Println(utils.FormatError("MCP server is not running"))
+			fmt.Println(utils.FormatInfo("Please start it with 'nixai mcp-server start' or 'nixai mcp-server start -d'"))
+			os.Exit(1)
+		}
+		if statusResp.StatusCode != 200 {
 			fmt.Println(utils.FormatError("MCP server is not running"))
 			fmt.Println(utils.FormatInfo("Please start it with 'nixai mcp-server start' or 'nixai mcp-server start -d'"))
 			os.Exit(1)
@@ -1344,7 +1350,8 @@ var explainHomeOptionCmd = &cobra.Command{
 		// Check MCP server status before querying
 		fmt.Print(utils.FormatProgress("Fetching official documentation..."))
 		mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
-		statusResp, err := http.Get(mcpURL + "/healthz")
+		client := http.Client{Timeout: 5 * time.Second}
+		statusResp, err := client.Get(mcpURL + "/healthz")
 		if err != nil || statusResp.StatusCode != 200 {
 			fmt.Println(utils.FormatError("MCP server is not running"))
 			fmt.Println(utils.FormatInfo("Please start it with 'nixai mcp-server start' or 'nixai mcp-server start -d'"))
