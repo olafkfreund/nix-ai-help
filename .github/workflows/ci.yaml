@@ -37,7 +37,7 @@ jobs:
         run: go build ./...
       - name: Start MCP server
         run: |
-          go build -o mcp-server ./internal/mcp/server.go
+          go build -o mcp-server ./internal/mcp
           chmod +x mcp-server
           ./mcp-server &
           sleep 2
