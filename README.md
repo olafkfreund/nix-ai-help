@@ -4,6 +4,14 @@
 [![Lint Status](https://github.com/olafkfreund/nix-ai-help/actions/workflows/ci.yaml/badge.svg?branch=main&label=lint)](https://github.com/olafkfreund/nix-ai-help/actions/workflows/ci.yaml)
 [![Security Tested](https://github.com/olafkfreund/nix-ai-help/actions/workflows/ci.yaml/badge.svg?branch=main&label=security)](https://github.com/olafkfreund/nix-ai-help/actions/workflows/ci.yaml)
 
+---
+
+## 📖 User Manual
+
+See the full [nixai User Manual](docs/MANUAL.md) for comprehensive feature documentation, advanced usage, real-world examples, and troubleshooting tips.
+
+---
+
 ## Prerequisites
 
 Before using or developing nixai, ensure## 🚀 What's New (May 2025)
