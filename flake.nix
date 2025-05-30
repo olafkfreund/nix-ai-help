@@ -28,6 +28,17 @@
     };
     defaultPackage.${system} = self.packages.${system}.nixai;
     defaultApp.${system} = self.apps.${system}.nixai;
+
+    # NixOS module
+    nixosModules.default = import ./modules/nixos.nix;
+
+    # Home Manager module
+    homeManagerModules.default = import ./modules/home-manager.nix;
+
+    # Legacy names for backward compatibility
+    nixosModule = self.nixosModules.default;
+    homeManagerModule = self.homeManagerModules.default;
+
     devShells.${system}.default = pkgs.mkShell {
       buildInputs = with pkgs; [
         go

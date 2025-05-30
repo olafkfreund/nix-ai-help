@@ -53,6 +53,7 @@ All other dependencies are managed by the Nix flake and justfile.
 - [🧩 Flake Input Analysis & AI Explanations](#-flake-input-analysis--ai-explanations)
 - [🔧 NixOS Option Explainer](#-nixos-option-explainer)
 - [📦 AI-Powered Package Repository Analysis](#-ai-powered-package-repository-analysis)
+- [🔄 MCP Server Configuration & Autostart](#-mcp-server-configuration--autostart)
 - [🎨 Terminal Output Formatting](#-terminal-output-formatting)
 - [🛠️ Installation & Usage](#%EF%B8%8F-installation--usage)
 - [📝 Commands & Usage](#-commands--usage)
@@ -114,7 +115,121 @@ All other dependencies are managed by the Nix flake and justfile.
 
 ---
 
-## 🚀 What’s New (May 2025)
+## 🔄 MCP Server Configuration & Autostart
+
+The nixai Model Context Protocol (MCP) server provides NixOS documentation and option queries to enhance AI responses. You can configure how the server runs and automatically start it on boot:
+
+### Socket Path Configuration
+
+By default, the MCP server uses `/tmp/nixai-mcp.sock` as the Unix domain socket path. You can customize this path using:
+
+- **Command-line flag**: `nixai mcp-server start --socket-path="/path/to/socket"`
+- **Environment variable**: `NIXAI_SOCKET_PATH="/path/to/socket" nixai mcp-server start`
+- **NixOS/Home Manager module**: Set the `socketPath` option in your configuration
+
+### Autostart Options
+
+The MCP server can be configured to start automatically on boot using either system-wide or user-level services:
+
+#### NixOS Module (System-wide)
+
+Add the nixai NixOS module to your configuration:
+
+```nix
+# configuration.nix
+{ config, pkgs, ... }:
+
+{
+  imports = [ 
+    # Path to the nixai flake or local module
+    (builtins.fetchTarball "https://github.com/olafkfreund/nix-ai-help/archive/main.tar.gz")/modules/nixos.nix
+  ];
+
+  services.nixai = {
+    enable = true;
+    mcp = {
+      enable = true;
+      # Optional: custom socket path
+      socketPath = "/run/nixai/mcp.sock";
+    };
+  };
+}
+```
+
+#### Home Manager Module (User-level)
+
+Add the nixai Home Manager module to your configuration:
+
+```nix
+# home.nix
+{ config, pkgs, ... }:
+
+{
+  imports = [
+    # Path to the nixai flake or local module
+    (builtins.fetchTarball "https://github.com/olafkfreund/nix-ai-help/archive/main.tar.gz")/modules/home-manager.nix
+  ];
+
+  services.nixai = {
+    enable = true;
+    mcp = {
+      enable = true;
+      # Optional: custom socket path (uses $HOME expansion)
+      socketPath = "$HOME/.local/share/nixai/mcp.sock";
+    };
+    # Optional: integrate with VS Code
+    vscodeIntegration = true;
+  };
+}
+```
+
+#### Using Flakes
+
+If you're using flakes, you can import the modules directly:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    home-manager.url = "github:nix-community/home-manager";
+    nixai.url = "github:olafkfreund/nix-ai-help";
+  };
+
+  outputs = { self, nixpkgs, home-manager, nixai, ... }: {
+    nixosConfigurations.yourhostname = nixpkgs.lib.nixosSystem {
+      # ...
+      modules = [
+        nixai.nixosModules.default
+        {
+          services.nixai = {
+            enable = true;
+            mcp.enable = true;
+          };
+        }
+      ];
+    };
+    
+    homeConfigurations.yourusername = home-manager.lib.homeManagerConfiguration {
+      # ...
+      modules = [
+        nixai.homeManagerModules.default
+        {
+          services.nixai = {
+            enable = true;
+            mcp.enable = true;
+          };
+        }
+      ];
+    };
+  };
+}
+```
+
+See [Autostart Options Documentation](docs/autostart-options.md) for more detailed examples and troubleshooting.
+
+---
+
+## ✨ Latest Features
 
 - **Config Path Awareness Everywhere:** All features now respect the NixOS config path, settable via `--nixos-path`, config file, or interactively. If unset or invalid, you’ll get clear guidance on how to fix it.
 - **Automated Service Option Lookup:** When searching for services, nixai now lists all available options for a service using `nixos-option --find services.<name>`, not just the top-level enable flag.
@@ -270,6 +385,50 @@ nix develop
 just build
 ./nixai --help
 ```
+
+### System Integration with NixOS and Home Manager
+
+nixai can be integrated into your NixOS or Home Manager configuration using the provided modules:
+
+```nix
+# NixOS configuration
+{ config, pkgs, ... }:
+{
+  imports = [
+    # Path to module (can be from flake or local)
+    ./path/to/nixai/modules/nixos.nix 
+  ];
+  
+  services.nixai = {
+    enable = true;
+    mcp = {
+      enable = true;
+      # Optional configuration
+    };
+  };
+}
+```
+
+```nix
+# Home Manager configuration
+{ config, pkgs, ... }:
+{
+  imports = [
+    # Path to module (can be from flake or local)
+    ./path/to/nixai/modules/home-manager.nix
+  ];
+  
+  services.nixai = {
+    enable = true;
+    mcp = {
+      enable = true;
+      # Optional configuration
+    };
+  };
+}
+```
+
+See the [MCP Server Configuration & Autostart](#-mcp-server-configuration--autostart) section for more details.
 
 **For Direct Nix Build:**
 
@@ -557,6 +716,31 @@ nixai interactive
 
 - Use `set-nixos-path` to specify your config folder interactively.
 
+### MCP Server Management
+
+```sh
+# Start the MCP server (foreground)
+nixai mcp-server start
+
+# Start in background (daemon mode)
+nixai mcp-server start --background
+nixai mcp-server start --daemon  # alias for --background
+
+# With custom socket path
+nixai mcp-server start --socket-path="/path/to/socket"
+
+# Check MCP server status
+nixai mcp-server status
+
+# Stop the MCP server
+nixai mcp-server stop
+```
+
+- MCP server provides NixOS documentation and options data to enhance AI responses
+- Can be configured to use a custom socket path for communication
+- Supports running as a background daemon process
+- Use environment variable `NIXAI_SOCKET_PATH` to set socket path system-wide
+
 ---
 
 ## 📝 How to Use the Latest Features
@@ -689,6 +873,7 @@ log_level: info
 mcp_server:
   host: localhost
   port: 8080
+  socket_path: /tmp/nixai-mcp.sock  # Custom Unix socket path
   documentation_sources:
     - https://wiki.nixos.org/wiki/NixOS_Wiki
     - https://nix.dev/manual/nix

@@ -323,6 +323,7 @@ func (m *MCPServer) handlePackageSearch(query string) string {
 // Server represents the combined HTTP and MCP server
 type Server struct {
 	addr                 string
+	socketPath           string
 	documentationSources []string
 	logger               *logger.Logger
 	debugLogging         bool
@@ -339,6 +340,7 @@ var (
 func NewServer(addr string, documentationSources []string) *Server {
 	return &Server{
 		addr:                 addr,
+		socketPath:           "/tmp/nixai-mcp.sock", // Default socket path
 		documentationSources: documentationSources,
 		logger:               logger.NewLoggerWithLevel("info"), // Default to info level
 		debugLogging:         false,
@@ -351,6 +353,7 @@ func NewServer(addr string, documentationSources []string) *Server {
 func NewServerWithDebug(addr string, documentationSources []string) *Server {
 	return &Server{
 		addr:                 addr,
+		socketPath:           "/tmp/nixai-mcp.sock", // Default socket path
 		documentationSources: documentationSources,
 		logger:               logger.NewLoggerWithLevel("debug"), // Enable debug level
 		debugLogging:         true,
@@ -365,13 +368,23 @@ func NewServerFromConfig(configPath string) (*Server, error) {
 		return nil, err
 	}
 	addr := fmt.Sprintf("%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
+	socketPath := "/tmp/nixai-mcp.sock" // Default
+	if cfg.MCPServer.SocketPath != "" {
+		socketPath = cfg.MCPServer.SocketPath
+	}
 	return &Server{
 		addr:                 addr,
+		socketPath:           socketPath,
 		documentationSources: cfg.MCPServer.DocumentationSources,
 		logger:               logger.NewLoggerWithLevel(cfg.LogLevel),
 		debugLogging:         strings.ToLower(cfg.LogLevel) == "debug",
 		mcpServer:            &MCPServer{logger: *logger.NewLoggerWithLevel(cfg.LogLevel)},
 	}, nil
+}
+
+// SetSocketPath sets a custom socket path for the MCP server
+func (s *Server) SetSocketPath(path string) {
+	s.socketPath = path
 }
 
 // Start initializes and starts the MCP server with graceful shutdown support.
@@ -410,11 +423,15 @@ func (s *Server) Start() error {
 	// Run MCP server in goroutine - but don't capture its result
 	// since the MCP server runs indefinitely and should not exit
 	go func() {
-		// Load config to get socket path, fallback to default
-		cfg, err := config.LoadYAMLConfig("configs/default.yaml")
-		socketPath := "/tmp/nixai-mcp.sock" // Default
-		if err == nil && cfg.MCPServer.SocketPath != "" {
-			socketPath = cfg.MCPServer.SocketPath
+		// Use the server's socketPath field, which might have been customized
+		socketPath := s.socketPath
+		if socketPath == "" {
+			socketPath = "/tmp/nixai-mcp.sock" // Default fallback
+		}
+
+		// Check environment variable for override
+		if envPath := os.Getenv("NIXAI_SOCKET_PATH"); envPath != "" {
+			socketPath = envPath
 		}
 
 		// Start the MCP server (this blocks and shouldn't return unless there's an error)

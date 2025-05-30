@@ -205,6 +205,9 @@ func init() {
 	mcpServerCmd.AddCommand(mcpServerStopCmd)
 	mcpServerCmd.AddCommand(mcpServerStatusCmd)
 	mcpServerStartCmd.Flags().BoolP("background", "d", false, "Run MCP server in background (daemon mode)")
+	mcpServerStartCmd.Flags().Bool("daemon", false, "Alias for --background")
+	mcpServerStartCmd.Flags().String("socket-path", "", "Custom path for the MCP server Unix socket")
+	mcpServerStartCmd.Flags().String("config", "", "Path to custom config file")
 
 	// Package repository command flags
 	packageRepoCmd.Flags().StringP("local", "l", "", "Local path to repository (instead of cloning)")
@@ -983,13 +986,49 @@ var mcpServerStartCmd = &cobra.Command{
 	Short: "Start the MCP server",
 	Run: func(cmd *cobra.Command, args []string) {
 		background, _ := cmd.Flags().GetBool("background")
+		daemon, _ := cmd.Flags().GetBool("daemon")
+		socketPath, _ := cmd.Flags().GetString("socket-path")
+		configPath, _ := cmd.Flags().GetString("config")
+
+		// If either background or daemon flag is set, run in background
+		background = background || daemon
+
+		// Check for daemon flag as alias for background
+		daemonFlag, _ := cmd.Flags().GetBool("daemon")
+		if daemonFlag {
+			background = true
+		}
+
+		// Use default config path if not specified
+		if configPath == "" {
+			configPath = "configs/default.yaml"
+		}
+
+		// Check if NIXAI_SOCKET_PATH environment variable is set
+		if socketPath == "" {
+			envSocketPath := os.Getenv("NIXAI_SOCKET_PATH")
+			if envSocketPath != "" {
+				socketPath = envSocketPath
+			}
+		}
+
 		if background {
 			absPath, err := os.Executable()
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Could not determine nixai binary path: %v\n", err)
 				os.Exit(1)
 			}
-			cmdStr := fmt.Sprintf("nohup %s mcp-server start > mcp.log 2>&1 &", absPath)
+
+			// Build command with any custom flags
+			startCmd := fmt.Sprintf("%s mcp-server start", absPath)
+			if socketPath != "" {
+				startCmd += fmt.Sprintf(" --socket-path=\"%s\"", socketPath)
+			}
+			if configPath != "configs/default.yaml" {
+				startCmd += fmt.Sprintf(" --config=\"%s\"", configPath)
+			}
+
+			cmdStr := fmt.Sprintf("nohup %s > mcp.log 2>&1 &", startCmd)
 			fmt.Println("Starting MCP server in background...")
 			shCmd := exec.Command("sh", "-c", cmdStr)
 			if err := shCmd.Start(); err != nil {
@@ -999,12 +1038,19 @@ var mcpServerStartCmd = &cobra.Command{
 			fmt.Println("MCP server started in background. Logs: mcp.log")
 			return
 		}
+
 		// Foreground
-		server, err := mcp.NewServerFromConfig("configs/default.yaml")
+		server, err := mcp.NewServerFromConfig(configPath)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Failed to create MCP server: %v\n", err)
 			os.Exit(1)
 		}
+
+		// Override socket path from command line if provided
+		if socketPath != "" {
+			server.SetSocketPath(socketPath)
+		}
+
 		if err := server.Start(); err != nil {
 			fmt.Fprintf(os.Stderr, "MCP server error: %v\n", err)
 			os.Exit(1)
