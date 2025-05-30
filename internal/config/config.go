@@ -20,6 +20,8 @@ type Config struct {
 type MCPServerConfig struct {
 	Host                 string   `yaml:"host" json:"host"`
 	Port                 int      `yaml:"port" json:"port"`
+	SocketPath           string   `yaml:"socket_path" json:"socket_path"`
+	AutoStart            bool     `yaml:"auto_start" json:"auto_start"`
 	DocumentationSources []string `yaml:"documentation_sources" json:"documentation_sources"`
 }
 
@@ -65,8 +67,10 @@ func DefaultUserConfig() *UserConfig {
 		NixosFolder: "~/nixos-config",
 		LogLevel:    "info",
 		MCPServer: MCPServerConfig{
-			Host: "localhost",
-			Port: 8080,
+			Host:       "localhost",
+			Port:       8080,
+			SocketPath: "/tmp/nixai-mcp.sock",
+			AutoStart:  false,
 			DocumentationSources: []string{
 				"https://wiki.nixos.org/wiki/NixOS_Wiki",
 				"https://nix.dev/manual/nix",
