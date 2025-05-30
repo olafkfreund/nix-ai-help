@@ -2,6 +2,8 @@
 
 Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, documentation, and automation from the command line. This manual covers all major features, with real-world usage examples for both beginners and advanced users.
 
+> **Latest Update (May 2025)**: All three AI providers (Ollama, Gemini, OpenAI) have been comprehensively tested and verified working. MCP server integration provides enhanced documentation retrieval from official NixOS sources.
+
 ---
 
 ## Table of Contents
@@ -41,6 +43,30 @@ just build
 # Run help
 ./nixai --help
 ```
+
+### MCP Server for Documentation
+
+nixai integrates with an MCP (Model Context Protocol) server to retrieve official NixOS documentation. For optimal performance, start the MCP server:
+
+```sh
+# Start MCP server in background (recommended)
+./nixai mcp-server start
+
+# Check server status
+./nixai mcp-server status
+
+# Stop server when done
+./nixai mcp-server stop
+```
+
+The MCP server queries official documentation sources including:
+- NixOS Wiki
+- Nix Manual
+- Nixpkgs Manual  
+- Nix Language Reference
+- Home Manager Manual
+
+**Note**: The MCP server runs on `localhost:8081` by default and provides enhanced documentation context for all AI providers.
 
 ---
 
@@ -339,9 +365,9 @@ In interactive mode, you can:
   ```
 - Switch AI providers interactively:
   ```sh
-  set-ai-provider openai
-  set-ai-provider ollama
-  set-ai-provider gemini
+  set ai openai
+  set ai ollama llama3
+  set ai gemini
   ```
 - View and update configuration settings:
   ```sh
@@ -379,7 +405,7 @@ Paste or type your log, or use --log-file: /var/log/nixos/nixos-rebuild.log
 
 **Switch provider and run a command:**
 ```
-> set-ai-provider gemini
+> set ai gemini
 > explain-option services.openssh.enable
 ```
 
@@ -462,7 +488,7 @@ nixai package-repo . --analyze-only --output-format json > analysis.json
 
 ### Interactive Mode Power Tips
 
-- Use `set-nixos-path` and `set-ai-provider` to change context on the fly.
+- Use `set-nixos-path` and `set ai` to change context on the fly.
 - Use tab completion for commands and options.
 - Use `show-config` to review current settings.
 - Use `help <command>` for detailed help on any feature.
@@ -493,23 +519,47 @@ nixai supports multiple AI providers. You can select your provider in the config
 - **OpenAI** (cloud, requires API key)
 - **Gemini** (cloud, requires API key)
 
+#### Provider Feature Comparison
+
+Based on comprehensive testing (May 2025), all three providers are fully functional:
+
+| Feature | Ollama | Gemini | OpenAI |
+|---------|--------|--------|--------|
+| Privacy | ✅ Local | ❌ Cloud | ❌ Cloud |
+| API Key Required | ❌ No | ✅ Yes | ✅ Yes |
+| Speed | ⚡ Fast | ⚡ Fast | ⚡ Fast |
+| Quality | ✅ Good | ✅ Excellent | ✅ Excellent |
+| Cost | 💚 Free | 💰 Paid | 💰 Paid |
+| Setup | 🔧 Requires Ollama | 🔧 API Key | 🔧 API Key |
+| **Recommended For** | Privacy & Development | Production & Quality | Production & Quality |
+
+**Testing Status**: ✅ All providers tested and working with `explain-option`, `find-option`, and interactive mode commands.
+
 #### Prerequisites for Each Provider
 
 - **Ollama**: Install [Ollama](https://ollama.com/) and pull the desired model (e.g., `ollama pull llama3`). No API key required. Runs locally.
+  - **Default Model**: llama3 (automatically used when no model specified)
+  - **Tested**: ✅ Working with llama3 model
+  
 - **OpenAI**: Requires an OpenAI API key. Sign up at [OpenAI](https://platform.openai.com/). Set your API key as an environment variable:
   ```sh
   export OPENAI_API_KEY=sk-...
   ```
-- **Gemini**: Requires a Gemini API key. Sign up at [Gemini](https://ai.google.dev/). Set your API key as an environment variable:
+  - **Default Model**: Uses OpenAI's default GPT model
+  - **Tested**: ✅ Working with environment variable configuration
+  
+- **Gemini**: Requires a Gemini API key. Sign up at [Google AI Studio](https://ai.google.dev/). Set your API key as an environment variable:
   ```sh
   export GEMINI_API_KEY=your-gemini-key
   ```
+  - **Current Model**: gemini-1.5-flash (updated from deprecated gemini-pro)
+  - **Tested**: ✅ Working with updated API endpoints and model
 
 #### Example config for OpenAI or Gemini
 
 ```yaml
 ai_provider: openai   # or 'gemini' or 'ollama'
-ai_model: gpt-4       # or 'llama3', 'gemini-pro', etc.
+ai_model: gpt-4       # or 'llama3', 'gemini-1.5-flash', etc.
 # ...other config options...
 ```
 
@@ -517,7 +567,7 @@ You can also override the provider and model at runtime:
 
 ```sh
 nixai diagnose --provider openai --model gpt-4 --log-file /var/log/nixos/nixos-rebuild.log
-nixai explain-option --provider gemini --model gemini-pro networking.firewall.enable
+nixai explain-option --provider gemini --model gemini-1.5-flash networking.firewall.enable
 ```
 
 **Note:**
@@ -529,6 +579,65 @@ nixai explain-option --provider gemini --model gemini-pro networking.firewall.en
 ai_provider: openai
 ai_model: gpt-4
 openai_api_key: sk-...
+```
+
+---
+
+## Recent Testing & Validation
+
+**Last Updated**: May 2025
+
+nixai has been comprehensively tested with all three AI providers to ensure reliability and functionality:
+
+### ✅ Verified Working Commands
+
+All commands tested successfully across all providers:
+
+```sh
+# Explain NixOS options
+./nixai explain-option services.nginx.enable
+./nixai explain-option services.openssh.enable
+
+# Find options using natural language
+./nixai find-option "enable SSH"
+
+# Interactive mode with provider switching
+./nixai interactive
+> set ai ollama llama3
+> set ai gemini
+> set ai openai
+> explain-option services.nginx.enable
+```
+
+### 🔧 Key Fixes Applied
+
+- **Ollama Model Handling**: Fixed empty model configuration by defaulting to "llama3"
+- **Gemini API Updates**: Updated from deprecated `gemini-pro` to `gemini-1.5-flash` model
+- **API Endpoints**: Fixed Gemini API URL construction for proper integration
+- **MCP Server**: Validated documentation retrieval from official NixOS sources
+
+### 📊 Current Working Configuration
+
+```yaml
+ai_provider: ollama    # Default for privacy
+ai_model: llama3      # Auto-selected for Ollama
+nixos_folder: ~/nixos-config
+log_level: debug
+mcp_server:
+    host: localhost
+    port: 8081
+```
+
+### 🚀 Provider Switching
+
+You can seamlessly switch between providers:
+
+```sh
+# Via interactive mode
+echo "set ai gemini" | ./nixai interactive
+
+# Via command line flags  
+./nixai explain-option --provider openai services.nginx.enable
 ```
 
 ---

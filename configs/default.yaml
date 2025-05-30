@@ -1,17 +1,16 @@
 default:
     ai_provider: openai
-    log_level: info
+    log_level: debug
     mcp_server:
         host: localhost
-        port: 8080
+        port: 8081
         documentation_sources:
+            - nixos-options-es://options  # Special endpoint for NixOS options via ElasticSearch
             - https://wiki.nixos.org/wiki/NixOS_Wiki
             - https://nix.dev/manual/nix
             - https://nixos.org/manual/nixpkgs/stable/
             - https://nix.dev/manual/nix/2.28/language/
             - https://nix-community.github.io/home-manager/
-            - https://search.nixos.org/options
-            - https://home-manager-options.extranix.com/options.json
     nixos:
         config_path: /etc/nixos/configuration.nix
         log_path: /var/log/nixos.log

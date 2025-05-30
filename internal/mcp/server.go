@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,7 +16,38 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/hashicorp/go-retryablehttp"
 )
+
+// ElasticSearch configuration for NixOS options
+const (
+	ElasticSearchUsername    = "aWVSALXpZv"
+	ElasticSearchPassword    = "X8gPHnzL52wFEekuxsfQ9cSh"
+	ElasticSearchURLTemplate = `https://nixos-search-7-1733963800.us-east-1.bonsaisearch.net:443/%s/_search`
+	ElasticSearchIndexPrefix = "latest-*-"
+)
+
+// NixOS option structure from ElasticSearch
+type NixOSOption struct {
+	Type        string `json:"type"`
+	Source      string `json:"option_source"`
+	Name        string `json:"option_name"`
+	Description string `json:"option_description"`
+	OptionType  string `json:"option_type"`
+	Default     string `json:"option_default"`
+	Example     string `json:"option_example"`
+	Flake       string `json:"option_flake"`
+}
+
+// ElasticSearch response structure
+type ESResponse struct {
+	Hits struct {
+		Hits []struct {
+			Source NixOSOption `json:"_source"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
 
 // Server represents the MCP server that handles requests for NixOS documentation.
 type Server struct {
@@ -226,7 +258,10 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		var body string
 		var err error
 		isStructured := false
-		if strings.HasSuffix(src, "/options") {
+		if strings.HasPrefix(src, "nixos-options-es://") {
+			body, err = fetchNixOSOptionsAPI(src, query)
+			isStructured = true
+		} else if strings.HasSuffix(src, "/options") {
 			body, err = fetchNixOSOptionsAPI(src, query)
 			isStructured = true
 		} else if strings.HasSuffix(src, "/options.json") {
@@ -359,17 +394,20 @@ func fetchNixOSOptionsAPI(_ string, option string) (string, error) {
 	if strings.TrimSpace(option) == "" {
 		return "", fmt.Errorf("option name required")
 	}
-	// gosec:ignore G101 -- This is a test credential for CI and not used in production
-	const (
-		esUser = "aWVSALXpZv"
-		esPass = "X8gPHnzL52wFEekuxsfQ9cSh"
-	)
-	// #nosec G107 -- esURL is a constant, not user input
-	esURL := "https://elasticsearch.nixos.org/options/_search"
-	// Build the query body
+
+	// Create retryable HTTP client
+	retryClient := retryablehttp.NewClient()
+	retryClient.RetryMax = 3
+	retryClient.Logger = nil
+
+	// Build ElasticSearch index URL
+	index := ElasticSearchIndexPrefix + "nixos-unstable"
+	esURL := fmt.Sprintf(ElasticSearchURLTemplate, index)
+
+	// Build the query body for exact option match
 	body := map[string]interface{}{
 		"from": 0,
-		"size": 5,
+		"size": 3,
 		"query": map[string]interface{}{
 			"bool": map[string]interface{}{
 				"must": []interface{}{
@@ -379,69 +417,72 @@ func fetchNixOSOptionsAPI(_ string, option string) (string, error) {
 			},
 		},
 	}
+
 	jsonBody, err := json.Marshal(body)
 	if err != nil {
 		return "", err
 	}
-	req, err := http.NewRequest("POST", esURL, strings.NewReader(string(jsonBody)))
+
+	req, err := http.NewRequest("POST", esURL, bytes.NewReader(jsonBody))
 	if err != nil {
 		return "", err
 	}
-	req.SetBasicAuth(esUser, esPass)
+
+	req.SetBasicAuth(ElasticSearchUsername, ElasticSearchPassword)
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+
+	resp, err := retryClient.StandardClient().Do(req)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to query ElasticSearch: %w", err)
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("failed to fetch %s: %s", esURL, resp.Status)
+		return "", fmt.Errorf("ElasticSearch returned status %d", resp.StatusCode)
 	}
+
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
-	log.Printf("Received %d bytes from NixOS ES", len(data))
-	// Parse hits
-	var esResp struct {
-		Hits struct {
-			Hits []struct {
-				Source struct {
-					Name        string `json:"option_name"`
-					Type        string `json:"option_type"`
-					Default     string `json:"option_default"`
-					Example     string `json:"option_example"`
-					Description string `json:"option_description"`
-					SourceFile  string `json:"option_source"`
-				} `json:"_source"`
-			} `json:"hits"`
-		} `json:"hits"`
-	}
+
+	// Parse response
+	var esResp ESResponse
 	if err := json.Unmarshal(data, &esResp); err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to parse ElasticSearch response: %w", err)
 	}
+
 	if len(esResp.Hits.Hits) == 0 {
-		return "No documentation found for option in the official NixOS options database.", nil
+		return "No documentation found for this option in the official NixOS options database.", nil
 	}
-	chosen := esResp.Hits.Hits[0].Source
-	var b strings.Builder
-	b.WriteString("Option: " + chosen.Name + "\n")
-	b.WriteString("Type: " + chosen.Type + "\n")
-	if chosen.Default != "" {
-		b.WriteString("Default: " + chosen.Default + "\n")
+
+	// Use the first (best) match
+	opt := esResp.Hits.Hits[0].Source
+	var result strings.Builder
+
+	result.WriteString(fmt.Sprintf("**%s**\n\n", opt.Name))
+
+	if opt.Description != "" {
+		cleanDesc := stripHTMLTags(opt.Description)
+		result.WriteString(fmt.Sprintf("**Description:** %s\n\n", cleanDesc))
 	}
-	if chosen.Example != "" {
-		b.WriteString("Example: " + chosen.Example + "\n")
+
+	result.WriteString(fmt.Sprintf("**Type:** %s\n", opt.OptionType))
+
+	if opt.Default != "" {
+		result.WriteString(fmt.Sprintf("**Default:** %s\n", opt.Default))
 	}
-	if chosen.Description != "" {
-		b.WriteString("Description: " + stripHTMLTags(chosen.Description) + "\n")
+
+	if opt.Example != "" && opt.Example != "null" {
+		result.WriteString(fmt.Sprintf("**Example:** %s\n", opt.Example))
 	}
-	if chosen.SourceFile != "" {
-		b.WriteString("Source: " + chosen.SourceFile + "\n")
+
+	if opt.Source != "" {
+		result.WriteString(fmt.Sprintf("**Source:** %s\n", opt.Source))
 	}
-	return b.String(), nil
+
+	return result.String(), nil
 }
 
 // fetchHomeManagerOptionsAPI fetches and parses option docs from home-manager-options.extranix.com or a compatible endpoint
