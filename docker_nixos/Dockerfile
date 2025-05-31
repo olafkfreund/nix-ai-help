@@ -27,10 +27,19 @@ RUN nix-env -iA nixpkgs.git \
     nixpkgs.neovim \
     nixpkgs.just \
     nixpkgs.tree \
-    nixpkgs.jq
+    nixpkgs.jq \
+    nixpkgs.inetutils \
+    nixpkgs.netcat \
+    nixpkgs.host \
+    nixpkgs.iproute2
 
 # Copy nixai source code
 COPY . nixai
+
+# Copy AI keys file separately for better layer caching
+COPY ./docker_nixos/.ai_keys /root/.ai_keys
+COPY ./docker_nixos/test_host_connectivity.sh /root/test_host_connectivity.sh
+RUN chmod +x /root/test_host_connectivity.sh
 
 # Set working directory
 WORKDIR /root/nixai
@@ -42,8 +51,14 @@ RUN nix develop --command bash -c "go mod tidy && go build -o ./nixai ./cmd/nixa
 ENV OLLAMA_HOST=http://host.docker.internal:11434
 
 # Create entrypoint script
-RUN echo '#!/bin/sh' > /root/entrypoint.sh && \
+RUN echo '#!/usr/bin/env bash' > /root/entrypoint.sh && \
     echo 'set -e' >> /root/entrypoint.sh && \
+    echo '' >> /root/entrypoint.sh && \
+    echo '# Source AI API keys' >> /root/entrypoint.sh && \
+    echo 'if [ -f "/root/.ai_keys" ]; then' >> /root/entrypoint.sh && \
+    echo '  . /root/.ai_keys' >> /root/entrypoint.sh && \
+    echo '  echo "🔑 AI API keys loaded"' >> /root/entrypoint.sh && \
+    echo 'fi' >> /root/entrypoint.sh && \
     echo '' >> /root/entrypoint.sh && \
     echo 'echo "🚀 NixOS Docker Environment for nixai Testing"' >> /root/entrypoint.sh && \
     echo 'echo "=============================================="' >> /root/entrypoint.sh && \
@@ -65,6 +80,18 @@ RUN echo '#!/bin/sh' > /root/entrypoint.sh && \
     echo 'echo "  ./nixai mcp-server start --help"' >> /root/entrypoint.sh && \
     echo 'echo ""' >> /root/entrypoint.sh && \
     echo '' >> /root/entrypoint.sh && \
+    echo '# Check Ollama connectivity' >> /root/entrypoint.sh && \
+    echo 'echo "🔄 Checking Ollama connectivity..."' >> /root/entrypoint.sh && \
+    echo 'if curl -s --connect-timeout 5 "${OLLAMA_HOST}/api/version" &>/dev/null; then' >> /root/entrypoint.sh && \
+    echo '  echo "✅ Ollama server is reachable at ${OLLAMA_HOST}"' >> /root/entrypoint.sh && \
+    echo '  OLLAMA_VERSION=$(curl -s "${OLLAMA_HOST}/api/version" | grep -o '"'"'"version":"[^"]*"'"'"' | sed '"'"'s/"version":"//'"'"' | sed '"'"'s/"//g'"'"' || echo "unknown")' >> /root/entrypoint.sh && \
+    echo '  echo "   Ollama version: ${OLLAMA_VERSION}"' >> /root/entrypoint.sh && \
+    echo 'else' >> /root/entrypoint.sh && \
+    echo '  echo "⚠️  Warning: Cannot connect to Ollama server at ${OLLAMA_HOST}"' >> /root/entrypoint.sh && \
+    echo '  echo "   This might affect some nixai functionality."' >> /root/entrypoint.sh && \
+    echo '  echo "   Run ./docker_nixos/test_host_connectivity.sh to diagnose connection issues."' >> /root/entrypoint.sh && \
+    echo 'fi' >> /root/entrypoint.sh && \
+    echo '' >> /root/entrypoint.sh && \
     echo '# Start MCP server in background' >> /root/entrypoint.sh && \
     echo 'cd /root/nixai' >> /root/entrypoint.sh && \
     echo 'echo "🖥️  Starting nixai MCP server..."' >> /root/entrypoint.sh && \
@@ -79,5 +106,6 @@ RUN chmod +x /root/entrypoint.sh
 ENV HOME=/root
 ENV USER=root
 
-ENTRYPOINT ["/root/entrypoint.sh"]
-CMD ["/bin/bash"]
+# Use the correct path to bash in the NixOS container
+ENTRYPOINT ["/root/.nix-profile/bin/bash", "/root/entrypoint.sh"]
+CMD []

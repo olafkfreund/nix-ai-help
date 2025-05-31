@@ -34,8 +34,16 @@ wait_for_user() {
 # Check if we're inside Docker
 if [ ! -f /.dockerenv ]; then
     echo -e "${RED}❌ This demo should be run inside the nixai Docker container${NC}"
-    echo "   Start the container with: ./docker_nixos/build_and_run_docker.sh"
-    echo "   Then run: cd /home/nixuser/nixai && ./docker_nixos/demo_nixai_features.sh"
+    echo ""
+    echo -e "${CYAN}To start the container:${NC}"
+    echo "   cd docker_nixos"
+    echo "   ./nixai-docker.sh run"
+    echo ""
+    echo -e "${CYAN}Then run this demo:${NC}"
+    echo "   ./docker_nixos/demo_nixai_features.sh"
+    echo ""
+    echo -e "${CYAN}Alternative - run demo directly:${NC}"
+    echo "   ./nixai-docker.sh run --demo"
     exit 1
 fi
 
@@ -45,18 +53,32 @@ echo ""
 echo "This demo will showcase all major nixai features in the Docker environment."
 echo "Each step will show you the command and then execute it."
 echo ""
+echo -e "${CYAN}Docker Environment Info:${NC}"
+echo "  • Container: nixai:latest"
+echo "  • User: nixuser"
+echo "  • Working Directory: $(pwd)"
+echo "  • Ollama Host: ${OLLAMA_HOST:-http://host.docker.internal:11434}"
+echo "  • MCP Server: Background process"
+echo ""
 
 wait_for_user
 
 # Demo 1: Basic nixai functionality
 demo_header "1. Basic nixai Functionality"
 
-demo_step "Show nixai help" "nixai --help"
-nixai --help
+# Ensure we're in the right directory and nixai binary exists
+cd /root/nixai
+if [ ! -f "./nixai" ]; then
+    echo -e "${RED}❌ nixai binary not found. Building it now...${NC}"
+    nix develop --command bash -c "go build -o ./nixai ./cmd/nixai/main.go"
+fi
+
+demo_step "Show nixai help" "./nixai --help"
+./nixai --help
 echo ""
 
-demo_step "Show nixai version" "nixai --version"
-nixai --version
+demo_step "Show nixai version" "./nixai --version"
+./nixai --version
 echo ""
 
 wait_for_user
@@ -64,9 +86,9 @@ wait_for_user
 # Demo 2: NixOS Option Explanation
 demo_header "2. NixOS Option Explanation"
 
-demo_step "Explain programs.git option" "nixai explain-option programs.git"
+demo_step "Explain programs.git option" "./nixai explain-option programs.git"
 echo -e "${YELLOW}Note: This may take a moment as it queries documentation...${NC}"
-timeout 30 nixai explain-option programs.git || echo -e "${YELLOW}(Timed out - this feature requires MCP server)${NC}"
+timeout 30 ./nixai explain-option programs.git || echo -e "${YELLOW}(Timed out - this feature requires MCP server)${NC}"
 echo ""
 
 wait_for_user
@@ -74,9 +96,9 @@ wait_for_user
 # Demo 3: Home Manager Integration
 demo_header "3. Home Manager Integration"
 
-demo_step "Explain Home Manager Neovim option" "nixai explain-home-option programs.neovim"
+demo_step "Explain Home Manager Neovim option" "./nixai explain-home-option programs.neovim"
 echo -e "${YELLOW}Note: This may take a moment as it queries documentation...${NC}"
-timeout 30 nixai explain-home-option programs.neovim || echo -e "${YELLOW}(Timed out - this feature requires MCP server)${NC}"
+timeout 30 ./nixai explain-home-option programs.neovim || echo -e "${YELLOW}(Timed out - this feature requires MCP server)${NC}"
 echo ""
 
 wait_for_user
@@ -84,28 +106,47 @@ wait_for_user
 # Demo 4: Direct Question Answering
 demo_header "4. Direct Question Answering"
 
-demo_step "Ask a direct question about NixOS" 'nixai "How do I install packages in NixOS?"'
+demo_step "Ask a direct question about NixOS" './nixai "How do I install packages in NixOS?"'
 echo -e "${YELLOW}Note: This requires AI provider and may take a moment...${NC}"
-timeout 45 nixai "How do I install packages in NixOS?" || echo -e "${YELLOW}(Timed out or requires AI provider configuration)${NC}"
+timeout 45 ./nixai "How do I install packages in NixOS?" || echo -e "${YELLOW}(Timed out or requires AI provider configuration)${NC}"
 echo ""
 
 wait_for_user
 
-# Demo 5: Development Environment
-demo_header "5. Development Environment"
+# Demo 5: AI Provider Testing
+demo_header "5. AI Provider Testing"
+
+demo_step "Test Ollama connectivity" "./nixai --ask 'What is NixOS?' --provider ollama"
+echo -e "${YELLOW}Note: This tests Ollama integration via host.docker.internal...${NC}"
+timeout 30 ./nixai --ask "What is NixOS?" --provider ollama 2>/dev/null || echo -e "${YELLOW}(Ollama may not be available or configured)${NC}"
+echo ""
+
+demo_step "Show AI provider status" "Check loaded AI keys"
+if [ -f /root/.ai_keys ]; then
+    echo -e "${GREEN}✅ AI keys file found${NC}"
+    echo "Available providers configured in .ai_keys"
+else
+    echo -e "${YELLOW}⚠️  No AI keys file found${NC}"
+fi
+echo ""
+
+wait_for_user
+
+# Demo 6: Development Environment
+demo_header "6. Development Environment"
 
 demo_step "Enter Nix development shell" "nix develop .#docker --command bash -c 'echo Inside Nix dev shell && which go && which just'"
-cd /home/nixuser/nixai
+cd /root/nixai
 nix develop .#docker --command bash -c 'echo "✅ Inside Nix dev shell" && echo "Go version: $(go version)" && echo "Just version: $(just --version)"'
 echo ""
 
 wait_for_user
 
-# Demo 6: Building nixai
-demo_header "6. Building nixai from Source"
+# Demo 7: Building nixai
+demo_header "7. Building nixai from Source"
 
 demo_step "Build nixai for Docker" "just build-docker"
-cd /home/nixuser/nixai
+cd /root/nixai
 nix develop .#docker --command just build-docker
 echo ""
 
@@ -116,21 +157,21 @@ echo ""
 
 wait_for_user
 
-# Demo 7: Testing
-demo_header "7. Testing Framework"
+# Demo 8: Testing
+demo_header "8. Testing Framework"
 
 demo_step "Run basic Go tests" "go test ./pkg/utils"
-cd /home/nixuser/nixai
+cd /root/nixai
 nix develop .#docker --command go test -v ./pkg/utils
 echo ""
 
 wait_for_user
 
-# Demo 8: MCP Server
-demo_header "8. MCP Server Integration"
+# Demo 9: MCP Server
+demo_header "9. MCP Server Integration"
 
-demo_step "Show MCP server help" "nixai mcp-server --help"
-nixai mcp-server --help
+demo_step "Show MCP server help" "./nixai mcp-server --help"
+./nixai mcp-server --help
 echo ""
 
 echo -e "${BLUE}[DEMO]${NC} MCP server provides documentation integration for:"
@@ -142,11 +183,11 @@ echo ""
 
 wait_for_user
 
-# Demo 9: Nix Build
-demo_header "9. Nix Build System"
+# Demo 10: Nix Build
+demo_header "10. Nix Build System"
 
 demo_step "Build with Nix" "nix build"
-cd /home/nixuser/nixai
+cd /root/nixai
 echo -e "${YELLOW}Note: This may take several minutes on first run...${NC}"
 if timeout 300 nix build --no-link; then
     echo -e "${GREEN}✅ Nix build successful${NC}"
@@ -157,8 +198,8 @@ echo ""
 
 wait_for_user
 
-# Demo 10: Integration Examples
-demo_header "10. Real-world Usage Examples"
+# Demo 11: Integration Examples
+demo_header "11. Real-world Usage Examples"
 
 echo -e "${BLUE}[DEMO]${NC} Here are some real-world nixai usage examples:"
 echo ""
@@ -200,13 +241,21 @@ echo "  nixai --interactive                  # Interactive mode"
 echo "  nixai mcp-server start               # Start MCP server"
 echo ""
 echo -e "${CYAN}Development:${NC}"
-echo "  cd /home/nixuser/nixai && nix develop .#docker # Enter dev shell"
-echo "  just build-docker                            # Build for Docker"
-echo "  just test                                     # Run tests"
-echo "  just help                                     # Show all commands"
+echo "  cd /root/nixai && nix develop .#docker    # Enter dev shell"
+echo "  just build-docker                        # Build for Docker"
+echo "  just test                                # Run tests"
+echo "  just help                                # Show all commands"
+echo ""
+echo -e "${CYAN}Docker Management:${NC}"
+echo "  ./nixai-docker.sh --help                     # Docker script help"
+echo "  ./nixai-docker.sh build                      # Build container"
+echo "  ./nixai-docker.sh run                        # Run container"
+echo "  ./nixai-docker.sh shell                      # Interactive shell"
+echo "  ./nixai-docker.sh test                       # Run tests"
 echo ""
 echo -e "${CYAN}Testing:${NC}"
-echo "  cd /home/nixuser/nixai && ./docker_nixos/test_docker_nixai.sh  # Run comprehensive tests"
+echo "  cd /root/nixai && ./docker_nixos/test_docker_nixai.sh  # Run comprehensive tests"
+echo "  ./nixai-docker.sh test                              # Quick Docker tests"
 echo ""
 
 echo -e "${GREEN}The nixai Docker environment is ready for development and testing!${NC}"

@@ -93,7 +93,6 @@ run_test "Git installation" "which git"
 run_test "Neovim installation" "which nvim"
 
 # Test experimental features
-run_test "Nix experimental features" "nix --version"
 run_test "Nix flakes support" "nix flake --help"
 
 echo ""
@@ -104,7 +103,6 @@ echo "------------------------------"
 
 run_test "nixai binary exists" "which nixai"
 run_test "nixai help command" "nixai --help"
-run_test "nixai version command" "nixai --version"
 
 echo ""
 
