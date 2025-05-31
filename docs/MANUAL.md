@@ -45,6 +45,7 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 - [Configuration](#configuration)
 - [Tips & Troubleshooting](#tips--troubleshooting)
 - [Development Environment (devenv) Feature](#development-environment-devenv-feature)
+- [Neovim + Home Manager Integration](#neovim--home-manager-integration)
 
 ---
 
@@ -737,6 +738,16 @@ vim.keymap.set('n', '<leader>nt', nixai_picker, {desc = 'Telescope NixOS Query'}
 - socat installed (`nix-env -iA nixos.socat` or add to your system packages)
 
 For more details and advanced usage, see the [Neovim Integration](neovim-integration.md) documentation.
+
+---
+
+## 📝 Neovim + Home Manager Integration
+
+For a bulletproof, copy-pasteable Neovim setup with Home Manager, see the [Neovim Integration Guide](neovim-integration.md). It covers:
+- Minimal working config for `home-manager.nix`
+- LSP and plugin setup
+- Troubleshooting and health checks
+- Best practices for reproducible Neovim environments
 
 ---
 
