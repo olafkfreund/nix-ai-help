@@ -61,10 +61,11 @@
     nixosModules.default = import ./modules/nixos.nix;
 
     # Home Manager module
-    homeConfigurations = {}; # Placeholder for home manager configs
+    homeManagerModules.default = import ./modules/home-manager.nix;
 
     # Legacy names for backward compatibility
     nixosModule = self.nixosModules.default;
+    homeManagerModule = self.homeManagerModules.default;
 
     devShells.${system} = {
       # Default development shell for local development

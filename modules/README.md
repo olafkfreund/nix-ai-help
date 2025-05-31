@@ -2,6 +2,50 @@
 
 This directory contains NixOS and Home Manager modules for integrating nixai into your configuration.
 
+## Using with Flakes
+
+If you're using Nix flakes, you can import the modules directly from the nixai flake:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    home-manager.url = "github:nix-community/home-manager";
+    nixai.url = "github:olafkfreund/nix-ai-help";
+  };
+
+  outputs = { self, nixpkgs, home-manager, nixai, ... }: {
+    # NixOS configuration
+    nixosConfigurations.yourhostname = nixpkgs.lib.nixosSystem {
+      # ...
+      modules = [
+        nixai.nixosModules.default
+        {
+          services.nixai = {
+            enable = true;
+            mcp.enable = true;
+          };
+        }
+      ];
+    };
+    
+    # Home Manager configuration
+    homeConfigurations.yourusername = home-manager.lib.homeManagerConfiguration {
+      # ...
+      modules = [
+        nixai.homeManagerModules.default
+        {
+          services.nixai = {
+            enable = true;
+            mcp.enable = true;
+          };
+        }
+      ];
+    };
+  };
+}
+```
+
 ## NixOS Module
 
 The NixOS module allows you to integrate nixai system-wide with proper service management.
