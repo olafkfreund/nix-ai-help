@@ -22,3 +22,21 @@ default:
     commands:
         timeout: 30
         retries: 3
+    devenv:
+        default_directory: "."
+        auto_init_git: true
+        templates:
+            python:
+                enabled: true
+                default_version: "311"
+                default_package_manager: "pip"
+            rust:
+                enabled: true
+                default_version: "stable"
+            nodejs:
+                enabled: true
+                default_version: "20"
+                default_package_manager: "npm"
+            golang:
+                enabled: true
+                default_version: "1.21"

@@ -29,8 +29,8 @@ pause
 
 # 3. Diagnosing NixOS Issues
 print_section "Diagnosing NixOS Issues"
-./nixai diagnose --log-file /var/log/nixos/nixos-rebuild.log || true
-pause
+# ./nixai diagnose --log-file /var/log/nixos/nixos-rebuild.log || true
+# pause
 ./nixai diagnose --nix-log /nix/store/vqbq2gvsxbw0g959znxvf1li9szz36c-bash52-031.drv || true
 pause
 echo 'services.nginx.enable = true;' | ./nixai diagnose || true
@@ -62,13 +62,16 @@ pause
 pause
 ./nixai package-repo . --analyze-only || true
 pause
-./nixai package-repo https://github.com/user/rust-app --output ./derivations --name my-rust-app || true
-pause
-./nixai package-repo https://github.com/user/monorepo || true
-pause
-./nixai package-repo git@github.com:yourorg/private-repo.git --ssh-key ~/.ssh/id_ed25519 || true
-pause
-./nixai package-repo . --output-format json || true
+# ./nixai package-repo https://github.com/user/rust-app --output ./derivations --name my-rust-app || true
+# pause
+# ./nixai package-repo https://github.com/user/monorepo || true
+# pause
+# ./nixai package-repo git@github.com:yourorg/private-repo.git --ssh-key ~/.ssh/id_ed25519 || true
+# pause
+
+# The --output-format flag is deprecated/unsupported; use supported flags only
+# ./nixai package-repo . --output-format json || true  # (REMOVED)
+
 pause
 
 # 7. System Health Checks
@@ -80,13 +83,29 @@ pause
 ./nixai health --log-level debug || true
 pause
 
-# 8. Interactive Mode
+# 8. Development Environment (devenv) Feature
+print_section "Development Environment (devenv) Feature"
+./nixai devenv list || true
+pause
+./nixai devenv create python demo-py --framework fastapi --with-poetry --services postgres,redis || true
+pause
+./nixai devenv create golang demo-go --framework gin --with-grpc || true
+pause
+./nixai devenv create nodejs demo-node --with-typescript --services mongodb || true
+pause
+./nixai devenv create rust demo-rust --with-wasm || true
+pause
+./nixai devenv suggest "web app with database and REST API" || true
+pause
+
+# 9. Interactive Mode
 print_section "Interactive Mode"
 echo "exit" | ./nixai interactive || true
 pause
 
-# 9. Neovim Integration
+# 10. Neovim Integration (with Home Manager reference)
 print_section "Neovim Integration"
+echo "See docs/neovim-integration.md for Home Manager config and troubleshooting."
 ./nixai neovim-setup || true
 pause
 ./nixai neovim-setup --socket-path=/tmp/nixai-mcp.sock || true
@@ -94,12 +113,12 @@ pause
 ./nixai neovim-setup --config-dir=~/.config/nvim || true
 pause
 
-# 10. Advanced Usage
+# 11. Advanced Usage
 print_section "Advanced Usage"
 ./nixai search --nixos-path /etc/nixos pkg nginx || true
 pause
-./nixai diagnose --provider openai --log-file /var/log/nixos/nixos-rebuild.log || true
-pause
+# ./nixai diagnose --provider openai --log-file  || true
+# pause
 ./nixai service-examples nginx || true
 pause
 ./nixai flake explain --flake /etc/nixos/flake.nix || true
@@ -108,15 +127,15 @@ journalctl -xe | ./nixai diagnose || true
 pause
 cat /etc/nixos/configuration.nix | ./nixai explain-option || true
 pause
-./nixai diagnose --provider ollama --model llama3 --temperature 0.2 --log-file /var/log/nixos/nixos-rebuild.log || true
-pause
-./nixai package-repo git@github.com:yourorg/private-repo.git --ssh-key ~/.ssh/id_ed25519 || true
-pause
-./nixai package-repo . --output-format json || true
-pause
-./nixai health --output-format json > health_report.json || true
-pause
-./nixai package-repo . --analyze-only --output-format json > analysis.json || true
+# ./nixai diagnose --provider ollama --model llama3 --temperature 0.2 --log-file  || true
+# pause
+# ./nixai package-repo git@github.com:yourorg/private-repo.git --ssh-key ~/.ssh/id_ed25519 || true
+# pause
+
+# The --output-format flag is deprecated/unsupported; use supported flags only
+# ./nixai health --output-format json > health_report.json || true  # (REMOVED)
+# ./nixai package-repo . --analyze-only --output-format json > analysis.json || true  # (REMOVED)
+
 pause
 
 print_section "All nixai commands demo complete!"

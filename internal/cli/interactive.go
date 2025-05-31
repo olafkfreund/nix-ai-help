@@ -10,6 +10,7 @@ import (
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/utils"
+	"nix-ai-help/pkg/version"
 )
 
 // TODO: Implement AI provider and model switching in interactive mode
@@ -22,6 +23,7 @@ func InteractiveMode() {
 
 	// Enhanced welcome message
 	fmt.Println(utils.FormatHeader("🚀 Welcome to nixai Interactive Mode"))
+	fmt.Println(utils.FormatKeyValue("Version", version.Get().Short()))
 	fmt.Println(utils.FormatInfo("Type 'help' for commands, 'exit' to quit."))
 
 	if nixosConfigPath != "" {
@@ -70,6 +72,10 @@ func handleCommand(command string) {
 			"service-examples <service> - Get AI-powered service configuration examples",
 			"lint-config <file>         - AI-powered configuration file analysis and linting",
 			"package-repo <path>        - Analyze repositories and generate Nix derivations",
+			"devenv <subcommand>        - Create and manage development environments",
+			"  devenv list               - List available devenv templates",
+			"  devenv create <template>  - Create development environment",
+			"  devenv suggest <desc>     - Get AI template suggestions",
 			"config <subcommand>        - AI-assisted Nix configuration management",
 			"  config show               - Show current configuration with AI analysis",
 			"  config set <key> <value>  - Set configuration option with AI guidance",
@@ -86,6 +92,7 @@ func handleCommand(command string) {
 			"set ai <provider> [model]  - Set AI provider (ollama, gemini, openai) and model (optional)",
 			"set-nixos-path <path>      - Set path to NixOS config folder",
 			"flake <subcommand>         - Manage Nix flakes (show, update, check, explain-inputs, explain <input>, ...)",
+			"version                    - Display version information",
 			"exit                       - Exit interactive mode",
 		}
 
@@ -351,6 +358,50 @@ func handleCommand(command string) {
 		// Use the same logic as the CLI command
 		findOptionCmd.Run(findOptionCmd, []string{description})
 		return
+	case "devenv":
+		if len(fields) < 2 {
+			fmt.Println("Usage: devenv <list|create|suggest>")
+			fmt.Println("Examples:")
+			fmt.Println("  devenv list                              # List available templates")
+			fmt.Println("  devenv create python myproject           # Create Python environment")
+			fmt.Println("  devenv create rust --with-wasm          # Create Rust with WebAssembly")
+			fmt.Println("  devenv suggest \"web app with database\"   # Get AI recommendations")
+			return
+		}
+
+		switch fields[1] {
+		case "list":
+			devenvListCmd.Run(devenvListCmd, []string{})
+		case "create":
+			if len(fields) < 3 {
+				fmt.Println("Usage: devenv create <template> [project-name]")
+				fmt.Println("Examples:")
+				fmt.Println("  devenv create python myapp")
+				fmt.Println("  devenv create rust --with-wasm")
+				fmt.Println("  devenv create nodejs --framework nextjs")
+				return
+			}
+			devenvCreateCmd.Run(devenvCreateCmd, fields[2:])
+		case "suggest":
+			if len(fields) < 3 {
+				fmt.Println("Usage: devenv suggest <description>")
+				fmt.Println("Examples:")
+				fmt.Println("  devenv suggest \"web application with database\"")
+				fmt.Println("  devenv suggest \"machine learning project\"")
+				return
+			}
+			description := strings.Join(fields[2:], " ")
+			devenvSuggestCmd.Run(devenvSuggestCmd, []string{description})
+		default:
+			fmt.Println("Unknown devenv subcommand. Use: list, create, or suggest")
+		}
+		return
+	case "version":
+		versionInfo := version.Get()
+		fmt.Println(utils.FormatHeader("📦 Version Information"))
+		fmt.Println(versionInfo.String())
+		fmt.Println(utils.FormatKeyValue("Platform", versionInfo.Platform))
+		fmt.Println(utils.FormatKeyValue("Go Version", versionInfo.GoVersion))
 	case "exit":
 		fmt.Println("Exiting nixai. Goodbye!")
 		os.Exit(0)

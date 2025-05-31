@@ -7,7 +7,7 @@ main
 
 # Go modules and vendor
 /go/
-vendor/
+# vendor/ - Commented out because Nix builds require vendor directory to be committed
 
 # Nix build results
 /result

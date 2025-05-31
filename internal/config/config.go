@@ -40,6 +40,18 @@ type CommandsConfig struct {
 	Retries int `yaml:"retries"`
 }
 
+type DevenvTemplateConfig struct {
+	Enabled               bool   `yaml:"enabled" json:"enabled"`
+	DefaultVersion        string `yaml:"default_version" json:"default_version"`
+	DefaultPackageManager string `yaml:"default_package_manager" json:"default_package_manager"`
+}
+
+type DevenvConfig struct {
+	DefaultDirectory string                          `yaml:"default_directory" json:"default_directory"`
+	AutoInitGit      bool                            `yaml:"auto_init_git" json:"auto_init_git"`
+	Templates        map[string]DevenvTemplateConfig `yaml:"templates" json:"templates"`
+}
+
 type YAMLConfig struct {
 	AIProvider  string            `yaml:"ai_provider" json:"ai_provider"`
 	LogLevel    string            `yaml:"log_level" json:"log_level"`
@@ -47,6 +59,7 @@ type YAMLConfig struct {
 	Nixos       NixosConfig       `yaml:"nixos" json:"nixos"`
 	Diagnostics DiagnosticsConfig `yaml:"diagnostics" json:"diagnostics"`
 	Commands    CommandsConfig    `yaml:"commands" json:"commands"`
+	Devenv      DevenvConfig      `yaml:"devenv" json:"devenv"`
 }
 
 type UserConfig struct {
@@ -58,6 +71,7 @@ type UserConfig struct {
 	Nixos       NixosConfig       `yaml:"nixos" json:"nixos"`
 	Diagnostics DiagnosticsConfig `yaml:"diagnostics" json:"diagnostics"`
 	Commands    CommandsConfig    `yaml:"commands" json:"commands"`
+	Devenv      DevenvConfig      `yaml:"devenv" json:"devenv"`
 }
 
 func DefaultUserConfig() *UserConfig {
@@ -85,6 +99,30 @@ func DefaultUserConfig() *UserConfig {
 		},
 		Diagnostics: DiagnosticsConfig{Enabled: true, Threshold: 1},
 		Commands:    CommandsConfig{Timeout: 30, Retries: 2},
+		Devenv: DevenvConfig{
+			DefaultDirectory: ".",
+			AutoInitGit:      true,
+			Templates: map[string]DevenvTemplateConfig{
+				"python": {
+					Enabled:               true,
+					DefaultVersion:        "311",
+					DefaultPackageManager: "pip",
+				},
+				"rust": {
+					Enabled:        true,
+					DefaultVersion: "stable",
+				},
+				"nodejs": {
+					Enabled:               true,
+					DefaultVersion:        "20",
+					DefaultPackageManager: "npm",
+				},
+				"golang": {
+					Enabled:        true,
+					DefaultVersion: "1.21",
+				},
+			},
+		},
 	}
 }
 

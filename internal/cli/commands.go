@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 	"nix-ai-help/internal/packaging"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
+	"nix-ai-help/pkg/version"
 
 	"github.com/charmbracelet/glamour"
 	"github.com/spf13/cobra"
@@ -102,8 +104,9 @@ func filterDocumentationContent(content string) string {
 
 // Command structure for the CLI
 var rootCmd = &cobra.Command{
-	Use:   "nixai [question]",
-	Short: "NixAI helps solve Nix configuration problems",
+	Use:     "nixai [question]",
+	Short:   "NixAI helps solve Nix configuration problems",
+	Version: version.Version,
 	Long: `NixAI is a command-line tool that assists users in diagnosing and solving NixOS configuration issues using AI models and documentation queries.
 
 You can also ask questions directly, e.g.:
@@ -259,6 +262,7 @@ func init() {
 	rootCmd.AddCommand(lintConfigCmd)        // Register the lint-config command
 	rootCmd.AddCommand(explainHomeOptionCmd) // Register the explain-home-option command
 	rootCmd.AddCommand(packageRepoCmd)       // Register the package-repo command
+	rootCmd.AddCommand(versionCmd)           // Register the version command
 
 	diagnoseCmd.Flags().StringVarP(&logFile, "log-file", "l", "", "Path to a log file to analyze")
 	diagnoseCmd.Flags().StringVarP(&configSnippet, "config-snippet", "c", "", "NixOS configuration snippet to analyze")
@@ -267,6 +271,10 @@ func init() {
 	searchCmd.Flags().StringVarP(&nixosConfigPath, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
 	rootCmd.PersistentFlags().StringVarP(&nixosConfigPathGlobal, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
 	rootCmd.Flags().StringVarP(&askQuestion, "ask", "a", "", "Ask a question about NixOS configuration")
+
+	// Version command flags
+	versionCmd.Flags().BoolP("json", "j", false, "Output version information in JSON format")
+	versionCmd.Flags().BoolP("short", "s", false, "Output only the version number")
 	configCmd.AddCommand(showUserConfig)
 	mcpServerCmd.AddCommand(mcpServerStartCmd)
 	mcpServerCmd.AddCommand(mcpServerStopCmd)
@@ -3201,6 +3209,35 @@ Examples:
 		fmt.Println("  <leader>ns - Get context-aware suggestions")
 		fmt.Println("  <leader>no - Explain a NixOS option")
 		fmt.Println("  <leader>nh - Explain a Home Manager option")
+	},
+}
+
+// Version command to display version information
+var versionCmd = &cobra.Command{
+	Use:   "version",
+	Short: "Display the version information",
+	Long: `Display version information for nixai.
+
+By default, shows detailed version information including commit hash and build date.
+Use --short for just the version number, or --json for JSON output.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		versionInfo := version.Get()
+
+		jsonOutput, _ := cmd.Flags().GetBool("json")
+		shortOutput, _ := cmd.Flags().GetBool("short")
+
+		if jsonOutput {
+			versionJSON, err := json.MarshalIndent(versionInfo, "", "  ")
+			if err != nil {
+				fmt.Println(utils.FormatError("Failed to retrieve version information"))
+				os.Exit(1)
+			}
+			fmt.Println(string(versionJSON))
+		} else if shortOutput {
+			fmt.Println(versionInfo.Short())
+		} else {
+			fmt.Println(versionInfo.String())
+		}
 	},
 }
 

@@ -1,23 +1,28 @@
 # Justfile for nixai project
 set shell := ["bash", "-c"]
 
+# Variables for version injection
+VERSION := `git describe --tags --always --dirty 2>/dev/null || echo "dev"`
+GIT_COMMIT := `git rev-parse --short HEAD 2>/dev/null || echo "unknown"`
+BUILD_DATE := `date -u +"%Y-%m-%dT%H:%M:%SZ"`
+
 # Build the application
 build:
 	@echo "Building nixai..."
-	go build -o ./nixai ./cmd/nixai/main.go
+	go build -ldflags="-X nix-ai-help/pkg/version.Version={{VERSION}} -X nix-ai-help/pkg/version.GitCommit={{GIT_COMMIT}} -X nix-ai-help/pkg/version.BuildDate={{BUILD_DATE}}" -o ./nixai ./cmd/nixai/main.go
 
 # Build for production with optimizations
 build-prod:
 	@echo "Building nixai for production..."
-	CGO_ENABLED=0 go build -ldflags="-w -s" -o ./nixai ./cmd/nixai/main.go
+	CGO_ENABLED=0 go build -ldflags="-w -s -X nix-ai-help/pkg/version.Version={{VERSION}} -X nix-ai-help/pkg/version.GitCommit={{GIT_COMMIT}} -X nix-ai-help/pkg/version.BuildDate={{BUILD_DATE}}" -o ./nixai ./cmd/nixai/main.go
 
 # Build for multiple architectures
 build-all:
 	@echo "Building nixai for multiple architectures..."
-	GOOS=linux GOARCH=amd64 go build -o ./dist/nixai-linux-amd64 ./cmd/nixai/main.go
-	GOOS=linux GOARCH=arm64 go build -o ./dist/nixai-linux-arm64 ./cmd/nixai/main.go
-	GOOS=darwin GOARCH=amd64 go build -o ./dist/nixai-darwin-amd64 ./cmd/nixai/main.go
-	GOOS=darwin GOARCH=arm64 go build -o ./dist/nixai-darwin-arm64 ./cmd/nixai/main.go
+	GOOS=linux GOARCH=amd64 go build -ldflags="-X nix-ai-help/pkg/version.Version={{VERSION}} -X nix-ai-help/pkg/version.GitCommit={{GIT_COMMIT}} -X nix-ai-help/pkg/version.BuildDate={{BUILD_DATE}}" -o ./dist/nixai-linux-amd64 ./cmd/nixai/main.go
+	GOOS=linux GOARCH=arm64 go build -ldflags="-X nix-ai-help/pkg/version.Version={{VERSION}} -X nix-ai-help/pkg/version.GitCommit={{GIT_COMMIT}} -X nix-ai-help/pkg/version.BuildDate={{BUILD_DATE}}" -o ./dist/nixai-linux-arm64 ./cmd/nixai/main.go
+	GOOS=darwin GOARCH=amd64 go build -ldflags="-X nix-ai-help/pkg/version.Version={{VERSION}} -X nix-ai-help/pkg/version.GitCommit={{GIT_COMMIT}} -X nix-ai-help/pkg/version.BuildDate={{BUILD_DATE}}" -o ./dist/nixai-darwin-amd64 ./cmd/nixai/main.go
+	GOOS=darwin GOARCH=arm64 go build -ldflags="-X nix-ai-help/pkg/version.Version={{VERSION}} -X nix-ai-help/pkg/version.GitCommit={{GIT_COMMIT}} -X nix-ai-help/pkg/version.BuildDate={{BUILD_DATE}}" -o ./dist/nixai-darwin-arm64 ./cmd/nixai/main.go
 
 # Docker Environment Commands (isolated test environment)
 docker-build:
@@ -41,7 +46,7 @@ docker-shell:
 # Docker-internal commands (for use inside containers only)
 build-docker:
 	@echo "Building nixai in Docker environment..."
-	go build -o /tmp/nixai ./cmd/nixai/main.go
+	go build -ldflags="-X nix-ai-help/pkg/version.Version={{VERSION}} -X nix-ai-help/pkg/version.GitCommit={{GIT_COMMIT}} -X nix-ai-help/pkg/version.BuildDate={{BUILD_DATE}}" -o /tmp/nixai ./cmd/nixai/main.go
 	@echo "Binary built at /tmp/nixai"
 
 run-docker: build-docker
