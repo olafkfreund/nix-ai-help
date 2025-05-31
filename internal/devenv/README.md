@@ -19,11 +19,13 @@ nixai's `devenv` feature lets you quickly scaffold reproducible development envi
 ## 🧑‍💻 Usage Examples
 
 ### List Available Templates
+
 ```sh
 nixai devenv list
 ```
 
 ### Create a New Project
+
 ```sh
 nixai devenv create python myproject --framework fastapi --with-poetry --services postgres,redis
 nixai devenv create golang my-go-app --framework gin --with-grpc
@@ -32,6 +34,7 @@ nixai devenv create rust my-rust-app --with-wasm
 ```
 
 ### Get AI-Powered Suggestions
+
 ```sh
 nixai devenv suggest "web app with database and REST API"
 ```
@@ -94,6 +97,7 @@ nixai devenv suggest "web app with database and REST API"
 ---
 
 ## 📚 References
+
 - [devenv.sh documentation](https://devenv.sh/)
 - [nix.dev](https://nix.dev/)
 - [NixOS Manual](https://nixos.org/manual/nixpkgs/stable/)
