@@ -15,7 +15,7 @@
         pname = "nixai";
         version = "0.1.0";
         src = ./.;
-        vendorHash = "sha256-abbfa/rHLiGcA88anY9cLlFH8fGw/hcSmUOw+uN9kQ0=";
+        vendorHash = "sha256-v12l65xY+hhHKoXWo3AJvvbaqviDeNcJSw7ZqEbxTwo=";
         doCheck = false; # Disable tests in Nix build due to network/sandbox restrictions
         meta = {
           description = "A tool for diagnosing and configuring NixOS using AI.";

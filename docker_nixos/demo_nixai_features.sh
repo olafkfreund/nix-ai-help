@@ -58,7 +58,7 @@ echo "  • Container: nixai:latest"
 echo "  • User: nixuser"
 echo "  • Working Directory: $(pwd)"
 echo "  • Ollama Host: ${OLLAMA_HOST:-http://host.docker.internal:11434}"
-echo "  • MCP Server: Background process"
+echo "  • MCP Server: Will be started during demo"
 echo ""
 
 wait_for_user
@@ -77,8 +77,22 @@ demo_step "Show nixai help" "./nixai --help"
 ./nixai --help
 echo ""
 
-demo_step "Show nixai version" "./nixai --version"
-./nixai --version
+wait_for_user
+
+# Start MCP Server for Documentation Features
+demo_header "Starting MCP Server for Documentation Features"
+
+demo_step "Start MCP server in background" "./nixai mcp-server start -d"
+echo -e "${YELLOW}Starting MCP server for documentation queries...${NC}"
+./nixai mcp-server start -d
+
+# Wait a moment for the server to initialize
+echo -e "${CYAN}Waiting for MCP server to initialize...${NC}"
+sleep 3
+
+# Check if MCP server is running
+demo_step "Check MCP server status" "./nixai mcp-server status"
+./nixai mcp-server status
 echo ""
 
 wait_for_user
@@ -256,6 +270,14 @@ echo ""
 echo -e "${CYAN}Testing:${NC}"
 echo "  cd /root/nixai && ./docker_nixos/test_docker_nixai.sh  # Run comprehensive tests"
 echo "  ./nixai-docker.sh test                              # Quick Docker tests"
+echo ""
+
+# Cleanup
+demo_header "Demo Cleanup"
+
+demo_step "Stop MCP server" "./nixai mcp-server stop"
+echo -e "${YELLOW}Stopping MCP server...${NC}"
+./nixai mcp-server stop || echo -e "${YELLOW}(MCP server may have already stopped)${NC}"
 echo ""
 
 echo -e "${GREEN}The nixai Docker environment is ready for development and testing!${NC}"

@@ -160,7 +160,6 @@ Test basic functionality:
 ```zsh
 # Test basic commands
 nixai --help
-nixai --version
 
 # Test direct questions
 nixai "How do I install Neovim in NixOS?"
