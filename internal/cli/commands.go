@@ -34,6 +34,72 @@ func getOllamaModel(configModel string) string {
 	return "llama3" // Default model
 }
 
+// filterDocumentationContent filters out HTML tags, wiki navigation, and other unwanted content
+func filterDocumentationContent(content string) string {
+	lines := strings.Split(content, "\n")
+	var filtered []string
+
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+
+		// Skip HTML content
+		if strings.Contains(trimmed, "<!DOCTYPE") ||
+			strings.Contains(trimmed, "<html") ||
+			strings.Contains(trimmed, "<head") ||
+			strings.Contains(trimmed, "</head>") ||
+			strings.Contains(trimmed, "<body") ||
+			strings.Contains(trimmed, "</body>") ||
+			strings.Contains(trimmed, "</html>") ||
+			strings.Contains(trimmed, "<meta") ||
+			strings.Contains(trimmed, "<link") ||
+			strings.Contains(trimmed, "<script") ||
+			strings.Contains(trimmed, "</script>") ||
+			strings.Contains(trimmed, "<style") ||
+			strings.Contains(trimmed, "</style>") {
+			continue
+		}
+
+		// Skip wiki navigation and interface elements
+		if strings.Contains(trimmed, "Navigation") ||
+			strings.Contains(trimmed, "Edit this page") ||
+			strings.Contains(trimmed, "Recent changes") ||
+			strings.Contains(trimmed, "Random page") ||
+			strings.Contains(trimmed, "Special pages") ||
+			strings.Contains(trimmed, "Main Page") ||
+			strings.Contains(trimmed, "Community portal") ||
+			strings.Contains(trimmed, "Help") ||
+			strings.Contains(trimmed, "Search") ||
+			strings.Contains(trimmed, "Go") ||
+			strings.Contains(trimmed, "Tools") ||
+			strings.Contains(trimmed, "Print/export") ||
+			strings.Contains(trimmed, "In other languages") {
+			continue
+		}
+
+		// Skip lines that are just URL references to wiki with HTML content
+		if strings.HasPrefix(trimmed, "https://wiki.nixos.org/wiki/") &&
+			(strings.Contains(trimmed, "<!DOCTYPE") || strings.Contains(trimmed, "<head") ||
+				strings.Contains(trimmed, "Navigation") || strings.Contains(trimmed, "<")) {
+			continue
+		}
+
+		// Remove HTML tags from remaining content
+		// Basic HTML tag removal regex
+		re := regexp.MustCompile(`<[^>]*>`)
+		cleaned := re.ReplaceAllString(trimmed, "")
+		cleaned = strings.TrimSpace(cleaned)
+
+		if cleaned != "" {
+			filtered = append(filtered, cleaned)
+		}
+	}
+
+	return strings.Join(filtered, "\n")
+}
+
 // Command structure for the CLI
 var rootCmd = &cobra.Command{
 	Use:   "nixai [question]",
@@ -1330,7 +1396,21 @@ var explainOptionCmd = &cobra.Command{
 				fmt.Println(utils.FormatBox("NixOS Option", "This option is managed by NixOS. See: https://search.nixos.org/options"))
 			}
 		}
-		fmt.Println(doc)
+
+		// Filter and display the documentation
+		filteredDoc := filterDocumentationContent(doc)
+		if strings.TrimSpace(filteredDoc) != "" {
+			fmt.Println(utils.FormatHeader("📋 Documentation"))
+			fmt.Println(utils.FormatDivider())
+			// Render the documentation as markdown for better formatting
+			rendered, err := glamour.Render(filteredDoc, "dark")
+			if err != nil {
+				fmt.Println(filteredDoc)
+			} else {
+				fmt.Print(rendered)
+			}
+			fmt.Println(utils.FormatDivider())
+		}
 
 		// Select AI provider
 		fmt.Print(utils.FormatProgress("Generating explanation with " + cfg.AIProvider + "..."))
@@ -1437,7 +1517,21 @@ var explainHomeOptionCmd = &cobra.Command{
 				fmt.Println(utils.FormatBox("NixOS Option", "This option is managed by NixOS. See: https://search.nixos.org/options"))
 			}
 		}
-		fmt.Println(doc)
+
+		// Filter and display the documentation
+		filteredDoc := filterDocumentationContent(doc)
+		if strings.TrimSpace(filteredDoc) != "" {
+			fmt.Println(utils.FormatHeader("📋 Documentation"))
+			fmt.Println(utils.FormatDivider())
+			// Render the documentation as markdown for better formatting
+			rendered, err := glamour.Render(filteredDoc, "dark")
+			if err != nil {
+				fmt.Println(filteredDoc)
+			} else {
+				fmt.Print(rendered)
+			}
+			fmt.Println(utils.FormatDivider())
+		}
 
 		// Select AI provider
 		fmt.Print(utils.FormatProgress("Generating explanation with " + cfg.AIProvider + "..."))
@@ -3094,7 +3188,7 @@ Examples:
 		fmt.Printf("\nCreated module: %s/lua/nixai.lua\n\n", usedConfigDir)
 
 		fmt.Println(utils.FormatHeader("Add to your Neovim configuration:"))
-		fmt.Printf("\nAdd this to your init.lua:\n\n")
+		fmt.Print("\nAdd this to your init.lua:\n\n")
 		fmt.Println(initSnippet)
 
 		fmt.Println("\nOr if you're using init.vim, add this:")

@@ -2,7 +2,27 @@
 
 Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, documentation, and automation from the command line. This manual covers all major features, with real-world usage examples for both beginners and advanced users.
 
-> **Latest Update (May 2025)**: Direct question functionality has been added! Ask questions directly with `nixai "your question"` or `nixai --ask "question"`. All three AI providers (Ollama, Gemini, OpenAI) have been comprehensively tested and verified working. MCP server integration provides enhanced documentation retrieval from official NixOS sources.
+> **Latest Update (May 2025)**: Major improvements to documentation display with HTML filtering, enhanced terminal formatting, and comprehensive editor integration. The `explain-option` and `explain-home-option` commands now provide clean, beautifully formatted output with all HTML artifacts removed. Direct question functionality has been enhanced with better error handling and documentation context retrieval. All three AI providers (Ollama, Gemini, OpenAI) have been comprehensively tested and verified working.
+
+---
+
+## 🆕 Recent Improvements & Features
+
+### Documentation Display Enhancements (May 2025)
+
+- **🧹 HTML Filtering**: Complete removal of HTML tags, DOCTYPE declarations, wiki navigation elements, and raw content from all documentation output
+- **🎨 Enhanced Formatting**: Consistent use of headers, dividers, key-value pairs, and glamour markdown rendering for improved readability
+- **🏠 Smart Option Detection**: Automatic visual distinction between NixOS options (`🖥️ NixOS Option`) and Home Manager options (`🏠 Home Manager Option`)
+- **🔧 Robust Error Handling**: Better error messages, graceful fallbacks when MCP server is unavailable, and clear feedback for configuration issues
+- **🧪 Comprehensive Testing**: All improvements are backed by extensive test coverage to ensure reliability
+
+### Core Capabilities
+
+- **🤖 Direct Question Assistant**: Ask questions directly with `nixai "your question"` for instant AI-powered help
+- **📖 Documentation Integration**: Enhanced MCP server integration for official NixOS documentation retrieval
+- **🔌 Editor Integration**: Full support for Neovim and VS Code with automatic setup and configuration
+- **📦 Package Analysis**: AI-powered repository analysis with Nix derivation generation
+- **🔍 Option Explanation**: Comprehensive explanations for NixOS and Home Manager options with examples and best practices
 
 ---
 
@@ -138,12 +158,41 @@ echo 'services.nginx.enable = true;' | nixai diagnose
 
 ## Explaining NixOS and Home Manager Options
 
-Get detailed, AI-powered explanations for any option, including type, default, description, best practices, and usage examples.
+Get detailed, AI-powered explanations for any option, including type, default, description, best practices, and usage examples. The explanation output now features enhanced HTML filtering and beautiful terminal formatting for improved readability.
+
+### Enhanced Documentation Display
+
+As of May 2025, the `explain-option` and `explain-home-option` commands feature significant improvements:
+
+- **🧹 Complete HTML Filtering:** Removes all HTML tags, DOCTYPE declarations, wiki navigation elements, and raw content
+- **🎨 Beautiful Formatting:** Consistent headers, dividers, key-value pairs, and glamour markdown rendering
+- **🏠 Smart Detection:** Automatic visual distinction between NixOS options (`🖥️ NixOS Option`) and Home Manager options (`🏠 Home Manager Option`)
+- **📖 Clean Documentation:** Official documentation is filtered and formatted for optimal terminal display
+- **🔧 Robust Error Handling:** Graceful fallbacks when documentation sources are unavailable
 
 ### NixOS Option
 
 ```sh
 nixai explain-option services.nginx.enable
+```
+
+**Example Output:**
+```
+🖥️ NixOS Option: services.nginx.enable
+
+📋 Option Information
+├─ Type: boolean
+├─ Default: false
+└─ Source: /nix/store/.../nixos/modules/services/web-servers/nginx.nix
+
+📖 Documentation
+Whether to enable the nginx Web Server.
+
+🤖 AI Explanation
+[Detailed AI-generated explanation with examples and best practices]
+
+💡 Usage Examples
+[Basic, common, and advanced configuration examples]
 ```
 
 ### Home Manager Option
@@ -152,11 +201,32 @@ nixai explain-option services.nginx.enable
 nixai explain-home-option programs.git.enable
 ```
 
+**Example Output:**
+```
+🏠 Home Manager Option: programs.git.enable
+
+📋 Option Information  
+├─ Type: boolean
+├─ Default: false
+└─ Module: programs.git
+
+📖 Documentation
+Whether to enable Git, a distributed version control system.
+
+🤖 AI Explanation
+[Detailed explanation specific to Home Manager context]
+
+💡 Usage Examples
+[Home Manager-specific configuration examples]
+```
+
 ### Natural Language Query
 
 ```sh
 nixai explain-option "how to enable SSH access"
 ```
+
+The system intelligently maps natural language queries to appropriate NixOS or Home Manager options and provides comprehensive explanations.
 
 ---
 
@@ -466,69 +536,156 @@ Interactive mode is ideal for:
 
 ## Editor Integration
 
+## Editor Integration
+
+nixai provides seamless integration with popular editors through the MCP (Model Context Protocol) server, enabling you to access NixOS documentation and AI assistance directly within your development environment. The integration supports both Neovim and VS Code with automatic setup and configuration.
+
+### VS Code Integration
+
+Complete VS Code integration with Copilot, Claude Dev, and other MCP-compatible extensions for in-editor NixOS assistance.
+
+#### Quick Setup
+
+1. **Start the MCP server:**
+```sh
+# Start the server in background mode
+nixai mcp-server start -d
+
+# Check server status
+nixai mcp-server status
+```
+
+2. **Install required VS Code extensions:**
+   - `automatalabs.copilot-mcp` - Copilot MCP extension
+   - `zebradev.mcp-server-runner` - MCP Server Runner  
+   - `saoudrizwan.claude-dev` - Claude Dev (Cline)
+
+3. **Configure VS Code settings:**
+
+Add to your `.vscode/settings.json`:
+
+```json
+{
+  "mcp.servers": {
+    "nixai": {
+      "command": "bash",
+      "args": ["-c", "socat STDIO UNIX-CONNECT:/tmp/nixai-mcp.sock"],
+      "env": {}
+    }
+  },
+  "copilot.mcp.servers": {
+    "nixai": {
+      "command": "bash",
+      "args": ["-c", "socat STDIO UNIX-CONNECT:/tmp/nixai-mcp.sock"],
+      "env": {}
+    }
+  },
+  "claude-dev.mcpServers": {
+    "nixai": {
+      "command": "bash",
+      "args": ["-c", "socat STDIO UNIX-CONNECT:/tmp/nixai-mcp.sock"],
+      "env": {}
+    }
+  },
+  "mcp.enableDebug": true,
+  "claude-dev.enableMcp": true
+}
+```
+
+#### Using nixai in VS Code
+
+Once configured, you can:
+
+- **Ask Copilot about NixOS:** Chat with GitHub Copilot and ask NixOS-specific questions - it will automatically query nixai's documentation
+- **Use Claude Dev:** Access comprehensive NixOS help through the Claude Dev extension
+- **Get contextual suggestions:** Receive NixOS-specific completions and explanations while editing configuration files
+
+For detailed VS Code setup instructions, see [VS Code Integration Guide](MCP_VSCODE_INTEGRATION.md).
+
 ### Neovim Integration
 
-nixai can be integrated with Neovim to provide AI-powered diagnostics, explanations, and suggestions directly within your editor.
+nixai provides comprehensive Neovim integration with lua configuration, custom commands, and keybindings for seamless NixOS assistance.
 
-#### Setting up Neovim Integration
+#### Automatic Setup
 
-The fastest way to set up Neovim integration is using the built-in command:
+Use the built-in command to automatically configure Neovim integration:
 
 ```sh
 # Basic setup with default socket path
 nixai neovim-setup
 
-# With custom socket path (if you're using a non-default socket)
-nixai neovim-setup --socket-path=/path/to/socket
+# With custom socket path
+nixai neovim-setup --socket-path=$HOME/.local/share/nixai/mcp.sock
 
-# With custom Neovim config directory
-nixai neovim-setup --config-dir=/path/to/config
+# With custom Neovim config directory  
+nixai neovim-setup --config-dir=$HOME/.config/nvim
 ```
 
 This command:
-
 1. Creates a `nixai.lua` module in your Neovim configuration
-2. Shows you the code to add to your `init.lua` or `init.vim`
+2. Provides instructions for adding it to your `init.lua` or `init.vim`
 3. Sets up keymaps for NixOS documentation lookup and option explanations
 
-#### Using nixai in Neovim
+#### Manual Setup
 
-Once set up, you can use these default keybindings:
-
-- `<leader>nq` - Ask a NixOS question (opens prompt)
-- `<leader>ns` - Get context-aware suggestions based on your current file
-- `<leader>no` - Explain a NixOS option (opens prompt)
-- `<leader>nh` - Explain a Home Manager option (opens prompt)
-
-For example, when editing your NixOS configuration:
-
-1. Place your cursor on a line with a NixOS option like `services.nginx.enable = true;`
-2. Press `<leader>ns` to get context-aware suggestions about nginx configuration
-3. Or press `<leader>no` and type `services.nginx.enable` to get a detailed explanation
-
-#### Customizing Neovim Integration
-
-You can customize how nixai integrates with your Neovim setup by editing the `~/.config/nvim/lua/nixai.lua` file or modifying the setup call:
+Add to your `init.lua`:
 
 ```lua
--- In your init.lua
-require('nixai').setup({
-  socket_path = "/custom/path/to/mcp.sock", -- Custom socket path
-  disable_keymaps = true,  -- Disable default keymaps if you want your own
-})
-
--- Custom keymaps
-vim.keymap.set('n', '<leader>nx', require('nixai').ask_query, {desc = 'NixAI Query'})
-vim.keymap.set('n', '<leader>nr', require('nixai').show_suggestion, {desc = 'NixAI Suggestion'})
+-- nixai integration
+local ok, nixai = pcall(require, "nixai")
+if ok then
+  nixai.setup({
+    socket_path = "/tmp/nixai-mcp.sock",
+    keybindings = true, -- Enable default keybindings
+  })
+else
+  vim.notify("nixai module not found", vim.log.levels.WARN)
+end
 ```
 
-#### Telescope Integration
+#### Available Commands
 
-You can create a Telescope integration for nixai queries:
+- `:NixaiExplainOption <option>` - Explain NixOS options
+- `:NixaiExplainHomeOption <option>` - Explain Home Manager options  
+- `:NixaiSearch <query>` - Search packages and services
+- `:NixaiDiagnose` - Diagnose current buffer or selection
+- `:NixaiAsk <question>` - Ask direct questions
 
-```lua
-local nixai_picker = function()
-  require('telescope.pickers').new({}, {
+#### Default Keybindings
+
+- `<leader>ne` - Explain option under cursor
+- `<leader>ns` - Search packages/services
+- `<leader>nd` - Diagnose current buffer
+- `<leader>na` - Ask nixai a question
+
+For comprehensive Neovim setup instructions, see [Neovim Integration Guide](neovim-integration.md).
+
+### Home Manager Integration
+
+Both editors can be automatically configured through Home Manager:
+
+```nix
+# home.nix
+{ config, pkgs, ... }:
+{
+  imports = [
+    # Import the nixai Home Manager module
+    (builtins.fetchTarball "https://github.com/olafkfreund/nix-ai-help/archive/main.tar.gz")/modules/home-manager.nix
+  ];
+
+  services.nixai = {
+    enable = true;
+    mcp = {
+      enable = true;
+      socketPath = "$HOME/.local/share/nixai/mcp.sock";
+    };
+    # Automatically configure VS Code
+    vscodeIntegration = true;
+    # Automatically configure Neovim
+    neovimIntegration = true;
+  };
+}
+```
     prompt_title = 'NixOS Query',
     finder = require('telescope.finders').new_dynamic({
       fn = function(prompt)
