@@ -68,7 +68,10 @@ pause
 # pause
 # ./nixai package-repo git@github.com:yourorg/private-repo.git --ssh-key ~/.ssh/id_ed25519 || true
 # pause
-./nixai package-repo . --output-format json || true
+
+# The --output-format flag is deprecated/unsupported; use supported flags only
+# ./nixai package-repo . --output-format json || true  # (REMOVED)
+
 pause
 
 # 7. System Health Checks
@@ -128,11 +131,11 @@ pause
 # pause
 # ./nixai package-repo git@github.com:yourorg/private-repo.git --ssh-key ~/.ssh/id_ed25519 || true
 # pause
-./nixai package-repo . --output-format json || true
-pause
-./nixai health --output-format json > health_report.json || true
-pause
-./nixai package-repo . --analyze-only --output-format json > analysis.json || true
+
+# The --output-format flag is deprecated/unsupported; use supported flags only
+# ./nixai health --output-format json > health_report.json || true  # (REMOVED)
+# ./nixai package-repo . --analyze-only --output-format json > analysis.json || true  # (REMOVED)
+
 pause
 
 print_section "All nixai commands demo complete!"
