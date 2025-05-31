@@ -44,6 +44,7 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 - [Advanced Usage](#advanced-usage)
 - [Configuration](#configuration)
 - [Tips & Troubleshooting](#tips--troubleshooting)
+- [Development Environment (devenv) Feature](#development-environment-devenv-feature)
 
 ---
 
@@ -968,4 +969,54 @@ echo "set ai gemini" | ./nixai interactive
 
 ---
 
-> _nixai: Your AI-powered NixOS assistant, right in your terminal._
+## 🆕 Development Environment (devenv) Feature
+
+nixai now supports rapid creation of reproducible development environments for Python, Rust, Node.js, and Go using the `devenv` command. This feature leverages [devenv.sh](https://devenv.sh/) and Nix to provide language-specific templates, framework/tool options, and service/database integration.
+
+### Practical Usage
+
+#### List Available Templates
+
+    nixai devenv list
+
+#### Create a New Project
+
+    nixai devenv create python myproject --framework fastapi --with-poetry --services postgres,redis
+    nixai devenv create golang my-go-app --framework gin --with-grpc
+    nixai devenv create nodejs my-node-app --with-typescript --services mongodb
+    nixai devenv create rust my-rust-app --with-wasm
+
+#### Get AI-Powered Suggestions
+
+    nixai devenv suggest "web app with database and REST API"
+
+### How to Add a New Language or Framework
+
+1. Edit `internal/devenv/builtin_templates.go` and implement the `Template` interface (see existing templates for examples).
+2. Register your template in `registerBuiltinTemplates()` in `service.go`.
+3. Add or update tests in `service_test.go`.
+4. Document your new template in the main README and this manual.
+
+### Example: Minimal Template Implementation
+
+```go
+// ExampleTemplate implements the Template interface
+ type ExampleTemplate struct{}
+
+ func (e *ExampleTemplate) Name() string { return "example" }
+ func (e *ExampleTemplate) Description() string { return "Example language environment" }
+ func (e *ExampleTemplate) RequiredInputs() []devenv.InputField { return nil }
+ func (e *ExampleTemplate) SupportedServices() []string { return nil }
+ func (e *ExampleTemplate) Validate(config devenv.TemplateConfig) error { return nil }
+ func (e *ExampleTemplate) Generate(config devenv.TemplateConfig) (*devenv.DevenvConfig, error) {
+     // ... generate config ...
+     return &devenv.DevenvConfig{/* ... */}, nil
+ }
+```
+
+### Testing
+
+- Run all tests: `go test ./internal/devenv/...`
+- Try creating projects with various options and check the generated `devenv.nix`
+
+---

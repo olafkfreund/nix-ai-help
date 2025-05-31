@@ -26,6 +26,11 @@ func IsDirectory(path string) bool {
 	return info.IsDir()
 }
 
+// DirExists checks if the given path exists and is a directory.
+func DirExists(path string) bool {
+	return IsDirectory(path)
+}
+
 // SplitLines splits a string into a slice of lines.
 func SplitLines(input string) []string {
 	return strings.Split(strings.TrimSpace(input), "\n")

@@ -50,6 +50,7 @@ All other dependencies are managed by the Nix flake and justfile.
 
 - [🚀 Project Overview](#-project-overview)
 - [✨ Features](#-features)
+- [🆕 Development Environment (devenv) Integration](#-development-environment-devenv-integration)
 - [🧩 Flake Input Analysis & AI Explanations](#-flake-input-analysis--ai-explanations)
 - [🔧 NixOS Option Explainer](#-nixos-option-explainer)
 - [📦 AI-Powered Package Repository Analysis](#-ai-powered-package-repository-analysis)
@@ -112,6 +113,44 @@ All other dependencies are managed by the Nix flake and justfile.
 - **NEW:** 🏠 **Home Manager Option Support** — Dedicated `nixai explain-home-option <option>` command with visual distinction between Home Manager and NixOS options.
 
 - **NEW:** 📦 **AI-Powered Package Repository Analysis** — Automatically analyze Git repositories and generate Nix derivations with `nixai package-repo <path>`, supporting Go, Python, Node.js, and Rust projects.
+
+---
+
+## 🆕 Development Environment (devenv) Integration
+
+nixai now includes a powerful `devenv` feature for quickly scaffolding reproducible development environments for popular languages (Python, Rust, Node.js, Go) using [devenv.sh](https://devenv.sh/) and Nix. This system is:
+
+- **Extensible**: Add new language/framework templates easily in Go
+- **Flexible**: Supports framework/tool options (e.g., Gin, FastAPI, TypeScript, gRPC, etc.)
+- **Service-aware**: Integrates databases/services (Postgres, Redis, MySQL, MongoDB)
+- **AI-powered**: Suggests templates based on your project description
+
+### Usage Examples
+
+- **List templates:**
+  ```sh
+  nixai devenv list
+  ```
+- **Create a project:**
+  ```sh
+  nixai devenv create python myproject --framework fastapi --with-poetry --services postgres,redis
+  nixai devenv create golang my-go-app --framework gin --with-grpc
+  nixai devenv create nodejs my-node-app --with-typescript --services mongodb
+  nixai devenv create rust my-rust-app --with-wasm
+  ```
+- **Get AI-powered suggestions:**
+  ```sh
+  nixai devenv suggest "web app with database and REST API"
+  ```
+
+### How to Add a New Language Template
+
+1. Edit `internal/devenv/builtin_templates.go` and implement the `Template` interface (see existing templates for examples).
+2. Register your template in `registerBuiltinTemplates()` in `service.go`.
+3. Add or update tests in `service_test.go`.
+4. Document your new template in the main README and manual.
+
+See `internal/devenv/README.md` for a full developer guide.
 
 ---
 
