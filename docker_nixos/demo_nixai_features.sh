@@ -84,11 +84,26 @@ demo_header "Starting MCP Server for Documentation Features"
 
 demo_step "Start MCP server in background" "./nixai mcp-server start -d"
 echo -e "${YELLOW}Starting MCP server for documentation queries...${NC}"
-./nixai mcp-server start -d
+./nixai mcp-server start --background
 
-# Wait a moment for the server to initialize
-echo -e "${CYAN}Waiting for MCP server to initialize...${NC}"
-sleep 3
+# Wait longer for the server to fully initialize
+echo -e "${CYAN}Waiting for MCP server to fully initialize...${NC}"
+sleep 5
+
+# Verify the server is responding to queries, not just health checks
+echo -e "${CYAN}Testing MCP server functionality...${NC}"
+for i in {1..10}; do
+    if curl -s -X POST http://localhost:8081/query -H "Content-Type: application/json" -d '{"query":"test"}' >/dev/null 2>&1; then
+        echo -e "${GREEN}✅ MCP server is ready for queries${NC}"
+        break
+    else
+        echo -e "${YELLOW}⏳ Waiting for MCP server (attempt $i/10)...${NC}"
+        sleep 2
+    fi
+    if [ $i -eq 10 ]; then
+        echo -e "${RED}❌ MCP server failed to respond to queries after 10 attempts${NC}"
+    fi
+done
 
 # Check if MCP server is running
 demo_step "Check MCP server status" "./nixai mcp-server status"

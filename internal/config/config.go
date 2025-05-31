@@ -68,7 +68,7 @@ func DefaultUserConfig() *UserConfig {
 		LogLevel:    "info",
 		MCPServer: MCPServerConfig{
 			Host:       "localhost",
-			Port:       8080,
+			Port:       8081,
 			SocketPath: "/tmp/nixai-mcp.sock",
 			AutoStart:  false,
 			DocumentationSources: []string{

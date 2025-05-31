@@ -35,7 +35,7 @@ in {
 
       port = mkOption {
         type = types.port;
-        default = 8080;
+        default = 8081;
         description = "Port for the MCP HTTP server to listen on";
       };
 
@@ -150,140 +150,7 @@ in {
     })
 
     (mkIf cfg.neovimIntegration.enable {
-      programs.nixvim = mkIf cfg.neovimIntegration.useNixVim {
-        enable = true;
-        defaultEditor = true;
-
-        # Basic Neovim settings
-        options = {
-          number = true;
-          relativenumber = true;
-          expandtab = true;
-          tabstop = 2;
-          shiftwidth = 2;
-          hidden = true;
-          ignorecase = true;
-          smartcase = true;
-          termguicolors = true;
-        };
-
-        # Set leader key
-        globals.mapleader = " ";
-
-        # Essential plugins for Nix development
-        plugins = {
-          # LSP support
-          lsp = {
-            enable = true;
-            servers = {
-              nil_ls.enable = true; # Nix LSP
-              gopls.enable = true; # Go LSP (for nixai development)
-            };
-          };
-
-          # Completion
-          cmp = {
-            enable = true;
-            autoEnableSources = true;
-            settings = {
-              sources = [
-                {name = "nvim_lsp";}
-                {name = "buffer";}
-                {name = "path";}
-              ];
-            };
-          };
-
-          # File explorer
-          nvim-tree.enable = true;
-
-          # Status line
-          lualine.enable = true;
-
-          # Git integration
-          gitsigns.enable = true;
-
-          # Telescope fuzzy finder
-          telescope.enable = true;
-
-          # Syntax highlighting
-          treesitter = {
-            enable = true;
-            nixGrammars = true;
-            settings = {
-              highlight.enable = true;
-              indent.enable = true;
-            };
-          };
-        };
-
-        # Custom nixai integration
-        extraConfigLua = ''
-          -- nixai integration for NixVim
-          local function nixai_query(question)
-            if not question or question == "" then
-              question = vim.fn.input("Ask nixai: ")
-            end
-
-            if question == "" then
-              return
-            end
-
-            -- Use the nixai binary from the package
-            local cmd = string.format("${cfg.mcp.package}/bin/nixai --ask \"%s\"", question:gsub('"', '\\"'))
-            local output = vim.fn.system(cmd)
-
-            -- Create response buffer
-            local buf = vim.api.nvim_create_buf(false, true)
-            local lines = vim.split(output, "\n")
-            vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-            vim.api.nvim_buf_set_option(buf, "filetype", "markdown")
-            vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
-            vim.api.nvim_buf_set_name(buf, "nixai-response")
-
-            -- Open in split
-            vim.cmd("split")
-            vim.api.nvim_set_current_buf(buf)
-
-            -- Add quit mapping
-            vim.keymap.set("n", "q", ":close<CR>", { buffer = buf, silent = true })
-
-            print("nixai response loaded in buffer")
-          end
-
-          local function start_mcp_server()
-            local socket_path = "${cfg.mcp.socketPath}"
-            local socket_dir = vim.fn.fnamemodify(socket_path, ":h")
-            vim.fn.mkdir(socket_dir, "p")
-
-            local cmd = string.format("${cfg.mcp.package}/bin/nixai mcp-server start --socket-path=%s --background", socket_path)
-            local result = vim.fn.system(cmd)
-            print("MCP server start result: " .. result)
-          end
-
-          -- Set up keymaps
-          vim.keymap.set("n", "${cfg.neovimIntegration.keybindings.askNixai}", nixai_query, { desc = "Ask nixai" })
-          vim.keymap.set("v", "${cfg.neovimIntegration.keybindings.askNixaiVisual}", function()
-            local start_pos = vim.fn.getpos("'<")
-            local end_pos = vim.fn.getpos("'>")
-            local lines = vim.fn.getline(start_pos[2], end_pos[2])
-            local text = table.concat(lines, "\n")
-            nixai_query("Explain this code: " .. text)
-          end, { desc = "Ask nixai about selection" })
-
-          vim.keymap.set("n", "${cfg.neovimIntegration.keybindings.startMcpServer}", start_mcp_server, { desc = "Start nixai MCP server" })
-
-          ${lib.optionalString cfg.neovimIntegration.autoStartMcp ''
-            -- Auto-start MCP server
-            start_mcp_server()
-          ''}
-
-          print("nixai integration loaded! Use ${cfg.neovimIntegration.keybindings.askNixai} to ask questions")
-        '';
-      };
-
-      # Alternative: Regular Neovim configuration if not using NixVim
-      programs.neovim = mkIf (!cfg.neovimIntegration.useNixVim) {
+      programs.neovim = {
         enable = true;
         defaultEditor = true;
         viAlias = true;

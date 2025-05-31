@@ -210,6 +210,35 @@ log_info "MCP server functionality verified (server not started to avoid backgro
 
 echo ""
 
+# Start MCP Server for Documentation Features
+echo "🔌 Starting MCP Server for Documentation Tests"
+echo "----------------------------------------------"
+
+log_info "Starting MCP server in background for documentation features..."
+if timeout 30 nixai mcp-server start -d; then
+    log_success "MCP server startup"
+    ((TESTS_PASSED++))
+    
+    # Wait for server to initialize
+    sleep 3
+    
+    # Check if MCP server is running
+    if nixai mcp-server status >/dev/null 2>&1; then
+        log_success "MCP server status check"
+        ((TESTS_PASSED++))
+    else
+        log_error "MCP server status check"
+        ((TESTS_FAILED++))
+    fi
+    ((TOTAL_TESTS++))
+else
+    log_error "MCP server startup"
+    ((TESTS_FAILED++))
+fi
+((TOTAL_TESTS++))
+
+echo ""
+
 # Test 8: Option Explanation Features
 echo "📚 Testing Option Explanation Features"
 echo "--------------------------------------"
@@ -336,5 +365,11 @@ echo "  nixai explain-option programs.git  # Explain NixOS option"
 echo "  just build-docker              # Build for Docker"
 echo "  just test                      # Run tests"
 echo "  nix develop .#docker           # Enter development shell"
+
+echo ""
+echo "🧹 Cleanup"
+echo "=========="
+log_info "Stopping MCP server..."
+nixai mcp-server stop >/dev/null 2>&1 || log_info "MCP server was not running"
 
 exit $TESTS_FAILED
