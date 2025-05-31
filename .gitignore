@@ -46,3 +46,4 @@ Thumbs.db
 # Ignore local configs
 configs/*.local.yaml
 ./nixai
+.ai_keys

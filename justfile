@@ -19,6 +19,45 @@ build-all:
 	GOOS=darwin GOARCH=amd64 go build -o ./dist/nixai-darwin-amd64 ./cmd/nixai/main.go
 	GOOS=darwin GOARCH=arm64 go build -o ./dist/nixai-darwin-arm64 ./cmd/nixai/main.go
 
+# Docker Environment Commands (isolated test environment)
+docker-build:
+	@echo "Building nixai Docker test environment (isolated with cloned repo)..."
+	./docker_nixos/build_and_run_docker.sh
+
+docker-test:
+	@echo "Running comprehensive Docker tests..."
+	@echo "Building and starting Docker container..."
+	./docker_nixos/build_and_run_docker.sh test
+
+docker-demo:
+	@echo "Running Docker feature demonstration..."
+	@echo "Building and starting Docker container..."
+	./docker_nixos/build_and_run_docker.sh demo
+
+docker-shell:
+	@echo "Starting interactive Docker shell..."
+	./docker_nixos/build_and_run_docker.sh shell
+
+# Docker-internal commands (for use inside containers only)
+build-docker:
+	@echo "Building nixai in Docker environment..."
+	go build -o /tmp/nixai ./cmd/nixai/main.go
+	@echo "Binary built at /tmp/nixai"
+
+run-docker: build-docker
+	@echo "Running nixai from Docker build..."
+	/tmp/nixai
+
+run-docker-args ARGS: build-docker
+	@echo "Running nixai with arguments: {{ARGS}}"
+	/tmp/nixai {{ARGS}}
+
+install-docker: build-docker
+	@echo "Updating globally installed nixai in Docker..."
+	sudo cp /tmp/nixai /usr/local/bin/nixai
+	sudo chmod +x /usr/local/bin/nixai
+	@echo "nixai updated at /usr/local/bin/nixai"
+
 # Run the application
 run: build
 	@echo "Running nixai..."
@@ -48,6 +87,26 @@ run-debug: build
 test:
 	@echo "Running tests..."
 	go test ./...
+
+# Run all tests (including Go tests, MCP tests, VS Code integration tests, provider tests)
+test-all:
+	@echo "Running all tests..."
+	./tests/run_all.sh
+
+# Run only MCP tests
+test-mcp:
+	@echo "Running MCP tests..."
+	./tests/run_mcp.sh
+
+# Run only VS Code integration tests
+test-vscode:
+	@echo "Running VS Code integration tests..."
+	./tests/run_vscode.sh
+
+# Run only AI provider tests
+test-providers:
+	@echo "Running AI provider tests..."
+	./tests/run_providers.sh
 
 # Test with coverage
 test-coverage:
@@ -222,6 +281,7 @@ help:
 	@echo "  build         - Build the application"
 	@echo "  build-prod    - Build for production with optimizations"
 	@echo "  build-all     - Build for multiple architectures"
+	@echo "  build-docker  - Build nixai in Docker environment (container-only)"
 	@echo "  nix-build     - Build using Nix"
 	@echo ""
 	@echo "Running:"
@@ -230,9 +290,22 @@ help:
 	@echo "  run-interactive - Run in interactive mode"
 	@echo "  run-mcp       - Run MCP server"
 	@echo "  run-debug     - Run with debug logging"
+	@echo "  run-docker    - Run the Docker-built application (container-only)"
+	@echo "  run-docker-args - Run Docker-built app with specific arguments (container-only)"
+	@echo ""
+	@echo "Docker Environment:"
+	@echo "  docker-build  - Build and start isolated Docker test environment"
+	@echo "  docker-test   - Run comprehensive tests in Docker environment"
+	@echo "  docker-demo   - Run feature demonstration in Docker environment"
+	@echo "  docker-shell  - Start interactive Docker shell"
+	@echo "  install-docker - Install nixai globally in Docker (container-only)"
 	@echo ""
 	@echo "Testing:"
 	@echo "  test          - Run tests"
+	@echo "  test-all      - Run all tests (including Go tests, MCP tests, VS Code integration tests, provider tests)"
+	@echo "  test-mcp      - Run only MCP tests"
+	@echo "  test-vscode   - Run only VS Code integration tests"
+	@echo "  test-providers - Run only AI provider tests"
 	@echo "  test-coverage - Run tests with coverage"
 	@echo "  test-race     - Run tests with race detection"
 	@echo "  test-bench    - Run benchmark tests"
@@ -283,6 +356,6 @@ help:
 	@echo ""
 	@echo "Setup:"
 	@echo "  setup-dev     - Setup development environment"
-	@echo "  doc     - Generate documentation"
-	@echo "  all     - Clean, build, test, and run"
-	@echo "  help    - Show this help message"
+	@echo ""
+	@echo "Utilities:"
+	@echo "  help          - Show this help message"

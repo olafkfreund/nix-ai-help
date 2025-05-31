@@ -53,6 +53,7 @@ All other dependencies are managed by the Nix flake and justfile.
 - [🧩 Flake Input Analysis & AI Explanations](#-flake-input-analysis--ai-explanations)
 - [🔧 NixOS Option Explainer](#-nixos-option-explainer)
 - [📦 AI-Powered Package Repository Analysis](#-ai-powered-package-repository-analysis)
+- [🔄 MCP Server Configuration & Autostart](#-mcp-server-configuration--autostart)
 - [🎨 Terminal Output Formatting](#-terminal-output-formatting)
 - [🛠️ Installation & Usage](#%EF%B8%8F-installation--usage)
 - [📝 Commands & Usage](#-commands--usage)
@@ -114,12 +115,140 @@ All other dependencies are managed by the Nix flake and justfile.
 
 ---
 
-## 🚀 What’s New (May 2025)
+## 🔄 MCP Server Configuration & Autostart
 
-- **Config Path Awareness Everywhere:** All features now respect the NixOS config path, settable via `--nixos-path`, config file, or interactively. If unset or invalid, you’ll get clear guidance on how to fix it.
-- **Automated Service Option Lookup:** When searching for services, nixai now lists all available options for a service using `nixos-option --find services.<name>`, not just the top-level enable flag.
-- **Enhanced Error Handling:** If your config path is missing or invalid, nixai will print actionable instructions for setting it (CLI flag, config, or interactive command).
-- **More Tests:** New tests cover service option lookup, diagnostics, and error handling for robust reliability.
+The nixai Model Context Protocol (MCP) server provides NixOS documentation and option queries to enhance AI responses. You can configure how the server runs and automatically start it on boot:
+
+### Socket Path Configuration
+
+By default, the MCP server uses `/tmp/nixai-mcp.sock` as the Unix domain socket path. You can customize this path using:
+
+- **Command-line flag**: `nixai mcp-server start --socket-path="/path/to/socket"`
+- **Environment variable**: `NIXAI_SOCKET_PATH="/path/to/socket" nixai mcp-server start`
+- **NixOS/Home Manager module**: Set the `socketPath` option in your configuration
+
+### Autostart Options
+
+The MCP server can be configured to start automatically on boot using either system-wide or user-level services:
+
+#### NixOS Module (System-wide)
+
+Add the nixai NixOS module to your configuration:
+
+```nix
+# configuration.nix
+{ config, pkgs, ... }:
+
+{
+  imports = [ 
+    # Path to the nixai flake or local module
+    (builtins.fetchTarball "https://github.com/olafkfreund/nix-ai-help/archive/main.tar.gz")/modules/nixos.nix
+  ];
+
+  services.nixai = {
+    enable = true;
+    mcp = {
+      enable = true;
+      # Optional: custom socket path
+      socketPath = "/run/nixai/mcp.sock";
+    };
+  };
+}
+```
+
+#### Home Manager Module (User-level)
+
+Add the nixai Home Manager module to your configuration:
+
+```nix
+# home.nix
+{ config, pkgs, ... }:
+
+{
+  imports = [
+    # Path to the nixai flake or local module
+    (builtins.fetchTarball "https://github.com/olafkfreund/nix-ai-help/archive/main.tar.gz")/modules/home-manager.nix
+  ];
+
+  services.nixai = {
+    enable = true;
+    mcp = {
+      enable = true;
+      # Optional: custom socket path (uses $HOME expansion)
+      socketPath = "$HOME/.local/share/nixai/mcp.sock";
+    };
+    # Optional: integrate with VS Code
+    vscodeIntegration = true;
+  };
+}
+```
+
+#### Using Flakes
+
+If you're using flakes, you can import the modules directly:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    home-manager.url = "github:nix-community/home-manager";
+    nixai.url = "github:olafkfreund/nix-ai-help";
+  };
+
+  outputs = { self, nixpkgs, home-manager, nixai, ... }: {
+    nixosConfigurations.yourhostname = nixpkgs.lib.nixosSystem {
+      # ...
+      modules = [
+        nixai.nixosModules.default
+        {
+          services.nixai = {
+            enable = true;
+            mcp.enable = true;
+          };
+        }
+      ];
+    };
+    
+    homeConfigurations.yourusername = home-manager.lib.homeManagerConfiguration {
+      # ...
+      modules = [
+        nixai.homeManagerModules.default
+        {
+          services.nixai = {
+            enable = true;
+            mcp.enable = true;
+          };
+        }
+      ];
+    };
+  };
+}
+```
+
+See [Autostart Options Documentation](docs/autostart-options.md) for more detailed examples and troubleshooting.
+
+---
+
+## ✨ Latest Features & Updates
+
+### Recent Fixes & Improvements (May 2025)
+
+- **✅ HTML Filtering for Clean Documentation:** The `explain-home-option` and `explain-option` commands now properly filter out HTML tags, wiki navigation elements, DOCTYPE declarations, and raw content, providing clean, formatted output with beautiful markdown rendering via glamour.
+- **🎨 Enhanced Terminal Output Formatting:** All documentation output uses consistent formatting with headers, dividers, key-value pairs, and glamour markdown rendering for improved readability across all terminal environments.
+- **🔧 Robust Error Handling:** Better error messages, graceful handling when MCP server is unavailable, improved timeout handling, and clear feedback for configuration issues.
+- **🏠 Home Manager Option Support:** Dedicated `explain-home-option` command with smart visual distinction between Home Manager and NixOS options, including proper source detection and documentation filtering.
+- **🔌 Full Editor Integration:** Complete support for Neovim and VS Code with MCP server integration for seamless in-editor NixOS assistance, including automatic setup commands and configuration generators.
+- **🧪 Comprehensive Testing:** All HTML filtering, documentation display, and error handling improvements are backed by extensive test coverage to ensure reliability.
+
+### Core Features
+
+- **🤖 Direct Question Assistant:** Ask questions directly with `nixai "your question"` or `nixai --ask "question"` for instant AI-powered NixOS help with documentation context.
+- **🎯 Config Path Awareness Everywhere:** All features respect the NixOS config path, settable via `--nixos-path`, config file, or interactively. If unset or invalid, you'll get clear guidance on how to fix it.
+- **🔍 Automated Service Option Lookup:** When searching for services, nixai lists all available options for a service using `nixos-option --find services.<name>`, not just the top-level enable flag.
+- **📦 AI-Powered Package Repository Analysis:** Analyze Git repositories and generate complete Nix derivations with support for Go, Python, Node.js, and Rust projects.
+- **🧩 Flake Input Analysis:** Analyze and explain flake inputs using AI, with upstream README/flake.nix summaries.
+- **🏥 System Health Checks:** Run comprehensive NixOS system health checks with AI-powered analysis and recommendations.
+- **✅ Comprehensive Test Coverage:** Extensive test coverage for service option lookup, diagnostics, error handling, packaging features, and HTML filtering for robust reliability.
 
 ---
 
@@ -256,6 +385,133 @@ All Markdown and HTML output from nixai is rendered as beautiful, colorized term
 
 ---
 
+## 🔌 Editor Integration
+
+nixai provides seamless integration with popular editors through the MCP (Model Context Protocol) server, enabling you to access NixOS documentation and AI assistance directly within your development environment.
+
+### 🔷 VS Code Integration
+
+Complete VS Code integration with Copilot, Claude Dev, and other MCP-compatible extensions:
+
+**Quick Setup:**
+```sh
+# Start the MCP server
+nixai mcp-server start -d
+
+# Check server status
+nixai mcp-server status
+```
+
+**Required Extensions:**
+- `automatalabs.copilot-mcp` - Copilot MCP extension
+- `zebradev.mcp-server-runner` - MCP Server Runner
+- `saoudrizwan.claude-dev` - Claude Dev (Cline)
+
+**Configuration (.vscode/settings.json):**
+```json
+{
+  "mcp.servers": {
+    "nixai": {
+      "command": "bash",
+      "args": ["-c", "socat STDIO UNIX-CONNECT:/tmp/nixai-mcp.sock"],
+      "env": {}
+    }
+  },
+  "copilot.mcp.servers": {
+    "nixai": {
+      "command": "bash", 
+      "args": ["-c", "socat STDIO UNIX-CONNECT:/tmp/nixai-mcp.sock"],
+      "env": {}
+    }
+  },
+  "claude-dev.mcpServers": {
+    "nixai": {
+      "command": "bash",
+      "args": ["-c", "socat STDIO UNIX-CONNECT:/tmp/nixai-mcp.sock"],
+      "env": {}
+    }
+  },
+  "mcp.enableDebug": true,
+  "claude-dev.enableMcp": true
+}
+```
+
+### 🟢 Neovim Integration
+
+Comprehensive Neovim integration with lua configuration and keybindings:
+
+**Automatic Setup:**
+```sh
+# Automatically configure Neovim integration
+nixai neovim-setup
+
+# With custom socket path
+nixai neovim-setup --socket-path=$HOME/.local/share/nixai/mcp.sock
+
+# With custom config directory
+nixai neovim-setup --config-dir=$HOME/.config/nvim
+```
+
+**Manual Setup (init.lua):**
+```lua
+-- nixai integration
+local ok, nixai = pcall(require, "nixai")
+if ok then
+  nixai.setup({
+    socket_path = "/tmp/nixai-mcp.sock",
+    keybindings = true, -- Enable default keybindings
+  })
+else
+  vim.notify("nixai module not found", vim.log.levels.WARN)
+end
+```
+
+**Available Commands:**
+- `:NixaiExplainOption <option>` - Explain NixOS options
+- `:NixaiExplainHomeOption <option>` - Explain Home Manager options
+- `:NixaiSearch <query>` - Search packages and services
+- `:NixaiDiagnose` - Diagnose current buffer or selection
+- `:NixaiAsk <question>` - Ask direct questions
+
+**Default Keybindings:**
+- `<leader>ne` - Explain option under cursor
+- `<leader>ns` - Search packages/services
+- `<leader>nd` - Diagnose current buffer
+- `<leader>na` - Ask nixai a question
+
+### 🏠 Home Manager Integration
+
+Both editors can be automatically configured through Home Manager:
+
+```nix
+# home.nix
+{ config, pkgs, ... }:
+{
+  imports = [
+    # Import the nixai Home Manager module
+    (builtins.fetchTarball "https://github.com/olafkfreund/nix-ai-help/archive/main.tar.gz")/modules/home-manager.nix
+  ];
+
+  services.nixai = {
+    enable = true;
+    mcp = {
+      enable = true;
+      socketPath = "$HOME/.local/share/nixai/mcp.sock";
+    };
+    # Automatically configure VS Code
+    vscodeIntegration = true;
+    # Automatically configure Neovim  
+    neovimIntegration = true;
+  };
+}
+```
+
+For detailed setup instructions and troubleshooting, see:
+- [VS Code Integration Guide](docs/MCP_VSCODE_INTEGRATION.md)
+- [Neovim Integration Guide](docs/neovim-integration.md)
+
+---
+
 ## 🛠️ Installation & Usage
 
 ### Using Nix (Recommended)
@@ -270,6 +526,50 @@ nix develop
 just build
 ./nixai --help
 ```
+
+### System Integration with NixOS and Home Manager
+
+nixai can be integrated into your NixOS or Home Manager configuration using the provided modules:
+
+```nix
+# NixOS configuration
+{ config, pkgs, ... }:
+{
+  imports = [
+    # Path to module (can be from flake or local)
+    ./path/to/nixai/modules/nixos.nix 
+  ];
+  
+  services.nixai = {
+    enable = true;
+    mcp = {
+      enable = true;
+      # Optional configuration
+    };
+  };
+}
+```
+
+```nix
+# Home Manager configuration
+{ config, pkgs, ... }:
+{
+  imports = [
+    # Path to module (can be from flake or local)
+    ./path/to/nixai/modules/home-manager.nix
+  ];
+  
+  services.nixai = {
+    enable = true;
+    mcp = {
+      enable = true;
+      # Optional configuration
+    };
+  };
+}
+```
+
+See the [MCP Server Configuration & Autostart](#-mcp-server-configuration--autostart) section for more details.
 
 **For Direct Nix Build:**
 
@@ -557,6 +857,55 @@ nixai interactive
 
 - Use `set-nixos-path` to specify your config folder interactively.
 
+### MCP Server Management
+
+```sh
+# Start the MCP server (foreground)
+nixai mcp-server start
+
+# Start in background (daemon mode)
+nixai mcp-server start --background
+nixai mcp-server start --daemon  # alias for --background
+
+# With custom socket path
+nixai mcp-server start --socket-path="/path/to/socket"
+
+# Check MCP server status
+nixai mcp-server status
+
+# Stop the MCP server
+nixai mcp-server stop
+```
+
+- MCP server provides NixOS documentation and options data to enhance AI responses
+- Can be configured to use a custom socket path for communication
+- Supports running as a background daemon process
+- Use environment variable `NIXAI_SOCKET_PATH` to set socket path system-wide
+
+### Editor Integration
+
+#### Neovim Integration
+
+```sh
+# Set up Neovim integration
+nixai neovim-setup
+
+# With custom socket path
+nixai neovim-setup --socket-path="/path/to/mcp.sock"
+
+# With custom Neovim config directory
+nixai neovim-setup --config-dir="/path/to/neovim/config"
+```
+
+Once set up, use these keybindings in Neovim:
+
+- `<leader>nq` - Ask a NixOS question
+- `<leader>ns` - Get context-aware suggestions
+- `<leader>no` - Explain a NixOS option
+- `<leader>nh` - Explain a Home Manager option
+
+See [Neovim Integration](docs/neovim-integration.md) for detailed setup instructions and advanced usage.
+
 ---
 
 ## 📝 How to Use the Latest Features
@@ -689,6 +1038,7 @@ log_level: info
 mcp_server:
   host: localhost
   port: 8080
+  socket_path: /tmp/nixai-mcp.sock  # Custom Unix socket path
   documentation_sources:
     - https://wiki.nixos.org/wiki/NixOS_Wiki
     - https://nix.dev/manual/nix
@@ -722,14 +1072,40 @@ nix develop
 just build
 
 # Run all tests
-just test
+just test-all
 
 # Check code quality
 just lint
 
 # Build using Nix directly
 nix build .#nixai
-./result/bin/nixai --help
+```
+
+### Test Structure
+
+Tests are organized in the `tests/` directory by category:
+
+- **MCP Tests**: `tests/mcp/` - Tests for MCP protocol and server
+- **VS Code Tests**: `tests/vscode/` - Tests for VS Code integration
+- **Provider Tests**: `tests/providers/` - Tests for AI provider integration
+
+Run specific test groups:
+
+```sh
+# MCP tests only
+just test-mcp
+
+# VS Code integration tests only
+just test-vscode
+
+# AI provider tests only
+just test-providers
+```
+
+Check test environment compatibility:
+
+```sh
+./tests/check-compatibility.sh
 ```
 
 ### Using Go Directly

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"nix-ai-help/internal/config"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-retryablehttp"
+	"github.com/sourcegraph/jsonrpc2"
 )
 
 // ElasticSearch configuration for NixOS options
@@ -49,12 +51,283 @@ type ESResponse struct {
 	} `json:"hits"`
 }
 
-// Server represents the MCP server that handles requests for NixOS documentation.
+// MCPServer represents the MCP protocol server
+type MCPServer struct {
+	logger   logger.Logger
+	listener net.Listener
+	mu       sync.Mutex
+}
+
+// MCPRequest represents an MCP protocol request
+type MCPRequest struct {
+	Method string          `json:"method"`
+	Params json.RawMessage `json:"params"`
+}
+
+// MCPResponse represents an MCP protocol response
+type MCPResponse struct {
+	Result interface{} `json:"result,omitempty"`
+	Error  *MCPError   `json:"error,omitempty"`
+}
+
+// MCPError represents an error in MCP protocol
+type MCPError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+// Tool represents an MCP tool
+type Tool struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// Handle processes MCP protocol requests
+func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
+	log.Printf("[DEBUG] Handle called with method: %s, ID: %v", req.Method, req.ID)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	switch req.Method {
+	case "initialize":
+		result := map[string]interface{}{
+			"protocolVersion": "2024-11-05",
+			"capabilities": map[string]interface{}{
+				"tools": map[string]interface{}{
+					"listChanged": false,
+				},
+			},
+			"serverInfo": map[string]interface{}{
+				"name":    "nixai-mcp-server",
+				"version": "1.0.0",
+			},
+		}
+		conn.Reply(ctx, req.ID, result)
+
+	case "tools/list":
+		tools := []Tool{
+			{
+				Name:        "query_nixos_docs",
+				Description: "Query NixOS documentation from multiple sources",
+			},
+			{
+				Name:        "explain_nixos_option",
+				Description: "Explain NixOS configuration options",
+			},
+			{
+				Name:        "explain_home_manager_option",
+				Description: "Explain Home Manager configuration options",
+			},
+			{
+				Name:        "search_nixos_packages",
+				Description: "Search for NixOS packages",
+			},
+		}
+		conn.Reply(ctx, req.ID, map[string]interface{}{"tools": tools})
+
+	case "tools/call":
+		var params struct {
+			Name      string                 `json:"name"`
+			Arguments map[string]interface{} `json:"arguments"`
+		}
+
+		if err := json.Unmarshal(*req.Params, &params); err != nil {
+			conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+				Code:    jsonrpc2.CodeInvalidParams,
+				Message: "Invalid parameters",
+			})
+			return
+		}
+
+		switch params.Name {
+		case "query_nixos_docs":
+			if query, ok := params.Arguments["query"].(string); ok {
+				result := m.handleDocQuery(query)
+				conn.Reply(ctx, req.ID, map[string]interface{}{
+					"content": []map[string]interface{}{
+						{
+							"type": "text",
+							"text": result,
+						},
+					},
+				})
+			} else {
+				conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInvalidParams,
+					Message: "Missing query parameter",
+				})
+			}
+
+		case "explain_nixos_option":
+			if option, ok := params.Arguments["option"].(string); ok {
+				result := m.handleOptionExplain(option)
+				conn.Reply(ctx, req.ID, map[string]interface{}{
+					"content": []map[string]interface{}{
+						{
+							"type": "text",
+							"text": result,
+						},
+					},
+				})
+			} else {
+				conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInvalidParams,
+					Message: "Missing option parameter",
+				})
+			}
+
+		case "explain_home_manager_option":
+			if option, ok := params.Arguments["option"].(string); ok {
+				result := m.handleHomeManagerOptionExplain(option)
+				conn.Reply(ctx, req.ID, map[string]interface{}{
+					"content": []map[string]interface{}{
+						{
+							"type": "text",
+							"text": result,
+						},
+					},
+				})
+			} else {
+				conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInvalidParams,
+					Message: "Missing option parameter",
+				})
+			}
+
+		case "search_nixos_packages":
+			if query, ok := params.Arguments["query"].(string); ok {
+				result := m.handlePackageSearch(query)
+				conn.Reply(ctx, req.ID, map[string]interface{}{
+					"content": []map[string]interface{}{
+						{
+							"type": "text",
+							"text": result,
+						},
+					},
+				})
+			} else {
+				conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInvalidParams,
+					Message: "Missing query parameter",
+				})
+			}
+
+		default:
+			conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+				Code:    jsonrpc2.CodeMethodNotFound,
+				Message: "Unknown tool: " + params.Name,
+			})
+		}
+
+	default:
+		conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+			Code:    jsonrpc2.CodeMethodNotFound,
+			Message: "Method not found: " + req.Method,
+		})
+	}
+}
+
+// Start starts the MCP server on Unix socket
+func (m *MCPServer) Start(socketPath string) error {
+	// Remove existing socket file if it exists
+	os.Remove(socketPath)
+
+	listener, err := net.Listen("unix", socketPath)
+	if err != nil {
+		return fmt.Errorf("failed to listen on Unix socket %s: %v", socketPath, err)
+	}
+
+	// Store listener for cleanup
+	m.mu.Lock()
+	m.listener = listener
+	m.mu.Unlock()
+
+	m.logger.Info(fmt.Sprintf("MCP server listening on Unix socket: %s", socketPath))
+
+	// Accept connections in a blocking loop
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			m.logger.Error(fmt.Sprintf("Failed to accept connection: %v", err))
+			continue
+		}
+
+		go func(conn net.Conn) {
+			defer conn.Close()
+			log.Printf("[DEBUG] New MCP client connected from %v", conn.RemoteAddr())
+
+			// Handle connection with JSON-RPC2
+			stream := jsonrpc2.NewPlainObjectStream(conn)
+			log.Printf("[DEBUG] Created buffered stream")
+
+			jsonConn := jsonrpc2.NewConn(context.Background(), stream, m)
+			log.Printf("[DEBUG] Created JSON-RPC2 connection")
+			defer jsonConn.Close()
+
+			// Keep connection alive
+			log.Printf("[DEBUG] Waiting for disconnect notification...")
+			<-jsonConn.DisconnectNotify()
+			log.Printf("[DEBUG] MCP client disconnected")
+		}(conn)
+	}
+}
+
+// Stop stops the MCP server
+func (m *MCPServer) Stop() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.listener != nil {
+		m.listener.Close()
+		m.listener = nil
+	}
+}
+
+// handleDocQuery processes documentation queries
+func (m *MCPServer) handleDocQuery(query string) string {
+	// Use existing QueryDocumentation logic with the configured server
+	client := NewMCPClient("http://localhost:8081") // Use correct port
+	result, err := client.QueryDocumentation(query)
+	if err != nil {
+		return fmt.Sprintf("Error querying documentation: %v", err)
+	}
+	return result
+}
+
+// handleOptionExplain processes NixOS option explanations
+func (m *MCPServer) handleOptionExplain(option string) string {
+	// Use the same logic as the HTTP server
+	client := NewMCPClient("http://localhost:8081")
+	result, err := client.QueryDocumentation(option)
+	if err != nil {
+		return fmt.Sprintf("Error explaining option %s: %v", option, err)
+	}
+	return result
+}
+
+// handleHomeManagerOptionExplain processes Home Manager option explanations
+func (m *MCPServer) handleHomeManagerOptionExplain(option string) string {
+	// Use the same logic as the HTTP server for Home Manager options
+	client := NewMCPClient("http://localhost:8081")
+	result, err := client.QueryDocumentation(option)
+	if err != nil {
+		return fmt.Sprintf("Error explaining Home Manager option %s: %v", option, err)
+	}
+	return result
+}
+
+// handlePackageSearch processes package search queries
+func (m *MCPServer) handlePackageSearch(query string) string {
+	return fmt.Sprintf("Package search for '%s' is not yet implemented in MCP protocol. Use the CLI interface: nixai search pkg %s", query, query)
+}
+
+// Server represents the combined HTTP and MCP server
 type Server struct {
 	addr                 string
+	socketPath           string
 	documentationSources []string
 	logger               *logger.Logger
 	debugLogging         bool
+	mcpServer            *MCPServer
 }
 
 // Add a simple in-memory cache for query results
@@ -67,9 +340,11 @@ var (
 func NewServer(addr string, documentationSources []string) *Server {
 	return &Server{
 		addr:                 addr,
+		socketPath:           "/tmp/nixai-mcp.sock", // Default socket path
 		documentationSources: documentationSources,
 		logger:               logger.NewLoggerWithLevel("info"), // Default to info level
 		debugLogging:         false,
+		mcpServer:            &MCPServer{logger: *logger.NewLoggerWithLevel("info")},
 	}
 }
 
@@ -78,9 +353,11 @@ func NewServer(addr string, documentationSources []string) *Server {
 func NewServerWithDebug(addr string, documentationSources []string) *Server {
 	return &Server{
 		addr:                 addr,
+		socketPath:           "/tmp/nixai-mcp.sock", // Default socket path
 		documentationSources: documentationSources,
 		logger:               logger.NewLoggerWithLevel("debug"), // Enable debug level
 		debugLogging:         true,
+		mcpServer:            &MCPServer{logger: *logger.NewLoggerWithLevel("debug")},
 	}
 }
 
@@ -91,12 +368,23 @@ func NewServerFromConfig(configPath string) (*Server, error) {
 		return nil, err
 	}
 	addr := fmt.Sprintf("%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
+	socketPath := "/tmp/nixai-mcp.sock" // Default
+	if cfg.MCPServer.SocketPath != "" {
+		socketPath = cfg.MCPServer.SocketPath
+	}
 	return &Server{
 		addr:                 addr,
+		socketPath:           socketPath,
 		documentationSources: cfg.MCPServer.DocumentationSources,
 		logger:               logger.NewLoggerWithLevel(cfg.LogLevel),
 		debugLogging:         strings.ToLower(cfg.LogLevel) == "debug",
+		mcpServer:            &MCPServer{logger: *logger.NewLoggerWithLevel(cfg.LogLevel)},
 	}, nil
+}
+
+// SetSocketPath sets a custom socket path for the MCP server
+func (s *Server) SetSocketPath(path string) {
+	s.socketPath = path
 }
 
 // Start initializes and starts the MCP server with graceful shutdown support.
@@ -126,23 +414,46 @@ func (s *Server) Start() error {
 
 	log.Printf("Starting MCP server on %s\n", s.addr)
 
-	// Run server in goroutine
+	// Run HTTP server in goroutine
 	errCh := make(chan error, 1)
 	go func() {
 		errCh <- server.ListenAndServe()
 	}()
 
-	// Wait for shutdown signal
+	// Run MCP server in goroutine - but don't capture its result
+	// since the MCP server runs indefinitely and should not exit
+	go func() {
+		// Use the server's socketPath field, which might have been customized
+		socketPath := s.socketPath
+		if socketPath == "" {
+			socketPath = "/tmp/nixai-mcp.sock" // Default fallback
+		}
+
+		// Check environment variable for override
+		if envPath := os.Getenv("NIXAI_SOCKET_PATH"); envPath != "" {
+			socketPath = envPath
+		}
+
+		// Start the MCP server (this blocks and shouldn't return unless there's an error)
+		if err := s.mcpServer.Start(socketPath); err != nil {
+			log.Printf("ERROR: MCP server encountered an error: %v", err)
+			// Don't exit the main server if the MCP server exits - just log the error
+		}
+	}()
+
+	// Wait for shutdown signal or HTTP server error
 	select {
 	case <-shutdownCh:
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		log.Println("Shutting down MCP server...")
+		s.mcpServer.Stop()
 		return server.Shutdown(ctx)
 	case err := <-errCh:
 		if strings.Contains(err.Error(), "address already in use") {
 			log.Printf("ERROR: The MCP server could not start because the address is already in use. If another instance is running, stop it with 'nixai mcp-server stop'.")
 		}
+		s.mcpServer.Stop() // Make sure to stop the MCP server if HTTP server fails
 		return err
 	}
 }
@@ -447,6 +758,9 @@ func fetchNixOSOptionsAPI(_ string, option string) (string, error) {
 		return "", err
 	}
 
+	// Debug logging for the response size
+	log.Printf("[DEBUG] Received %d bytes from NixOS ES", len(data))
+
 	// Parse response
 	var esResp ESResponse
 	if err := json.Unmarshal(data, &esResp); err != nil {
@@ -461,25 +775,25 @@ func fetchNixOSOptionsAPI(_ string, option string) (string, error) {
 	opt := esResp.Hits.Hits[0].Source
 	var result strings.Builder
 
-	result.WriteString(fmt.Sprintf("**%s**\n\n", opt.Name))
+	result.WriteString(fmt.Sprintf("Option: %s\n", opt.Name))
 
 	if opt.Description != "" {
 		cleanDesc := stripHTMLTags(opt.Description)
-		result.WriteString(fmt.Sprintf("**Description:** %s\n\n", cleanDesc))
+		result.WriteString(fmt.Sprintf("Description: %s\n", cleanDesc))
 	}
 
-	result.WriteString(fmt.Sprintf("**Type:** %s\n", opt.OptionType))
+	result.WriteString(fmt.Sprintf("Type: %s\n", opt.OptionType))
 
 	if opt.Default != "" {
-		result.WriteString(fmt.Sprintf("**Default:** %s\n", opt.Default))
+		result.WriteString(fmt.Sprintf("Default: %s\n", opt.Default))
 	}
 
 	if opt.Example != "" && opt.Example != "null" {
-		result.WriteString(fmt.Sprintf("**Example:** %s\n", opt.Example))
+		result.WriteString(fmt.Sprintf("Example: %s\n", opt.Example))
 	}
 
 	if opt.Source != "" {
-		result.WriteString(fmt.Sprintf("**Source:** %s\n", opt.Source))
+		result.WriteString(fmt.Sprintf("Source: %s\n", opt.Source))
 	}
 
 	return result.String(), nil

@@ -4,6 +4,8 @@ default:
     mcp_server:
         host: localhost
         port: 8081
+        socket_path: /tmp/nixai-mcp.sock
+        auto_start: false
         documentation_sources:
             - nixos-options-es://options  # Special endpoint for NixOS options via ElasticSearch
             - https://wiki.nixos.org/wiki/NixOS_Wiki
