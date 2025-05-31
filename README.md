@@ -128,17 +128,22 @@ nixai now includes a powerful `devenv` feature for quickly scaffolding reproduci
 ### Usage Examples
 
 - **List templates:**
+
   ```sh
   nixai devenv list
   ```
+
 - **Create a project:**
+
   ```sh
   nixai devenv create python myproject --framework fastapi --with-poetry --services postgres,redis
   nixai devenv create golang my-go-app --framework gin --with-grpc
   nixai devenv create nodejs my-node-app --with-typescript --services mongodb
   nixai devenv create rust my-rust-app --with-wasm
   ```
+
 - **Get AI-powered suggestions:**
+
   ```sh
   nixai devenv suggest "web app with database and REST API"
   ```
@@ -433,6 +438,7 @@ nixai provides seamless integration with popular editors through the MCP (Model 
 Complete VS Code integration with Copilot, Claude Dev, and other MCP-compatible extensions:
 
 **Quick Setup:**
+
 ```sh
 # Start the MCP server
 nixai mcp-server start -d
@@ -442,11 +448,13 @@ nixai mcp-server status
 ```
 
 **Required Extensions:**
+
 - `automatalabs.copilot-mcp` - Copilot MCP extension
 - `zebradev.mcp-server-runner` - MCP Server Runner
 - `saoudrizwan.claude-dev` - Claude Dev (Cline)
 
 **Configuration (.vscode/settings.json):**
+
 ```json
 {
   "mcp.servers": {
@@ -480,6 +488,7 @@ nixai mcp-server status
 Comprehensive Neovim integration with lua configuration and keybindings:
 
 **Automatic Setup:**
+
 ```sh
 # Automatically configure Neovim integration
 nixai neovim-setup
@@ -492,6 +501,7 @@ nixai neovim-setup --config-dir=$HOME/.config/nvim
 ```
 
 **Manual Setup (init.lua):**
+
 ```lua
 -- nixai integration
 local ok, nixai = pcall(require, "nixai")
@@ -506,6 +516,7 @@ end
 ```
 
 **Available Commands:**
+
 - `:NixaiExplainOption <option>` - Explain NixOS options
 - `:NixaiExplainHomeOption <option>` - Explain Home Manager options
 - `:NixaiSearch <query>` - Search packages and services
@@ -513,6 +524,7 @@ end
 - `:NixaiAsk <question>` - Ask direct questions
 
 **Default Keybindings:**
+
 - `<leader>ne` - Explain option under cursor
 - `<leader>ns` - Search packages/services
 - `<leader>nd` - Diagnose current buffer
@@ -546,6 +558,7 @@ Both editors can be automatically configured through Home Manager:
 ```
 
 For detailed setup instructions and troubleshooting, see:
+
 - [VS Code Integration Guide](docs/MCP_VSCODE_INTEGRATION.md)
 - [Neovim Integration Guide](docs/neovim-integration.md)
 
@@ -786,6 +799,7 @@ nixai -a "what's the difference between NixOS and other Linux distributions?"
 ```
 
 **Features:**
+
 - 🤖 **AI-Powered Responses**: Get comprehensive answers using Ollama, Gemini, or OpenAI
 - 📚 **Documentation Context**: Automatic querying of official NixOS docs via MCP server
 - 🎨 **Beautiful Output**: Colorized markdown with syntax highlighting
