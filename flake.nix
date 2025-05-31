@@ -15,8 +15,29 @@
         pname = "nixai";
         version = "0.1.0";
         src = ./.;
-        vendorHash = "sha256-v12l65xY+hhHKoXWo3AJvvbaqviDeNcJSw7ZqEbxTwo=";
+        vendorHash = null; # TODO: Update when dependencies change
         doCheck = false; # Disable tests in Nix build due to network/sandbox restrictions
+
+        # Specify the main package to build
+        subPackages = ["cmd/nixai"];
+
+        # Inject version information at build time
+        ldflags = let
+          version =
+            if (self ? rev)
+            then self.rev
+            else "dirty";
+          gitCommit =
+            if (self ? rev)
+            then builtins.substring 0 7 self.rev
+            else "unknown";
+          buildDate = "1970-01-01T00:00:00Z"; # Nix builds are reproducible
+        in [
+          "-X nix-ai-help/pkg/version.Version=${version}"
+          "-X nix-ai-help/pkg/version.GitCommit=${gitCommit}"
+          "-X nix-ai-help/pkg/version.BuildDate=${buildDate}"
+        ];
+
         meta = {
           description = "A tool for diagnosing and configuring NixOS using AI.";
           license = pkgs.lib.licenses.mit;

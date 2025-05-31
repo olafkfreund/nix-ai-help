@@ -10,6 +10,7 @@ import (
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/utils"
+	"nix-ai-help/pkg/version"
 )
 
 // TODO: Implement AI provider and model switching in interactive mode
@@ -22,6 +23,7 @@ func InteractiveMode() {
 
 	// Enhanced welcome message
 	fmt.Println(utils.FormatHeader("🚀 Welcome to nixai Interactive Mode"))
+	fmt.Println(utils.FormatKeyValue("Version", version.Get().Short()))
 	fmt.Println(utils.FormatInfo("Type 'help' for commands, 'exit' to quit."))
 
 	if nixosConfigPath != "" {
@@ -86,6 +88,7 @@ func handleCommand(command string) {
 			"set ai <provider> [model]  - Set AI provider (ollama, gemini, openai) and model (optional)",
 			"set-nixos-path <path>      - Set path to NixOS config folder",
 			"flake <subcommand>         - Manage Nix flakes (show, update, check, explain-inputs, explain <input>, ...)",
+			"version                    - Display version information",
 			"exit                       - Exit interactive mode",
 		}
 
@@ -351,6 +354,12 @@ func handleCommand(command string) {
 		// Use the same logic as the CLI command
 		findOptionCmd.Run(findOptionCmd, []string{description})
 		return
+	case "version":
+		versionInfo := version.Get()
+		fmt.Println(utils.FormatHeader("📦 Version Information"))
+		fmt.Println(versionInfo.String())
+		fmt.Println(utils.FormatKeyValue("Platform", versionInfo.Platform))
+		fmt.Println(utils.FormatKeyValue("Go Version", versionInfo.GoVersion))
 	case "exit":
 		fmt.Println("Exiting nixai. Goodbye!")
 		os.Exit(0)
