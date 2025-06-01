@@ -881,14 +881,14 @@ Based on comprehensive testing (May 2025), all three providers are fully functio
   ```sh
   export GEMINI_API_KEY=your-gemini-key
   ```
-  - **Current Model**: gemini-1.5-flash (updated from deprecated gemini-pro)
+  - **Current Model**: gemini-2.0-flash-exp (updated from deprecated gemini-pro)
   - **Tested**: ✅ Working with updated API endpoints and model
 
 #### Example config for OpenAI or Gemini
 
 ```yaml
 ai_provider: openai   # or 'gemini' or 'ollama'
-ai_model: gpt-4       # or 'llama3', 'gemini-1.5-flash', etc.
+ai_model: gpt-4       # or 'llama3', 'gemini-2.0-flash-exp', etc.
 # ...other config options...
 ```
 
@@ -896,7 +896,7 @@ You can also override the provider and model at runtime:
 
 ```sh
 nixai diagnose --provider openai --model gpt-4 --log-file /var/log/nixos/nixos-rebuild.log
-nixai explain-option --provider gemini --model gemini-1.5-flash networking.firewall.enable
+nixai explain-option --provider gemini --model gemini-2.0-flash-exp networking.firewall.enable
 ```
 
 **Note:**
@@ -941,7 +941,7 @@ All commands tested successfully across all providers:
 ### 🔧 Key Fixes Applied
 
 - **Ollama Model Handling**: Fixed empty model configuration by defaulting to "llama3"
-- **Gemini API Updates**: Updated from deprecated `gemini-pro` to `gemini-1.5-flash` model
+- **Gemini API Updates**: Updated from deprecated `gemini-pro` to `gemini-2.0-flash-exp` model
 - **API Endpoints**: Fixed Gemini API URL construction for proper integration
 - **MCP Server**: Validated documentation retrieval from official NixOS sources
 

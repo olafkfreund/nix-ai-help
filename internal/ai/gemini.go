@@ -46,7 +46,7 @@ type GeminiResponse struct {
 func (c *GeminiClient) Query(prompt string) (string, error) {
 	apiURL := c.BaseURL
 	if apiURL == "" {
-		apiURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
+		apiURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
 	}
 	apiKey := c.APIKey
 	if apiKey == "" {

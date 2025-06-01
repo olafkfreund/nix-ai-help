@@ -146,7 +146,7 @@ You can also ask questions directly, e.g.:
 		case "ollama":
 			provider = ai.NewOllamaProvider(getOllamaModel(cfg.AIModel))
 		case "gemini":
-			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 		case "openai":
 			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		default:
@@ -374,7 +374,7 @@ Options:
 			case "ollama":
 				provider = ai.NewOllamaProvider("llama3")
 			case "gemini":
-				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 			default:
@@ -638,7 +638,7 @@ Examples:
 			case "ollama":
 				provider = ai.NewOllamaProvider(getOllamaModel(cfg.AIModel))
 			case "gemini":
-				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 			default:
@@ -694,7 +694,7 @@ var buildCmd = &cobra.Command{
 			case "ollama":
 				provider = ai.NewOllamaProvider("llama3")
 			case "gemini":
-				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 			default:
@@ -779,7 +779,7 @@ var flakeCmd = &cobra.Command{
 			case "ollama":
 				provider = ai.NewOllamaProvider("llama3")
 			case "gemini":
-				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 			default:
@@ -900,7 +900,7 @@ func ExplainFlakeInputs(inputs []string) {
 		case "ollama":
 			provider = ai.NewOllamaProvider("llama3")
 		case "gemini":
-			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 		case "openai":
 			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		default:
@@ -1427,7 +1427,7 @@ var explainOptionCmd = &cobra.Command{
 		case "ollama":
 			provider = ai.NewOllamaProvider(getOllamaModel(cfg.AIModel))
 		case "gemini":
-			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 		case "openai":
 			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		default:
@@ -1548,7 +1548,7 @@ var explainHomeOptionCmd = &cobra.Command{
 		case "ollama":
 			provider = ai.NewOllamaProvider(cfg.AIModel)
 		case "gemini":
-			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 		case "openai":
 			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		default:
@@ -1600,7 +1600,7 @@ Examples:
 		case "ollama":
 			provider = ai.NewOllamaProvider(cfg.AIModel)
 		case "gemini":
-			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 		case "openai":
 			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		default:
@@ -2100,7 +2100,7 @@ Be specific and actionable. Focus on NixOS-specific solutions.`
 	case "ollama":
 		provider = ai.NewOllamaProvider(cfg.AIModel)
 	case "gemini":
-		provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+		provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 	case "openai":
 		provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 	default:
@@ -2196,7 +2196,7 @@ Examples:
 			case "ollama":
 				provider = ai.NewOllamaProvider(cfg.AIModel)
 			case "gemini":
-				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 			default:
@@ -2276,7 +2276,7 @@ Examples:
 			case "ollama":
 				provider = ai.NewOllamaProvider(cfg.AIModel)
 			case "gemini":
-				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 			default:
@@ -2642,7 +2642,7 @@ The generated derivation will follow nixpkgs conventions and include:
 		case "ollama":
 			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
 		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		default:
@@ -2824,7 +2824,7 @@ Examples:
 			case "ollama":
 				provider = ai.NewOllamaProvider(cfg.AIModel)
 			case "gemini":
-				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 			default:
@@ -2924,7 +2924,7 @@ Examples:
 			case "ollama":
 				provider = ai.NewOllamaProvider(cfg.AIModel)
 			case "gemini":
-				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent")
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 			default:
