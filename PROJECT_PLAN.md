@@ -378,12 +378,310 @@ A console-based Linux application to help solve NixOS configuration problems and
 
 ---
 
+## 🚀 Next-Generation Features Roadmap
+
+### Priority 1: High-Impact User Experience Features
+
+#### 11. Configuration Template & Snippet Manager ✅ **COMPLETED**
+
+- **Description:** Curated NixOS configuration templates with GitHub code search integration for finding real-world working configurations.
+
+- **Implementation:** ✅ **COMPLETED**
+  - ✅ **GitHub Integration**: Use GitHub API to search for working NixOS configurations
+  - ✅ **Template Categories**: Desktop environments, servers, development setups, gaming, minimal configs
+  - ✅ **Snippet Management**: Save, organize, and share custom configuration snippets
+  - ✅ **AI Curation**: AI-powered quality assessment and compatibility checking
+  - ✅ **Interactive Browser**: Browse templates with previews and explanations
+  - ✅ **Search & Filter**: Find templates by hardware, use case, or specific services
+
+- **Commands:**
+  ```bash
+  nixai templates list                    # Browse curated templates
+  nixai templates search gaming           # Find gaming-optimized configs
+  nixai templates search desktop kde      # Find KDE desktop configs
+  nixai templates apply desktop-minimal   # Apply template to config
+  nixai templates github <query>         # Search GitHub for configs
+  nixai snippets add <name>              # Save custom snippet
+  nixai snippets search nvidia           # Find NVIDIA-related snippets
+  nixai snippets apply <name>            # Apply saved snippet
+  ```
+
+#### 12. Garbage Collection Advisor ✅ **COMPLETED**
+
+- **Description:** Intelligent garbage collection analysis and safe cleanup with AI-powered recommendations to prevent disk space issues.
+
+- **Implementation:** ✅ **COMPLETED**
+  - ✅ Added `nixai gc` command with 4 subcommands (CLI/interactive):
+    - ✅ `gc analyze` - Analyze Nix store usage patterns and show cleanup opportunities
+    - ✅ `gc safe-clean` - AI-guided safe cleanup with detailed explanations and dry-run mode
+    - ✅ `gc compare-generations` - Compare generations with AI recommendations for safe removal
+    - ✅ `gc disk-usage` - Visualize store usage patterns with optimization recommendations
+  - ✅ **AI Integration**: Comprehensive AI analysis for safety assessment, recommendations, and risk evaluation
+  - ✅ **Safety Features**: Dry-run mode, generation comparison, and detailed explanations before cleanup
+  - ✅ **Disk Usage Analysis**: Real-time store size analysis, available space monitoring, and usage visualization
+  - ✅ **Generation Management**: Smart generation analysis with safety checks and rollback capabilities
+  - ✅ **Beautiful Terminal Output**: Progress indicators, ASCII usage bars, and markdown-rendered AI analysis
+  - ✅ **Risk Assessment**: Automated risk level calculation (LOW/MEDIUM/HIGH/CRITICAL) based on usage patterns
+  - ✅ **Interactive Mode Support**: Full functionality available in interactive mode
+
+- **Usage:**
+  ```bash
+  nixai gc analyze                       # Analyze store and show cleanup opportunities
+  nixai gc safe-clean --dry-run         # Preview cleanup operations safely
+  nixai gc safe-clean --keep-generations 5  # Keep 5 most recent generations
+  nixai gc compare-generations --keep 3  # Compare generations and recommend cleanup
+  nixai gc disk-usage                   # Visualize store usage with ASCII charts
+  ```
+
+#### 13. Hardware Configuration Optimizer ✅ **COMPLETED**
+
+- **Description:** Detect hardware and automatically generate optimized NixOS configurations for specific hardware setups.
+
+- **Implementation:** ✅ **COMPLETED**
+  - ✅ Added `nixai hardware` command with 5 subcommands (CLI/interactive):
+    - ✅ `hardware detect` - Auto-detect CPU, GPU, network cards, and other hardware components
+    - ✅ `hardware optimize` - Apply hardware-specific performance tuning and optimizations
+    - ✅ `hardware drivers` - Automatically configure drivers (NVIDIA, WiFi, Bluetooth, firmware)
+    - ✅ `hardware compare` - Compare current vs optimal settings with detailed analysis
+    - ✅ `hardware laptop` - Laptop-specific power management and optimization
+  - ✅ **Hardware Detection**: Comprehensive system analysis including CPU features, GPU models, network devices
+  - ✅ **Driver Management**: Automatic detection and configuration of hardware-specific drivers
+  - ✅ **Performance Optimization**: Hardware-specific tuning recommendations and settings
+  - ✅ **Power Management**: Advanced laptop power optimization with battery life improvements
+  - ✅ **AI Integration**: Intelligent analysis and recommendations for hardware-specific configurations
+  - ✅ **Dry-Run Support**: Safe preview mode for testing optimizations before applying changes
+  - ✅ **Compatibility Analysis**: Assessment of hardware compatibility and potential issues
+  - ✅ **Beautiful Terminal Output**: Progress indicators, colorized status, and detailed hardware reports
+
+- **Usage:**
+  ```bash
+  nixai hardware detect                  # Detect and analyze hardware
+  nixai hardware optimize --dry-run     # Preview hardware optimizations
+  nixai hardware drivers --auto-install # Auto-configure drivers
+  nixai hardware compare                # Compare current vs optimal settings
+  nixai hardware laptop --power-save    # Laptop-specific optimizations
+  ```
+
+### Priority 2: Advanced System Management
+
+#### 14. AI-Powered Channel/Flake Migration Assistant 🆕
+
+- **Description:** Comprehensive migration assistant for converting between channels and flakes with safety checks and rollback capabilities.
+
+- **Implementation Plan:**
+  - ✅ **Migration Analysis**: Analyze current setup and migration complexity
+  - ✅ **Step-by-Step Guide**: AI-generated migration steps with safety checks
+  - ✅ **Backup & Rollback**: Automatic backups and rollback procedures
+  - ✅ **Validation**: Comprehensive validation of migration success
+  - ✅ **Best Practices**: Integration of flake best practices and optimizations
+
+- **Commands:**
+  ```bash
+  nixai migrate to-flakes              # Convert from channels to flakes
+  nixai migrate from-flakes           # Convert back to channels
+  nixai migrate analyze               # Analyze migration complexity
+  nixai migrate channel-upgrade       # Safely upgrade channels
+  nixai migrate flake-inputs          # Update and explain flake inputs
+  ```
+
+#### 15. Dependency & Import Graph Analyzer 🆕
+
+- **Description:** Visualize and analyze NixOS configuration dependencies with AI-powered insights and optimization recommendations.
+
+- **Implementation Plan:**
+  - ✅ **Dependency Mapping**: Build comprehensive dependency graphs
+  - ✅ **Conflict Detection**: Identify and resolve package conflicts
+  - ✅ **Optimization Analysis**: Suggest dependency optimizations
+  - ✅ **Import Tracking**: Track configuration file imports and relationships
+  - ✅ **Visualization**: Generate visual dependency graphs
+
+- **Commands:**
+  ```bash
+  nixai deps analyze                   # Show dependency tree with AI insights
+  nixai deps why <package>            # Explain why a package is installed
+  nixai deps conflicts               # Find and resolve conflicts
+  nixai deps optimize               # Suggest optimizations
+  nixai deps graph                  # Generate visual dependency graph
+  ```
+
+#### 16. Enhanced Build Troubleshooter 🆕
+
+- **Description:** Advanced build failure analysis with intelligent retry mechanisms and comprehensive debugging assistance.
+
+- **Implementation Plan:**
+  - ✅ **Build Analysis**: Deep analysis of build failures with pattern recognition
+  - ✅ **Intelligent Retry**: Smart retry with automated fixes for common issues
+  - ✅ **Cache Analysis**: Analyze cache miss reasons and optimization opportunities
+  - ✅ **Sandbox Debugging**: Debug sandbox-related build issues
+  - ✅ **Performance Profiling**: Build performance analysis and optimization
+
+- **Commands:**
+  ```bash
+  nixai build debug <package>         # Deep build failure analysis
+  nixai build retry                  # Intelligent retry with fixes
+  nixai build cache-miss            # Analyze cache miss reasons
+  nixai build sandbox-debug         # Debug sandbox issues
+  nixai build profile              # Build performance analysis
+  ```
+
+### Priority 3: Community & Learning Features
+
+#### 17. Multi-Machine Configuration Manager 🆕
+
+- **Description:** Manage and synchronize NixOS configurations across multiple machines with centralized management and deployment.
+
+- **Implementation Plan:**
+  - ✅ **Machine Registry**: Register and manage multiple NixOS machines
+  - ✅ **Configuration Sync**: Synchronize configurations between machines
+  - ✅ **Deployment Management**: Deploy configurations to remote machines
+  - ✅ **Diff Analysis**: Compare configurations across machines
+  - ✅ **Fleet Management**: Manage groups of machines with shared configurations
+
+- **Commands:**
+  ```bash
+  nixai machines list                 # List registered machines
+  nixai machines add <name> <host>   # Register new machine
+  nixai machines sync <machine>      # Sync configs to machine
+  nixai machines diff               # Compare configurations
+  nixai machines deploy            # Deploy to multiple machines
+  ```
+
+#### 18. Learning & Onboarding System 🆕
+
+- **Description:** Interactive learning modules and guided tutorials for NixOS users at all skill levels.
+
+- **Implementation Plan:**
+  - ✅ **Interactive Modules**: Step-by-step learning modules with practical exercises
+  - ✅ **Skill Assessment**: Quiz system with AI-powered feedback
+  - ✅ **Personalized Paths**: Customized learning paths based on user goals
+  - ✅ **Progress Tracking**: Track learning progress and achievements
+  - ✅ **Real-World Examples**: Practical examples and hands-on exercises
+
+- **Commands:**
+  ```bash
+  nixai learn basics                 # Basic NixOS concepts
+  nixai learn advanced              # Advanced topics
+  nixai learn quiz                  # Knowledge assessment
+  nixai learn path <topic>          # Personalized learning path
+  nixai learn progress             # View learning progress
+  ```
+
+#### 19. Community Integration Platform 🆕
+
+- **Description:** Connect with the NixOS community to share configurations, discover trends, and validate against best practices.
+
+- **Implementation Plan:**
+  - ✅ **Configuration Sharing**: Share and discover community configurations
+  - ✅ **Best Practice Validation**: Validate configurations against community standards
+  - ✅ **Trend Analysis**: Show trending packages and configuration patterns
+  - ✅ **Quality Rating**: Community-driven quality ratings and reviews
+  - ✅ **Integration Points**: GitHub, NixOS forums, and community repositories
+
+- **Commands:**
+  ```bash
+  nixai community search             # Search community configurations
+  nixai community share             # Share your configurations
+  nixai community validate          # Validate against best practices
+  nixai community trends            # Show trending packages/configs
+  nixai community rate             # Rate community configurations
+  ```
+
+### Priority 4: Security & Advanced Features
+
+#### 20. Security & Compliance Scanner 🆕
+
+- **Description:** Comprehensive security audit and compliance checking for NixOS configurations with automated hardening suggestions.
+
+- **Implementation Plan:**
+  - ✅ **Security Audit**: Comprehensive security analysis of configurations
+  - ✅ **CVE Scanning**: Check installed packages for known vulnerabilities
+  - ✅ **Compliance Checking**: Validate against security standards (CIS, NIST)
+  - ✅ **Hardening Automation**: Apply security hardening configurations
+  - ✅ **Risk Assessment**: Prioritize security issues by risk level
+
+- **Commands:**
+  ```bash
+  nixai security scan               # Security audit of configuration
+  nixai security harden           # Apply hardening suggestions
+  nixai security cve              # Check for CVEs
+  nixai security compliance       # Check compliance standards
+  nixai security risk            # Risk assessment report
+  ```
+
+#### 21. System State Backup & Restore 🆕
+
+- **Description:** Comprehensive system state backup and restore capabilities with validation and incremental backups.
+
+- **Implementation Plan:**
+  - ✅ **Full System Backup**: Complete system state including configurations and data
+  - ✅ **Incremental Backups**: Efficient incremental backup strategies
+  - ✅ **Backup Validation**: Verify backup integrity and completeness
+  - ✅ **Automated Scheduling**: Schedule automated backups with retention policies
+  - ✅ **Disaster Recovery**: Complete disaster recovery procedures
+
+- **Commands:**
+  ```bash
+  nixai backup create               # Create comprehensive backup
+  nixai backup restore <backup>    # Restore from backup
+  nixai backup schedule           # Schedule automated backups
+  nixai backup verify             # Verify backup integrity
+  nixai backup list              # List available backups
+  ```
+
+#### 22. Store Integrity & Performance Monitor 🆕
+
+- **Description:** Monitor and optimize Nix store performance with integrity checking and automated optimization.
+
+- **Implementation Plan:**
+  - ✅ **Integrity Monitoring**: Continuous store integrity monitoring
+  - ✅ **Performance Analysis**: Store performance profiling and optimization
+  - ✅ **Repair Automation**: Automated store repair procedures
+  - ✅ **Optimization Engine**: Intelligent store layout and caching optimization
+  - ✅ **Health Dashboards**: Visual store health and performance dashboards
+
+- **Commands:**
+  ```bash
+  nixai store verify               # Verify store integrity
+  nixai store performance         # Analyze performance
+  nixai store repair              # Guided repair procedures
+  nixai store optimize           # Optimize layout and caching
+  nixai store health             # Store health dashboard
+  ```
+
+---
+
+## 📋 Implementation Priority Queue
+
+### Phase 1: High-Impact Features (2025) ✅ **COMPLETED**
+1. ✅ **Configuration Template & Snippet Manager** - Immediate user value with GitHub integration
+2. ✅ **Garbage Collection Advisor** - Solves critical disk space issues
+3. ✅ **Hardware Configuration Optimizer** - Eliminates hardware configuration pain points
+
+### Phase 2: Advanced Management (2025) 🚀 **CURRENT FOCUS**
+4. **Channel/Flake Migration Assistant** - Critical missing functionality - **NEXT**
+5. **Dependency & Import Graph Analyzer** - Enhanced debugging capabilities
+6. **Enhanced Build Troubleshooter** - Extends existing diagnostic features
+
+### Phase 3: Community & Learning (2025)
+7. **Multi-Machine Configuration Manager** - Advanced user workflows
+8. **Learning & Onboarding System** - User education and adoption
+9. **Community Integration Platform** - Connect with broader ecosystem
+
+### Phase 4: Security & Advanced (2025)
+10. **Security & Compliance Scanner** - Enterprise and security-focused users
+11. **System State Backup & Restore** - Comprehensive system management
+12. **Store Integrity & Performance Monitor** - Advanced optimization features
+
+---
+
 ## 🤝 Contributing
 
 - Follow Go idioms and best practices
 - Keep code modular and well-documented
 - Add/update tests for all new features and bugfixes
 - Update README and this file for any new features or changes
+- All new features must include comprehensive AI integration and beautiful terminal output
+- GitHub integration features should use proper rate limiting and caching
 
 ---
 

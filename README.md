@@ -21,6 +21,7 @@ See the full [nixai User Manual](docs/MANUAL.md) for comprehensive feature docum
 - **🏠 Home Manager vs NixOS Visual Distinction:** Smart detection automatically shows `🖥️ NixOS Option` or `🏠 Home Manager Option` headers with appropriate documentation sources.
 - **🆕 Dedicated Home Manager Command:** New `explain-home-option` command specifically for Home Manager configuration options.
 - **🆕 AI-Powered Package Repository Analysis:** New `package-repo` command automatically analyzes Git repositories and generates complete Nix derivations using AI-powered build system detection and dependency analysis.
+- **📝 Configuration Templates & Snippets:** Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
 - **More Tests:** New tests cover service option lookup, diagnostics, error handling, and packaging features for robust reliability.
 
 ## Prerequisites
@@ -113,6 +114,8 @@ All other dependencies are managed by the Nix flake and justfile.
 - **NEW:** 🏠 **Home Manager Option Support** — Dedicated `nixai explain-home-option <option>` command with visual distinction between Home Manager and NixOS options.
 
 - **NEW:** 📦 **AI-Powered Package Repository Analysis** — Automatically analyze Git repositories and generate Nix derivations with `nixai package-repo <path>`, supporting Go, Python, Node.js, and Rust projects.
+
+- **NEW:** 📝 **Configuration Templates & Snippets** — Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
 
 ---
 
@@ -290,6 +293,7 @@ See [Autostart Options Documentation](docs/autostart-options.md) for more detail
 - **🎯 Config Path Awareness Everywhere:** All features respect the NixOS config path, settable via `--nixos-path`, config file, or interactively. If unset or invalid, you'll get clear guidance on how to fix it.
 - **🔍 Automated Service Option Lookup:** When searching for services, nixai lists all available options for a service using `nixos-option --find services.<name>`, not just the top-level enable flag.
 - **📦 AI-Powered Package Repository Analysis:** Analyze Git repositories and generate complete Nix derivations with support for Go, Python, Node.js, and Rust projects.
+- **📝 Configuration Templates & Snippets:** Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
 - **🧩 Flake Input Analysis:** Analyze and explain flake inputs using AI, with upstream README/flake.nix summaries.
 - **🏥 System Health Checks:** Run comprehensive NixOS system health checks with AI-powered analysis and recommendations.
 - **✅ Comprehensive Test Coverage:** Extensive test coverage for service option lookup, diagnostics, error handling, packaging features, and HTML filtering for robust reliability.
@@ -416,6 +420,70 @@ nixai package-repo https://github.com/user/project
 - **Comprehensive Validation**: Validates generated derivations for completeness and correctness
 - **Path Resolution**: Supports both relative and absolute paths
 - **Debug Mode**: Comprehensive logging for troubleshooting and development
+
+---
+
+## 📝 Configuration Templates & Snippets
+
+Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
+
+#### Templates
+
+```sh
+# Browse available templates
+nixai templates list
+
+# Search templates by keyword or category
+nixai templates search gaming
+nixai templates search desktop kde
+
+# Show template details and content
+nixai templates show desktop-minimal
+
+# Apply template to current configuration
+nixai templates apply gaming-config
+
+# Save configuration as template
+nixai templates save my-template /path/to/config.nix
+
+# List template categories
+nixai templates categories
+
+# Search GitHub for NixOS configurations
+nixai templates github "gaming nixos configuration"
+nixai templates github "kde plasma nixos"
+```
+
+#### Snippets
+
+```sh
+# List saved snippets
+nixai snippets list
+
+# Search snippets by name or tag
+nixai snippets search nvidia
+
+# Save current config as snippet
+nixai snippets add my-nvidia-config --file /etc/nixos/hardware.nix
+
+# Apply snippet to configuration
+nixai snippets apply gaming-setup --output ./gaming.nix
+
+# Show snippet content
+nixai snippets show my-snippet
+
+# Remove saved snippet
+nixai snippets remove old-config
+```
+
+**Key Features:**
+
+- **Built-in Templates**: Curated templates for desktop, gaming, server, and development environments
+- **GitHub Integration**: Search real-world NixOS configurations from the community
+- **Personal Snippets**: Save and organize your own configuration snippets with tags
+- **Template Categories**: Organized by Desktop, Gaming, Server, Development, etc.
+- **YAML Persistence**: Templates and snippets stored as structured YAML files
+- **Merge Support**: Apply templates with merge capabilities for existing configurations
 
 ---
 
@@ -888,6 +956,68 @@ nixai package-repo https://github.com/user/rust-app --output ./derivations --nam
 - **AI Generation**: Creates complete, valid derivations with proper structure and metadata
 - **Validation**: Ensures generated derivations include all required attributes
 - **Git Integration**: Automatic source URL and commit information extraction
+
+### Configuration Templates & Snippets
+
+Manage curated NixOS configuration templates and personal configuration snippets:
+
+#### Templates
+
+```sh
+# Browse available templates
+nixai templates list
+
+# Search templates by keyword or category
+nixai templates search gaming
+nixai templates search desktop kde
+
+# Show template details and content
+nixai templates show desktop-minimal
+
+# Apply template to current configuration
+nixai templates apply gaming-config
+
+# Save configuration as template
+nixai templates save my-template /path/to/config.nix
+
+# List template categories
+nixai templates categories
+
+# Search GitHub for NixOS configurations
+nixai templates github "gaming nixos configuration"
+nixai templates github "kde plasma nixos"
+```
+
+#### Snippets
+
+```sh
+# List saved snippets
+nixai snippets list
+
+# Search snippets by name or tag
+nixai snippets search nvidia
+
+# Save current config as snippet
+nixai snippets add my-nvidia-config --file /etc/nixos/hardware.nix
+
+# Apply snippet to configuration
+nixai snippets apply gaming-setup --output ./gaming.nix
+
+# Show snippet content
+nixai snippets show my-snippet
+
+# Remove saved snippet
+nixai snippets remove old-config
+```
+
+**Key Features:**
+
+- **Built-in Templates**: Curated templates for desktop, gaming, server, and development environments
+- **GitHub Integration**: Search real-world NixOS configurations from the community
+- **Personal Snippets**: Save and organize your own configuration snippets with tags
+- **Template Categories**: Organized by Desktop, Gaming, Server, Development, etc.
+- **YAML Persistence**: Templates and snippets stored as structured YAML files
+- **Merge Support**: Apply templates with merge capabilities for existing configurations
 
 ### System Health Check
 

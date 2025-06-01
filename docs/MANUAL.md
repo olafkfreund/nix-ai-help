@@ -38,6 +38,7 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 - [Searching for Packages and Services](#searching-for-packages-and-services)
 - [AI-Powered Package Repository Analysis](#ai-powered-package-repository-analysis)
 - [System Health Checks](#system-health-checks)
+- [Configuration Templates & Snippets](#configuration-templates--snippets)
 - [Interactive Mode](#interactive-mode)
 - [Editor Integration](#editor-integration)
   - [Neovim Integration](#neovim-integration)
@@ -407,57 +408,279 @@ _Output:_
 
 ## System Health Checks
 
-Run a comprehensive health check on your NixOS system to detect common issues, misconfigurations, and get actionable AI-powered recommendations.
-
-```sh
-nixai health
-```
+The `nixai health` command provides comprehensive health checks for your NixOS system, with AI-powered analysis and recommendations.
 
 ### What does `nixai health` check?
+
 - NixOS configuration validity
-- Service status (e.g., failed or inactive services)
-- Disk space and filesystem health
-- Outdated or broken packages
-- Security warnings and best practices
-- AI-powered suggestions for improving system reliability and security
+- Failed system services
+- Disk space usage
+- Nix channel status
+- Boot integrity
+- Network connectivity
+- Nix store health
 
 ### Real Life Examples
 
-**Basic health check:**
 ```sh
+# Run comprehensive health check
 nixai health
-```
-_Output:_
-```
-[✓] NixOS configuration is valid
-[✓] All critical services are running
-[!] Disk space low on /home (2% free)
-[!] 3 packages are outdated
-[AI] Suggestion: Consider enabling automatic updates for security
-```
 
-**Check health for a custom NixOS config path:**
-```sh
-nixai health --nixos-path ~/my-nixos-config
-```
-
-**Get detailed output and recommendations:**
-```sh
-nixai health --log-level debug
+# Output includes:
+# ✓ Configuration validation passed
+# ⚠ Low disk space on /nix/store (85% full)
+# ✗ Service postgresql.service failed
+# ✓ Network connectivity OK
+# ... plus AI recommendations
 ```
 
 **Example: Fixing a failed service**
+
 ```
-> nixai health
-[!] Service 'nginx' is failed
-[AI] Suggestion: Check nginx config syntax with `nginx -t` and review recent changes in /etc/nixos/configuration.nix
+⚠ Failed Services:
+   postgresql.service - PostgreSQL database server
+
+💡 AI Analysis:
+   PostgreSQL service failure is commonly caused by:
+   1. Incorrect data directory permissions
+   2. Port conflicts with existing services
+   3. Invalid configuration syntax
+   
+   Recommended actions:
+   1. Check service logs: systemctl status postgresql.service
+   2. Verify data directory: ls -la /var/lib/postgresql/
+   3. Review configuration: nixos-option services.postgresql
 ```
 
 **Example: Security recommendations**
+
 ```
-> nixai health
-[AI] Security: SSH root login is enabled. It is recommended to set `services.openssh.permitRootLogin = "no";`
+🔒 Security Analysis:
+   - SSH root login is enabled (consider disabling)
+   - Firewall has open ports: 22, 80, 443, 8080
+   - Automatic updates are disabled
+   
+   Recommendations:
+   1. Disable SSH root login: services.openssh.permitRootLogin = "no";
+   2. Review open ports and close unnecessary ones
+   3. Enable automatic security updates
 ```
+
+---
+
+## Configuration Templates & Snippets
+
+nixai provides a powerful template and snippet management system to help you quickly set up and reuse NixOS configurations. This feature includes curated templates for common setups and personal snippet management for your custom configurations.
+
+### Templates
+
+Templates are pre-built NixOS configurations for common use cases. nixai includes built-in templates and can search GitHub for real-world configurations.
+
+#### Browsing Templates
+
+```sh
+# List all available templates
+nixai templates list
+
+# Show template categories
+nixai templates categories
+
+# Search templates by keyword
+nixai templates search gaming
+nixai templates search desktop kde
+nixai templates search server nginx
+```
+
+#### Viewing Template Details
+
+```sh
+# Show complete template details and content
+nixai templates show desktop-minimal
+nixai templates show gaming-config
+nixai templates show server-basic
+```
+
+#### Applying Templates
+
+```sh
+# Apply template to default location (/etc/nixos/configuration.nix)
+nixai templates apply desktop-minimal
+
+# Apply template to specific file
+nixai templates apply gaming-config --output ./gaming.nix
+
+# Merge template with existing configuration
+nixai templates apply server-basic --merge --output /etc/nixos/server.nix
+```
+
+#### GitHub Integration
+
+Search GitHub for real-world NixOS configurations:
+
+```sh
+# Search GitHub for configurations
+nixai templates github "gaming nixos configuration"
+nixai templates github "kde plasma nixos"
+nixai templates github "thinkpad nixos hardware"
+nixai templates github "server nginx configuration.nix"
+```
+
+#### Saving Custom Templates
+
+```sh
+# Save local configuration file as template
+nixai templates save my-desktop /etc/nixos/configuration.nix --category Desktop --description "My custom desktop setup"
+
+# Save from GitHub URL
+nixai templates save nvidia-gaming https://github.com/user/repo/blob/main/nixos/gaming.nix --category Gaming
+
+# Add tags for better organization
+nixai templates save my-template config.nix --tags "nvidia,gaming,performance"
+```
+
+### Snippets
+
+Snippets allow you to save and reuse small configuration fragments. Perfect for commonly used service configurations, hardware settings, or package lists.
+
+#### Managing Snippets
+
+```sh
+# List all saved snippets
+nixai snippets list
+
+# Search snippets by name or tag
+nixai snippets search nvidia
+nixai snippets search gaming
+nixai snippets search development
+```
+
+#### Adding Snippets
+
+```sh
+# Save configuration file as snippet
+nixai snippets add nvidia-drivers --file ./hardware.nix --description "NVIDIA driver configuration" --tags "nvidia,graphics"
+
+# Save from stdin (pipe content)
+cat hardware-config.nix | nixai snippets add my-hardware --description "Custom hardware config"
+
+# Add snippet with multiple tags
+nixai snippets add gaming-packages --file packages.nix --tags "gaming,steam,lutris"
+```
+
+#### Using Snippets
+
+```sh
+# Show snippet content
+nixai snippets show nvidia-drivers
+
+# Apply snippet to file
+nixai snippets apply gaming-setup --output ./gaming.nix
+
+# Apply snippet to stdout (for copying)
+nixai snippets apply my-config
+```
+
+#### Organizing Snippets
+
+```sh
+# Remove old or unused snippets
+nixai snippets remove old-config
+
+# Search by multiple criteria
+nixai snippets search "nvidia AND gaming"
+```
+
+### Built-in Templates
+
+nixai includes curated templates for common NixOS configurations:
+
+#### Desktop Environments
+
+- **desktop-minimal**: Minimal GNOME desktop with essential applications
+- **desktop-kde**: Full KDE Plasma desktop environment
+- **desktop-xfce**: Lightweight XFCE desktop setup
+
+#### Gaming Configurations
+
+- **gaming-config**: Gaming-optimized configuration with Steam, drivers, and performance tweaks
+- **gaming-nvidia**: NVIDIA-specific gaming setup with proper drivers and settings
+
+#### Server Configurations
+
+- **server-basic**: Basic server with SSH, firewall, and essential tools
+- **server-web**: Web server with nginx, SSL, and security hardening
+- **server-database**: Database server with PostgreSQL or MySQL
+
+#### Development Environments
+
+- **development-env**: Development setup with common programming tools, git, and editors
+- **development-nix**: Nix development environment for nixpkgs contributions
+
+### Real-World Examples
+
+#### Setting up a Gaming System
+
+```sh
+# Browse gaming templates
+nixai templates search gaming
+
+# View gaming template details
+nixai templates show gaming-config
+
+# Apply gaming template
+nixai templates apply gaming-config --output /etc/nixos/gaming.nix
+
+# Save your custom gaming tweaks as snippet
+nixai snippets add my-gaming-tweaks --file ./performance.nix --tags "gaming,performance"
+```
+
+#### Creating a Development Environment
+
+```sh
+# Search for development templates
+nixai templates search development
+
+# Look for specific language setups on GitHub
+nixai templates github "rust development nixos"
+
+# Apply development template
+nixai templates apply development-env --merge
+
+# Save your editor configuration as snippet
+nixai snippets add neovim-config --file ./editor.nix --tags "neovim,development"
+```
+
+#### Server Setup Workflow
+
+```sh
+# Browse server templates
+nixai templates categories
+nixai templates search server
+
+# Apply basic server template
+nixai templates apply server-basic --output /etc/nixos/server.nix
+
+# Add specific service snippets
+nixai snippets apply nginx-config --output ./services.nix
+nixai snippets apply postgresql-setup --output ./database.nix
+```
+
+### Tips and Best Practices
+
+- **Use Categories**: Templates are organized by category (Desktop, Gaming, Server, Development) for easy browsing
+- **Tag Everything**: Use descriptive tags when saving templates and snippets for better searchability
+- **GitHub Discovery**: Use the GitHub search to find real-world configurations for inspiration
+- **Incremental Building**: Start with a base template and add snippets to customize your configuration
+- **Backup First**: Always backup your existing configuration before applying templates
+- **Test Configurations**: Use `nixos-rebuild test` to test configurations before committing them
+
+### Integration with Other Features
+
+The template and snippet system integrates seamlessly with other nixai features:
+
+- **Health Checks**: `nixai health` can validate templates before applying them
+- **Option Explanation**: Use `nixai explain-option` to understand options used in templates
+- **Direct Questions**: Ask questions about template configurations with `nixai "how does this gaming template work?"`
 
 ---
 
@@ -535,8 +758,6 @@ Interactive mode is ideal for:
 - Troubleshooting and exploring NixOS options, logs, and documentation in a conversational way
 
 ---
-
-## Editor Integration
 
 ## Editor Integration
 
