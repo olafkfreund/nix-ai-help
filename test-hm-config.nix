@@ -1,10 +1,12 @@
 # Test configuration to verify Home Manager module works
-{ config, pkgs, lib, ... }:
-
-let
-  nixai-flake = builtins.getFlake (toString ./flake.nix);
-in
 {
+  config,
+  pkgs,
+  lib,
+  ...
+}: let
+  nixai-flake = builtins.getFlake (toString ./flake.nix);
+in {
   imports = [
     nixai-flake.homeManagerModules.default
   ];
@@ -17,6 +19,6 @@ in
 
   # Required for Home Manager
   home.username = "test";
-  home.homeDirectory = "/home/test"; 
+  home.homeDirectory = "/home/test";
   home.stateVersion = "23.11";
 }

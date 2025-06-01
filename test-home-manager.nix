@@ -1,7 +1,9 @@
 # Test Home Manager configuration
-{ config, pkgs, ... }:
-
 {
+  config,
+  pkgs,
+  ...
+}: {
   imports = [
     ./flake.nix.homeManagerModules.default
   ];
