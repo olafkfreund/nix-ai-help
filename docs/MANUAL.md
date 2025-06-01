@@ -43,6 +43,8 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 - [Editor Integration](#editor-integration)
   - [Neovim Integration](#neovim-integration)
 - [Advanced Usage](#advanced-usage)
+  - [Enhanced Build Troubleshooter](#enhanced-build-troubleshooter)
+  - [Dependency & Import Graph Analyzer](#dependency--import-graph-analyzer)
 - [Configuration](#configuration)
 - [Tips & Troubleshooting](#tips--troubleshooting)
 - [Development Environment (devenv) Feature](#development-environment-devenv-feature)
@@ -1103,6 +1105,436 @@ nixai package-repo . --analyze-only --output-format json > analysis.json
 - For complex monorepos, review each generated derivation and consult the AI explanations for manual steps.
 - For custom build systems, use `--analyze-only` and follow AI suggestions for manual packaging tweaks.
 - Always validate generated Nix code with `nix build` or `nix flake check` before deploying.
+
+### Enhanced Build Troubleshooter
+
+The Enhanced Build Troubleshooter is a comprehensive tool for analyzing build failures, optimizing build performance, and resolving common Nix build issues. It provides AI-powered analysis and actionable recommendations through a set of specialized subcommands.
+
+#### Basic Build with AI Assistance
+
+```sh
+# Build a package with AI assistance for any failures
+nixai build .#mypackage
+
+# Build the current flake with AI assistance
+nixai build
+```
+
+When using the basic `build` command, nixai will:
+1. Run the standard `nix build` command
+2. Capture any build failures
+3. Provide an AI-generated summary of the problem
+4. Suggest fixes based on the error patterns detected
+
+#### Deep Build Analysis
+
+```sh
+nixai build debug firefox
+```
+
+The `debug` subcommand performs comprehensive analysis of build failures:
+
+- 🔍 **Error Pattern Recognition**: Identifies common error types (dependency issues, compiler errors, missing inputs)
+- 📊 **Detailed Analysis**: Provides step-by-step explanation of the error chain
+- 🛠️ **Actionable Recommendations**: Suggests specific fixes for each identified issue
+- 📚 **Documentation Links**: References relevant NixOS/Nixpkgs documentation
+- 📋 **Comprehensive Report**: Generates a detailed failure analysis report
+
+**Example Output:**
+
+```
+🔍 Deep Build Analysis: firefox
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 Build Environment
+├─ Nixpkgs Version: 23.11
+├─ System: x86_64-linux
+├─ Cores Available: 8
+└─ Memory Available: 16.0 GB
+
+📊 Error Analysis
+├─ Error Type: Missing Dependency
+├─ Phase: Configure
+├─ Component: firefox-112.0.2
+└─ Root Cause: Required dependency 'libwebp' not found
+
+🛠️ Recommended Fixes
+1. Add missing dependency to buildInputs:
+   buildInputs = old.buildInputs ++ [ pkgs.libwebp ];
+
+2. Verify package is available in your nixpkgs version:
+   nix-env -qA nixpkgs.libwebp
+
+3. Apply this patch to your firefox derivation:
+   [Detailed patch instructions]
+
+💡 Additional Context
+The error occurred because the build system expects libwebp for image processing,
+but it wasn't included in the build environment. Firefox recently made this a
+required dependency rather than optional.
+```
+
+#### Intelligent Retry with Automatic Fixes
+
+```sh
+nixai build retry
+```
+
+The `retry` subcommand:
+
+- Analyzes the last build failure
+- Automatically identifies common issues that can be fixed
+- Applies recommended fixes and retries the build
+- Provides detailed progress updates during the retry process
+- Shows a comparison of before/after states
+
+This command is particularly useful for common failure patterns like missing dependencies, permission issues, or simple configuration problems that have standard solutions.
+
+#### Cache Miss Analysis
+
+```sh
+nixai build cache-miss
+```
+
+The `cache-miss` subcommand analyzes why builds aren't using the binary cache:
+
+- 📊 **Cache Statistics**: Hit/miss rates and patterns
+- 🔍 **Miss Reasons**: Identifies why specific builds aren't found in the cache
+- 🌐 **Cache Configuration**: Analyzes substituter settings and connectivity
+- 🔑 **Key Verification**: Checks for trusted keys and signing issues
+- 📈 **Optimization Recommendations**: Suggests settings to improve cache utilization
+
+**Example Output:**
+
+```
+📊 Cache Analysis Results
+
+Cache Performance
+├─ Hit Rate: 75%
+├─ Miss Rate: 25%
+├─ Cache Size: 2.5GB
+├─ Recent Hits: 42
+└─ Recent Misses: 14
+
+Miss Reasons
+├─ 8 misses due to missing trusted keys
+├─ 4 misses due to custom package overrides
+├─ 2 misses due to network connectivity issues
+
+🛠️ Recommended Optimizations
+1. Add missing trusted keys:
+   nix-env --option trusted-public-keys 'cache.nixos.org-1:...'
+
+2. Configure additional binary caches:
+   nix.settings.substituters = [
+     "https://cache.nixos.org"
+     "https://nixpkgs-wayland.cachix.org"
+   ];
+
+3. Verify network connectivity to cache.nixos.org
+```
+
+#### Sandbox Debugging
+
+```sh
+nixai build sandbox-debug
+```
+
+The `sandbox-debug` subcommand helps resolve sandbox-related build issues:
+
+- 🔒 **Sandbox Configuration**: Analyzes current sandbox settings
+- 🔍 **Permission Analysis**: Identifies permission and access issues
+- 🌐 **Network Access**: Diagnoses network-related sandbox problems
+- 📁 **Path Access**: Identifies missing or inaccessible paths
+- 🛠️ **Fix Recommendations**: Suggests sandbox configuration changes
+
+This command is particularly useful for builds that fail with permission errors, network access issues, or path-related problems.
+
+#### Build Performance Profiling
+
+```sh
+nixai build profile --package vim
+```
+
+The `profile` subcommand analyzes build performance and identifies optimization opportunities:
+
+- ⏱️ **Time Analysis**: Breaks down where build time is spent
+- 🧮 **Resource Usage**: CPU, memory, and I/O utilization 
+- 🔍 **Bottleneck Detection**: Identifies performance bottlenecks
+- 📊 **Comparison**: Benchmarks against typical build times
+- 🚀 **Optimization Suggestions**: Recommendations to improve build speed
+
+**Example Output:**
+
+```
+⚡ Build Performance Profile: vim
+
+Build Time Breakdown
+├─ Total Time: 4m 32s
+├─ CPU Usage: 85%
+├─ Memory Peak: 2.1GB
+├─ Network Time: 45s  
+├─ Compilation Time: 3m 20s
+└─ Download Time: 27s
+
+🔍 Bottlenecks Identified
+1. Single-threaded compilation phase (3m 20s)
+2. Limited parallelization in test phase
+3. High memory usage during linking
+
+🚀 Optimization Recommendations
+1. Increase parallelization:
+   nix.settings.max-jobs = 8;
+   
+2. Allocate more memory to builds:
+   nix.settings.cores = 0;  # Use all cores
+   
+3. Consider using ccache:
+   nix.settings.extra-sandbox-paths = [ "/var/cache/ccache" ];
+```
+
+#### Integration with Other nixai Features
+
+The Enhanced Build Troubleshooter integrates seamlessly with other nixai features:
+
+- **Documentation Integration**: Links to relevant NixOS docs via the MCP server
+- **AI-Powered Analysis**: Uses the configured AI provider for intelligent analysis
+- **System Health Context**: Incorporates system health data for better recommendations
+- **Configuration Awareness**: Respects your NixOS config path settings
+- **Terminal Formatting**: Beautiful, colorized terminal output with progress indicators
+
+---
+
+### Dependency & Import Graph Analyzer
+
+The Dependency & Import Graph Analyzer helps you understand, visualize, and optimize the relationships between packages and configuration files in your NixOS system. This powerful tool provides AI-powered insights into your dependency tree and suggests optimizations to improve your system's performance and maintainability.
+
+#### Analyzing Dependency Trees
+
+```sh
+nixai deps analyze
+```
+
+The `analyze` subcommand provides a comprehensive view of your system's package dependencies:
+
+- 🔍 **Full System Analysis**: Maps all package relationships in your current configuration
+- 📊 **Hierarchy Visualization**: Shows parent-child relationships between packages
+- 🔎 **Circular Dependency Detection**: Identifies potential circular dependencies
+- 📝 **AI-Powered Summary**: Provides an overview of your dependency structure with insights
+- 🚩 **Issue Flagging**: Highlights potential problems like outdated packages or uncommon version constraints
+
+**Example Output:**
+
+```
+📊 Dependency Analysis
+
+System Overview
+├─ Total Packages: 1,248
+├─ Direct Dependencies: 142
+├─ Indirect Dependencies: 1,106
+├─ Deepest Chain: 15 levels
+└─ Potential Issues: 3 found
+
+Key Dependencies
+├─ gcc [10.3.0] - Used by 428 packages
+├─ glibc [2.35] - Used by 1,052 packages
+├─ python3 [3.10.9] - Used by 89 packages
+└─ openssl [3.0.8] - Used by 124 packages
+
+🚩 Issues Detected
+1. Circular dependency: python3 → pip → setuptools → python3
+2. Multiple python versions: python 3.9 and 3.10
+3. Outdated dependency: openssl 3.0.8 (3.0.9 available)
+
+🤖 AI Analysis
+Your system has a moderate-sized dependency tree with some outdated packages
+and a circular dependency that may cause build issues. Consider updating
+openssl and standardizing on a single Python version.
+```
+
+#### Understanding Package Inclusion
+
+```sh
+nixai deps why firefox
+```
+
+The `why` subcommand explains why a specific package is installed on your system:
+
+- 🔍 **Origin Tracing**: Identifies the source of package inclusion
+- 📋 **Full Path**: Shows the complete dependency chain leading to the package
+- 🔍 **Alternative Paths**: Identifies multiple inclusion paths if they exist
+- 🔄 **Version Resolution**: Explains version selection logic
+- 🗑️ **Removal Impact**: Analysis of what would happen if the package were removed
+
+**Example Output:**
+
+```
+❓ Why is firefox installed?
+
+📋 Primary Inclusion Path:
+configuration.nix
+└─ environment.systemPackages
+   └─ firefox [114.0.2]
+
+📋 Alternative Paths:
+home-manager
+└─ home.packages
+   └─ firefox [114.0.2]
+
+💪 Direct Dependency: Yes
+   This package was explicitly requested in your configuration.
+
+🔄 Version Selection:
+   Version 114.0.2 was selected from nixpkgs (override in /etc/nixos/overlays/firefox.nix)
+   Default version would have been 113.0.1
+
+🗑️ Removal Impact:
+   Removing firefox would not break any other packages.
+   2 user configurations reference this package.
+```
+
+#### Finding and Resolving Conflicts
+
+```sh
+nixai deps conflicts
+```
+
+The `conflicts` subcommand detects and helps resolve package conflicts:
+
+- 🔍 **Conflict Detection**: Identifies conflicting package versions or flags
+- 📋 **Comprehensive Report**: Details all conflicts with their sources
+- 🛠️ **Resolution Suggestions**: Provides specific fix recommendations for each conflict
+- 📈 **Priority Analysis**: Determines which conflicts are most critical to resolve
+- 📊 **Before/After Comparison**: Shows the impact of proposed resolutions
+
+**Example Output:**
+
+```
+🚫 Dependency Conflicts
+
+Found 3 package conflicts in your configuration:
+
+1. 🔴 Critical: openssl version conflict
+   ├─ Path 1: nixpkgs.openssl [3.0.8] via environment.systemPackages
+   ├─ Path 2: nixpkgs.openssl [1.1.1t] via letsencrypt
+   └─ Resolution: Add the following to your configuration.nix:
+      nixpkgs.config.packageOverrides = pkgs: {
+        letsencrypt = pkgs.letsencrypt.override {
+          openssl = pkgs.openssl;
+        };
+      };
+
+2. 🟠 Important: python package conflict
+   ├─ Path 1: python39
+   ├─ Path 2: python310
+   └─ Resolution: Standardize on one Python version:
+      environment.systemPackages = with pkgs; [
+        (python310.withPackages (ps: with ps; [ 
+          # your Python packages here
+        ]))
+      ];
+
+3. 🟡 Minor: gtk theme conflict
+   ├─ Path 1: gnome.adwaita-icon-theme
+   ├─ Path 2: custom-icon-theme
+   └─ Resolution: Set GTK_THEME environment variable:
+      environment.variables.GTK_THEME = "Adwaita";
+```
+
+#### Optimizing Dependencies
+
+```sh
+nixai deps optimize
+```
+
+The `optimize` subcommand analyzes your dependency structure and suggests optimizations:
+
+- 🔍 **Inefficiency Detection**: Identifies redundant or unnecessary dependencies
+- 📊 **Size Impact Analysis**: Shows the impact of each dependency on system size
+- 🚀 **Performance Suggestions**: Recommends changes to improve build/runtime performance
+- 💾 **Disk Usage Optimization**: Identifies opportunities to reduce system size
+- 📝 **Configuration Recommendations**: Suggests specific configuration changes
+
+**Example Output:**
+
+```
+⚡ Dependency Optimization
+
+System Analysis
+├─ Current Closure Size: 8.2 GB
+├─ Redundant Packages: 14 found
+├─ Unnecessary Dev Deps: 8 found
+└─ Optimization Potential: ~1.1 GB (~13%)
+
+🔍 Optimization Opportunities
+
+1. 💾 Remove unnecessary development dependencies (~650 MB)
+   ├─ Current: python310Full [includes dev tools, docs, tests]
+   ├─ Suggested: python310 [minimal runtime only]
+   └─ Configuration Change:
+      - environment.systemPackages = with pkgs; [ python310Full ];
+      + environment.systemPackages = with pkgs; [ python310 ];
+
+2. 🚀 Consolidate duplicate libraries (~250 MB)
+   ├─ Issue: Multiple versions of openssl, glib, and gtk
+   └─ Resolution: Add overlay to standardize versions
+     
+3. 🧹 Clean up unused dependencies (~200 MB)
+   ├─ kde-frameworks [only kdeconnect is used]
+   └─ texlive-full [only basic LaTeX commands used]
+
+📈 Expected Impact
+├─ Storage Saved: ~1.1 GB
+├─ Build Time Reduction: ~15%
+└─ Boot Time Improvement: ~8%
+```
+
+#### Generating Dependency Graphs
+
+```sh
+nixai deps graph
+```
+
+The `graph` subcommand generates visual representations of your dependency structure:
+
+- 📊 **Visualization**: Creates DOT or SVG graph of package relationships
+- 🔍 **Interactive Exploration**: Optional output for interactive graph viewers
+- 🎯 **Focused Views**: Generate graphs for specific packages or subsystems
+- 🎨 **Customizable Display**: Options for detail level and graph layout
+- 📁 **Import Maps**: Visualizes relationships between your configuration files
+
+**Example Output:**
+
+The command generates a dependency graph visualization and outputs:
+
+```
+📊 Dependency Graph Generated
+
+Generated Files:
+├─ nixos-deps.dot - DOT format graph (for processing)
+└─ nixos-deps.svg - SVG visualization (for viewing)
+
+Graph Statistics:
+├─ Nodes: 248 packages
+├─ Edges: 1,047 relationships
+└─ Clusters: 12 major dependency groups
+
+To view the interactive graph:
+xdg-open nixos-deps.svg
+
+To generate a focused graph for a specific package:
+nixai deps graph --focus firefox
+```
+
+#### Integration with Other nixai Features
+
+The Dependency & Import Graph Analyzer integrates with other nixai features:
+
+- **Build Troubleshooter**: Provides dependency context for build failure analysis
+- **Package Repository Analysis**: Leverages dependency information for better Nix derivations
+- **System Health**: Incorporates dependency data in health reports
+- **Configuration Management**: Shows the impact of configuration changes on dependencies
 
 ---
 

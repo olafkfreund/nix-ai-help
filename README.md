@@ -12,11 +12,12 @@ See the full [nixai User Manual](docs/MANUAL.md) for comprehensive feature docum
 
 ### This is development code. Things may not work or are broken. I'm changing the code all the time. Don't expect something production ready
 
-## 🚀 What's New (May 2025)
+## 🚀 What's New (June 2025)
 
-- **🆕 Direct Question Assistant**: Ask questions instantly with `nixai "your question"` or `nixai --ask "question"` for immediate AI-powered NixOS help with documentation context.
+- **🔧 Enhanced Build Troubleshooter:** New `build` command with advanced build failure analysis, intelligent retry mechanisms, cache analysis, sandbox debugging, and performance profiling.
+- **🤖 Direct Question Assistant**: Ask questions instantly with `nixai "your question"` or `nixai --ask "question"` for immediate AI-powered NixOS help with documentation context.
 - **Config Path Awareness Everywhere:** All features now respect the NixOS config path, settable via `--nixos-path`, config file, or interactively. If unset or invalid, you'll get clear guidance on how to fix it.
-- **Automated Service Option Lookup:** When searching for services, nixai now lists all available options for a service using `nixos-option --find services.<name>`, not just the top-level enable flag.
+- **Automated Service Option Lookup:** When searching for services, nixai now lists all available options for a service using `nixos-option --find services.<n>`, not just the top-level enable flag.
 - **Enhanced Error Handling:** If your config path is missing or invalid, nixai will print actionable instructions for setting it (CLI flag, config, or interactive command).
 - **🏠 Home Manager vs NixOS Visual Distinction:** Smart detection automatically shows `🖥️ NixOS Option` or `🏠 Home Manager Option` headers with appropriate documentation sources.
 - **🆕 Dedicated Home Manager Command:** New `explain-home-option` command specifically for Home Manager configuration options.
@@ -534,6 +535,40 @@ All Markdown and HTML output from nixai is rendered as beautiful, colorized term
 
 ---
 
+## 🔧 Enhanced Build Troubleshooter
+
+```sh
+# Basic build with AI assistance
+nixai build .#mypackage
+
+# Deep analysis of build failures
+nixai build debug firefox
+
+# Intelligent retry with automated fixes
+nixai build retry
+
+# Cache miss analysis
+nixai build cache-miss
+
+# Sandbox debugging
+nixai build sandbox-debug
+
+# Build performance profiling
+nixai build profile --package vim
+```
+
+The Enhanced Build Troubleshooter provides comprehensive build failure analysis and resolution capabilities:
+
+- **🔍 Deep Analysis**: Pattern recognition for common failure types with detailed explanations
+- **🤖 Intelligent Retry**: Automated application of fixes for common issues with progress feedback
+- **📊 Cache Analysis**: Detailed analysis of cache hit/miss patterns with optimization recommendations
+- **🔐 Sandbox Debugging**: Resolve permission issues and sandbox environment problems
+- **⚡ Performance Profiling**: Identify build bottlenecks and optimization opportunities
+
+Each subcommand provides focused analysis and actionable recommendations, helping you resolve build failures faster and optimize your build process.
+
+---
+
 ## 🔌 Editor Integration
 
 nixai provides seamless integration with popular editors through the MCP (Model Context Protocol) server, enabling you to access NixOS documentation and AI assistance directly within your development environment.
@@ -993,6 +1028,35 @@ nixai package-repo https://github.com/user/rust-app --output ./derivations --nam
 - **AI Generation**: Creates complete, valid derivations with proper structure and metadata
 - **Validation**: Ensures generated derivations include all required attributes
 - **Git Integration**: Automatic source URL and commit information extraction
+
+### Dependency & Import Graph Analyzer
+
+```sh
+# Show dependency tree with AI insights
+nixai deps analyze
+
+# Explain why a package is installed
+nixai deps why firefox
+
+# Find and resolve conflicts
+nixai deps conflicts
+
+# Suggest dependency optimizations
+nixai deps optimize
+
+# Generate visual dependency graph
+nixai deps graph
+```
+
+The Dependency & Import Graph Analyzer provides comprehensive tools for visualizing and optimizing your NixOS configuration dependencies:
+
+- **🔍 Dependency Mapping**: Build comprehensive dependency graphs with insight into package relationships
+- **❓ Package Explanation**: Get clear explanations of why specific packages are installed in your system
+- **🚫 Conflict Detection**: Identify and resolve package conflicts and overlapping dependencies
+- **⚡ Optimization Analysis**: Find opportunities to streamline your dependency tree for better performance
+- **📊 Visual Graphs**: Generate visual dependency graphs for better understanding of your system
+
+This feature is particularly useful for debugging complex dependency issues, optimizing system performance, and understanding the relationships between packages in your NixOS configuration.
 
 ### Configuration Templates & Snippets
 
