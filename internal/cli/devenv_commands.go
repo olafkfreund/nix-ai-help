@@ -58,7 +58,7 @@ var devenvListCmd = &cobra.Command{
 		case "ollama":
 			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
 		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
+			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		default:
@@ -160,7 +160,7 @@ Examples:
 		case "ollama":
 			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
 		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
+			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		default:
@@ -264,7 +264,7 @@ Examples:
 		case "ollama":
 			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
 		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent")
+			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		default:
