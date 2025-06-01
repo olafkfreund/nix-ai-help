@@ -2,6 +2,8 @@
 
 This directory contains NixOS and Home Manager modules for integrating nixai into your configuration.
 
+> **Note**: Home Manager integration has been recently fixed to resolve package reference issues. The module now properly handles the nixai package and creates a valid derivation fallback when needed.
+
 ## Using with Flakes
 
 If you're using Nix flakes, you can import the modules directly from the nixai flake:
