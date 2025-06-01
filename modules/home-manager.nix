@@ -1,4 +1,5 @@
 # Home Manager module for nixai
+{nixaiPackage ? null}: # Accept optional nixai package parameter
 {
   config,
   lib,
@@ -7,6 +8,30 @@
 }:
 with lib; let
   cfg = config.services.nixai;
+  
+  # Use provided package or try to find nixai in pkgs, fallback to placeholder
+  defaultNixaiPackage = 
+    if nixaiPackage != null 
+    then nixaiPackage
+    else if pkgs ? nixai 
+    then pkgs.nixai
+    else pkgs.stdenv.mkDerivation {
+      pname = "nixai-placeholder";
+      version = "0.0.0";
+      src = pkgs.writeText "placeholder" "";
+      dontUnpack = true;
+      installPhase = ''
+        mkdir -p $out/bin
+        cat > $out/bin/nixai << 'EOF'
+#!/bin/sh
+echo "nixai placeholder: Please install nixai package or build from flake"
+echo "Try: nix run github:username/nixai -- \"\$@\""
+exit 1
+EOF
+        chmod +x $out/bin/nixai
+      '';
+      meta.description = "Placeholder for nixai when package is not available";
+    };
 in {
   options.services.nixai = {
     enable = mkEnableOption "nixai service";
@@ -16,9 +41,9 @@ in {
 
       package = mkOption {
         type = types.package;
-        default = pkgs.writeShellScript "nixai-placeholder" "echo 'nixai binary from local build should be used'";
+        default = defaultNixaiPackage;
         defaultText = literalExpression "pkgs.nixai";
-        description = "The nixai package to use. Defaults to local build when nixai package is not available.";
+        description = "The nixai package to use. Defaults to a placeholder when nixai package is not available.";
       };
 
       socketPath = mkOption {

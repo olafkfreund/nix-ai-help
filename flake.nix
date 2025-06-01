@@ -60,8 +60,10 @@
     # NixOS module
     nixosModules.default = import ./modules/nixos.nix;
 
-    # Home Manager module
-    homeManagerModules.default = import ./modules/home-manager.nix;
+    # Home Manager module - pass the nixai package
+    homeManagerModules.default = import ./modules/home-manager.nix {
+      nixaiPackage = self.packages.${system}.nixai;
+    };
 
     # Legacy names for backward compatibility
     nixosModule = self.nixosModules.default;
