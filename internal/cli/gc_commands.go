@@ -610,8 +610,7 @@ func (gcm *GCManager) DisplayAnalysis(analysis *GCAnalysis, aiProvider ai.AIProv
 		fmt.Println(utils.FormatWarning("Could not get AI analysis: " + err.Error()))
 	} else {
 		fmt.Println(utils.FormatSubsection("🤖 AI Analysis & Recommendations", ""))
-		rendered := renderForTerminal(aiAnalysis)
-		fmt.Println(rendered)
+		fmt.Println(utils.RenderMarkdown(aiAnalysis))
 	}
 
 	fmt.Println()
@@ -636,8 +635,7 @@ func (gcm *GCManager) SafeCleanup(aiProvider ai.AIProvider, dryRun bool, keepGen
 
 	// Display AI recommendations
 	fmt.Println(utils.FormatSubsection("🤖 AI Safety Analysis", ""))
-	rendered := renderForTerminal(recommendations)
-	fmt.Println(rendered)
+	fmt.Println(utils.RenderMarkdown(recommendations))
 	fmt.Println()
 
 	// Perform cleanup operations
@@ -683,8 +681,7 @@ func (gcm *GCManager) CompareGenerations(aiProvider ai.AIProvider, keepCount int
 	}
 
 	fmt.Println(utils.FormatSubsection("🤖 AI Generation Analysis", ""))
-	rendered := renderForTerminal(analysis)
-	fmt.Println(rendered)
+	fmt.Println(utils.RenderMarkdown(analysis))
 
 	return nil
 }
@@ -731,8 +728,7 @@ func (gcm *GCManager) AnalyzeDiskUsage(aiProvider ai.AIProvider) error {
 	}
 
 	fmt.Println(utils.FormatSubsection("🤖 AI Optimization Recommendations", ""))
-	rendered := renderForTerminal(recommendations)
-	fmt.Println(rendered)
+	fmt.Println(utils.RenderMarkdown(recommendations))
 
 	return nil
 }

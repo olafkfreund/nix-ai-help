@@ -93,8 +93,7 @@ Focus on NixOS-specific configuration and provide actionable advice.`
 			fmt.Println(utils.FormatWarning("Could not get AI analysis: " + err.Error()))
 		} else {
 			fmt.Println(utils.FormatSubsection("🤖 AI Hardware Analysis", ""))
-			rendered := renderForTerminal(analysis)
-			fmt.Println(rendered)
+			fmt.Println(utils.RenderMarkdown(analysis))
 		}
 
 		fmt.Println()
@@ -127,7 +126,12 @@ This command provides:
 		}
 
 		// Initialize AI provider
-		aiProvider := initializeAIProvider()
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
+			cfg = &config.UserConfig{AIProvider: "ollama", AIModel: "llama3"}
+		}
+		aiProvider := initializeAIProvider(cfg)
 
 		// Get optimization recommendations
 		fmt.Println(utils.FormatProgress("Analyzing hardware for optimization opportunities..."))
@@ -168,8 +172,7 @@ Provide actual NixOS configuration snippets that can be applied.`
 		}
 
 		fmt.Println(utils.FormatSubsection("🔧 Optimization Recommendations", ""))
-		rendered := renderForTerminal(optimization)
-		fmt.Println(rendered)
+		fmt.Println(utils.RenderMarkdown(optimization))
 
 		fmt.Println()
 		if dryRun {
@@ -205,7 +208,12 @@ This command handles:
 		}
 
 		// Initialize AI provider
-		aiProvider := initializeAIProvider()
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
+			cfg = &config.UserConfig{AIProvider: "ollama", AIModel: "llama3"}
+		}
+		aiProvider := initializeAIProvider(cfg)
 
 		// Get driver configuration recommendations
 		fmt.Println(utils.FormatProgress("Analyzing hardware drivers and firmware..."))
@@ -251,8 +259,7 @@ Provide specific NixOS configuration examples with actual package names and opti
 		}
 
 		fmt.Println(utils.FormatSubsection("🛠️ Driver Configuration", ""))
-		rendered := renderForTerminal(drivers)
-		fmt.Println(rendered)
+		fmt.Println(utils.RenderMarkdown(drivers))
 
 		fmt.Println()
 		if autoInstall {
@@ -282,7 +289,12 @@ This command analyzes:
 		fmt.Println()
 
 		// Initialize AI provider
-		aiProvider := initializeAIProvider()
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
+			cfg = &config.UserConfig{AIProvider: "ollama", AIModel: "llama3"}
+		}
+		aiProvider := initializeAIProvider(cfg)
 
 		// Get comparison analysis
 		fmt.Println(utils.FormatProgress("Analyzing current configuration vs optimal settings..."))
@@ -322,8 +334,7 @@ Provide actionable recommendations with priority levels (high, medium, low).`
 		}
 
 		fmt.Println(utils.FormatSubsection("📊 Configuration Analysis", ""))
-		rendered := renderForTerminal(comparison)
-		fmt.Println(rendered)
+		fmt.Println(utils.RenderMarkdown(comparison))
 
 		fmt.Println()
 		fmt.Println(utils.FormatTip("Use 'nixai hardware optimize' to apply recommended changes"))
@@ -369,7 +380,12 @@ This command provides:
 		fmt.Println()
 
 		// Initialize AI provider
-		aiProvider := initializeAIProvider()
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
+			cfg = &config.UserConfig{AIProvider: "ollama", AIModel: "llama3"}
+		}
+		aiProvider := initializeAIProvider(cfg)
 
 		// Get laptop-specific recommendations
 		fmt.Println(utils.FormatProgress("Analyzing laptop hardware for optimization..."))
@@ -421,33 +437,13 @@ Provide actual NixOS configuration snippets optimized for %s mode.`, mode, mode,
 		}
 
 		fmt.Println(utils.FormatSubsection("⚙️ Laptop Configuration", ""))
-		rendered := renderForTerminal(laptop)
-		fmt.Println(rendered)
+		fmt.Println(utils.RenderMarkdown(laptop))
 
 		fmt.Println()
 		fmt.Println(utils.FormatTip("Test power settings with 'powertop' and 'tlp-stat'"))
 		fmt.Println(utils.FormatTip("Monitor temperatures with 'sensors' and 'htop'"))
 		fmt.Println(utils.FormatNote("Reboot after applying power management changes"))
 	},
-}
-
-// Helper function to initialize AI provider
-func initializeAIProvider() ai.AIProvider {
-	cfg, err := config.LoadUserConfig()
-	if err != nil {
-		return ai.NewOllamaProvider("llama3")
-	}
-
-	switch cfg.AIProvider {
-	case "ollama":
-		return ai.NewOllamaProvider(cfg.AIModel)
-	case "gemini":
-		return ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
-	case "openai":
-		return ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-	default:
-		return ai.NewOllamaProvider("llama3")
-	}
 }
 
 // Add commands to CLI in init function

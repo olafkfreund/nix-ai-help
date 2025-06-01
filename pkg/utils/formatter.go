@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -290,4 +291,27 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// RenderMarkdown renders markdown text for terminal display
+func RenderMarkdown(markdown string) string {
+	if markdown == "" {
+		return ""
+	}
+
+	renderer, err := glamour.NewTermRenderer(
+		glamour.WithAutoStyle(),
+		glamour.WithWordWrap(100),
+	)
+
+	if err != nil {
+		return markdown // fallback to original text on error
+	}
+
+	rendered, err := renderer.Render(markdown)
+	if err != nil {
+		return markdown // fallback to original text on error
+	}
+
+	return rendered
 }

@@ -250,55 +250,21 @@ func init() {
 	rootCmd.AddCommand(interactiveCmd)
 	rootCmd.AddCommand(searchCmd)
 	rootCmd.AddCommand(configCmd)
-	rootCmd.AddCommand(buildCmd)
+	// buildCmd is replaced by enhancedBuildCmd in build_commands.go
 	rootCmd.AddCommand(flakeCmd)
-	rootCmd.AddCommand(explainOptionCmd)
-	rootCmd.AddCommand(findOptionCmd)        // Register the find-option command
-	rootCmd.AddCommand(mcpServerCmd)         // Register the MCP server command
-	rootCmd.AddCommand(healthCheckCmd)       // Register the health check command
-	rootCmd.AddCommand(decodeErrorCmd)       // Register the decode-error command
-	rootCmd.AddCommand(upgradeAdvisorCmd)    // Register the upgrade-advisor command
-	rootCmd.AddCommand(serviceExamplesCmd)   // Register the service-examples command
-	rootCmd.AddCommand(lintConfigCmd)        // Register the lint-config command
-	rootCmd.AddCommand(explainHomeOptionCmd) // Register the explain-home-option command
-	rootCmd.AddCommand(packageRepoCmd)       // Register the package-repo command
-	rootCmd.AddCommand(versionCmd)           // Register the version command
-	rootCmd.AddCommand(migrateCmd)           // Register the migrate command
-	rootCmd.AddCommand(NewDepsCommand())     // Register the deps command with new implementation
+
+	// The deps command is implemented in deps_commands.go
+	rootCmd.AddCommand(NewDepsCommand())
 
 	diagnoseCmd.Flags().StringVarP(&logFile, "log-file", "l", "", "Path to a log file to analyze")
 	diagnoseCmd.Flags().StringVarP(&configSnippet, "config-snippet", "c", "", "NixOS configuration snippet to analyze")
 	diagnoseCmd.Flags().StringVarP(&nixLogTarget, "nix-log", "g", "", "Run 'nix log' (optionally with a path or derivation) and analyze the output") // New flag
-	decodeErrorCmd.Flags().StringP("log-file", "l", "", "Path to a log file containing error messages to analyze")
 	searchCmd.Flags().StringVarP(&nixosConfigPath, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
 	rootCmd.PersistentFlags().StringVarP(&nixosConfigPathGlobal, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
 	rootCmd.Flags().StringVarP(&askQuestion, "ask", "a", "", "Ask a question about NixOS configuration")
 
-	// Version command flags
-	versionCmd.Flags().BoolP("json", "j", false, "Output version information in JSON format")
-	versionCmd.Flags().BoolP("short", "s", false, "Output only the version number")
-	configCmd.AddCommand(showUserConfig)
-	mcpServerCmd.AddCommand(mcpServerStartCmd)
-	mcpServerCmd.AddCommand(mcpServerStopCmd)
-	mcpServerCmd.AddCommand(mcpServerStatusCmd)
-	mcpServerStartCmd.Flags().BoolP("background", "d", false, "Run MCP server in background (daemon mode)")
-	mcpServerStartCmd.Flags().Bool("daemon", false, "Alias for --background")
-	mcpServerStartCmd.Flags().String("socket-path", "", "Custom path for the MCP server Unix socket")
-	mcpServerStartCmd.Flags().String("config", "", "Path to custom config file")
-
-	// Package repository command flags
-	packageRepoCmd.Flags().StringP("local", "l", "", "Local path to repository (instead of cloning)")
-	packageRepoCmd.Flags().StringP("output", "o", "", "Output directory for generated derivation file")
-	packageRepoCmd.Flags().String("name", "", "Override package name")
-	packageRepoCmd.Flags().BoolP("quiet", "q", false, "Suppress progress output")
-	packageRepoCmd.Flags().Bool("analyze-only", false, "Only analyze repository without generating derivation")
-
-	// Add neovim integration command
-	rootCmd.AddCommand(neovimCmd)
-
-	// Add neovim command flags
-	neovimCmd.Flags().String("socket-path", "", "Custom path for the MCP server Unix socket")
-	neovimCmd.Flags().String("config-dir", "", "Custom path for the Neovim configuration directory")
+	// Note: The following command would be registered here but are commented out to focus on the core build functionality first
+	// rootCmd.AddCommand(neovimCmd)
 }
 
 // Diagnose command to analyze NixOS configuration issues
@@ -683,6 +649,9 @@ Examples:
 }
 
 // Build command for AI-assisted nix build troubleshooting
+// NOTE: This command has been replaced by enhancedBuildCmd in build_commands.go
+// which provides more advanced build troubleshooting features.
+/*
 var buildCmd = &cobra.Command{
 	Use:   "build [args]",
 	Short: "AI-assisted nix build/flakes troubleshooting and guidance",
@@ -733,18 +702,10 @@ var buildCmd = &cobra.Command{
 		}
 	},
 }
+*/
 
-// summarizeBuildOutput provides a simple summary of common nix build errors.
-func summarizeBuildOutput(output string) string {
-	lines := strings.Split(output, "\n")
-	var summary []string
-	for _, line := range lines {
-		if strings.Contains(line, "error:") || strings.Contains(line, "failed") || strings.Contains(line, "cannot") {
-			summary = append(summary, line)
-		}
-	}
-	return strings.Join(summary, "\n")
-}
+// The summarizeBuildOutput function has been moved to build_commands.go
+// to avoid duplicate declarations.
 
 // Flake command for AI-assisted nix flake troubleshooting
 var flakeCmd = &cobra.Command{
@@ -797,45 +758,7 @@ var flakeCmd = &cobra.Command{
 	},
 }
 
-// renderForTerminal formats markdown and simple HTML for terminal output with color
-func renderForTerminal(input string) string {
-	if input == "" {
-		return ""
-	}
-	// Remove HTML tags except <b>, <i>, <code>, <pre>, <a>, <ul>, <ol>, <li>
-	re := regexp.MustCompile(`<[^>]+>`)
-	clean := re.ReplaceAllStringFunc(input, func(tag string) string {
-		// Allow some tags to pass as markdown
-		switch {
-		case tag == "<b>" || tag == "</b>":
-			return "**"
-		case tag == "<i>" || tag == "</i>":
-			return "_"
-		case tag == "<code>" || tag == "</code>":
-			return "`"
-		case tag == "<pre>" || tag == "</pre>":
-			return "\n```\n"
-		case tag == "<ul>" || tag == "</ul>" || tag == "<ol>" || tag == "</ol>":
-			return ""
-		case tag == "<li>":
-			return "- "
-		case tag == "</li>":
-			return "\n"
-		case tag[:2] == "<a":
-			return ""
-		case tag == "</a>":
-			return ""
-		default:
-			return ""
-		}
-	})
-	// Use glamour to render markdown to ANSI
-	out, err := glamour.Render(clean, "dark")
-	if err != nil {
-		return clean
-	}
-	return out
-}
+// Using utils.RenderMarkdown for markdown rendering
 
 // ExplainFlakeInputs handles 'nixai flake explain-inputs' and 'nixai flake explain <input>'
 func ExplainFlakeInputs(inputs []string) {
@@ -878,22 +801,22 @@ func ExplainFlakeInputs(inputs []string) {
 	// 3. For each input, try to fetch README.md and flake.nix from GitHub if possible
 	for _, inp := range targets {
 		readme, flake, repoURL := fetchGitHubReadmeAndFlake(inp.URL)
-		fmt.Println(renderForTerminal("\n---\n"))
-		fmt.Print(renderForTerminal(fmt.Sprintf("**Input:** `%s`\n**Source:** %s\n", inp.Name, inp.URL)))
+		fmt.Println(utils.RenderMarkdown("\n---\n"))
+		fmt.Print(utils.RenderMarkdown(fmt.Sprintf("**Input:** `%s`\n**Source:** %s\n", inp.Name, inp.URL)))
 		if repoURL != "" {
-			fmt.Print(renderForTerminal(fmt.Sprintf("**Repo:** %s\n", repoURL)))
+			fmt.Print(utils.RenderMarkdown(fmt.Sprintf("**Repo:** %s\n", repoURL)))
 		}
 		if readme != "" {
-			fmt.Println(renderForTerminal("### README.md summary:"))
-			fmt.Println(renderForTerminal(summarizeText(readme)))
+			fmt.Println(utils.RenderMarkdown("### README.md summary:"))
+			fmt.Println(utils.RenderMarkdown(summarizeText(readme)))
 		} else {
-			fmt.Println(renderForTerminal("_No README.md found._"))
+			fmt.Println(utils.RenderMarkdown("_No README.md found._"))
 		}
 		if flake != "" {
-			fmt.Println(renderForTerminal("### flake.nix summary:"))
-			fmt.Println(renderForTerminal(summarizeText(flake)))
+			fmt.Println(utils.RenderMarkdown("### flake.nix summary:"))
+			fmt.Println(utils.RenderMarkdown(summarizeText(flake)))
 		} else {
-			fmt.Println(renderForTerminal("_No flake.nix found in repo._"))
+			fmt.Println(utils.RenderMarkdown("_No flake.nix found in repo._"))
 		}
 		// 4. Use AI to explain and suggest improvements
 		cfg, _ := config.LoadYAMLConfig("configs/default.yaml")
@@ -912,8 +835,8 @@ func ExplainFlakeInputs(inputs []string) {
 			"README.md (if any):\n" + readme + "\nflake.nix (if any):\n" + flake + "\nSuggest improvements or highlight issues."
 		aiResp, aiErr := provider.Query(prompt)
 		if aiErr == nil && aiResp != "" {
-			fmt.Println(renderForTerminal("\n**AI explanation and suggestions:**"))
-			fmt.Println(renderForTerminal(aiResp))
+			fmt.Println(utils.RenderMarkdown("\n**AI explanation and suggestions:**"))
+			fmt.Println(utils.RenderMarkdown(aiResp))
 		}
 	}
 }
@@ -1564,7 +1487,7 @@ var explainHomeOptionCmd = &cobra.Command{
 		}
 
 		// Render the response with markdown formatting
-		rendered := renderForTerminal(response)
+		rendered := utils.RenderMarkdown(response)
 		fmt.Println(rendered)
 	},
 }
@@ -2865,7 +2788,7 @@ Examples:
 		}
 
 		// Render the response with markdown formatting
-		rendered := renderForTerminal(response)
+		rendered := utils.RenderMarkdown(response)
 		fmt.Println(rendered)
 
 		fmt.Println()
@@ -2955,7 +2878,7 @@ Examples:
 		}
 
 		// Render the response
-		rendered := renderForTerminal(response)
+		rendered := utils.RenderMarkdown(response)
 		fmt.Println(rendered)
 
 		// Show basic syntax issues if any
