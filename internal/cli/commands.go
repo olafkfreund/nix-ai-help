@@ -263,6 +263,7 @@ func init() {
 	rootCmd.AddCommand(explainHomeOptionCmd) // Register the explain-home-option command
 	rootCmd.AddCommand(packageRepoCmd)       // Register the package-repo command
 	rootCmd.AddCommand(versionCmd)           // Register the version command
+	rootCmd.AddCommand(migrateCmd)           // Register the migrate command
 
 	diagnoseCmd.Flags().StringVarP(&logFile, "log-file", "l", "", "Path to a log file to analyze")
 	diagnoseCmd.Flags().StringVarP(&configSnippet, "config-snippet", "c", "", "NixOS configuration snippet to analyze")

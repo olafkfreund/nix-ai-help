@@ -56,6 +56,7 @@ All other dependencies are managed by the Nix flake and justfile.
 - [🔧 NixOS Option Explainer](#-nixos-option-explainer)
 - [📦 AI-Powered Package Repository Analysis](#-ai-powered-package-repository-analysis)
 - [🔄 MCP Server Configuration & Autostart](#-mcp-server-configuration--autostart)
+- [🔄 Migration Assistant (Channels ↔ Flakes)](#-migration-assistant-channels--flakes)
 - [🎨 Terminal Output Formatting](#-terminal-output-formatting)
 - [🛠️ Installation & Usage](#%EF%B8%8F-installation--usage)
 - [📝 Commands & Usage](#-commands--usage)
@@ -273,6 +274,42 @@ If you're using flakes, you can import the modules directly:
 ```
 
 See [Autostart Options Documentation](docs/autostart-options.md) for more detailed examples and troubleshooting.
+
+---
+
+## 🔄 Migration Assistant (Channels ↔ Flakes)
+
+nixai includes a comprehensive migration assistant to help you convert your NixOS configuration between legacy channels and modern flakes, with safety checks, backup/rollback, and AI-powered guidance.
+
+**Key Features:**
+
+- Analyze your current setup and migration complexity
+- Step-by-step migration guide with best practices
+- Automatic backup and rollback procedures
+- Validation of migration success
+- AI-powered explanations and troubleshooting
+
+**Usage Examples:**
+
+```sh
+nixai migrate analyze --nixos-path /etc/nixos
+```
+
+```sh
+nixai migrate to-flakes --nixos-path /etc/nixos
+```
+
+- The assistant will walk you through the migration, create a backup, and validate the result.
+- All output is formatted with glamour for easy reading.
+- If anything goes wrong, you can roll back to your previous configuration.
+
+**Planned:**
+
+- `nixai migrate from-flakes` (convert back to channels)
+- `nixai migrate channel-upgrade` (safe channel upgrades)
+- `nixai migrate flake-inputs` (update/explain flake inputs)
+
+See the [User Manual](docs/MANUAL.md#migration-assistant) for full details and troubleshooting.
 
 ---
 

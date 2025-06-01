@@ -47,6 +47,7 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 - [Tips & Troubleshooting](#tips--troubleshooting)
 - [Development Environment (devenv) Feature](#development-environment-devenv-feature)
 - [Neovim + Home Manager Integration](#neovim--home-manager-integration)
+- [Migration Assistant](#migration-assistant)
 
 ---
 
@@ -89,6 +90,7 @@ nixai integrates with an MCP (Model Context Protocol) server to retrieve officia
 ```
 
 The MCP server queries official documentation sources including:
+
 - NixOS Wiki
 - Nix Manual
 - Nixpkgs Manual  
@@ -180,6 +182,7 @@ nixai explain-option services.nginx.enable
 ```
 
 **Example Output:**
+
 ```
 🖥️ NixOS Option: services.nginx.enable
 
@@ -205,6 +208,7 @@ nixai explain-home-option programs.git.enable
 ```
 
 **Example Output:**
+
 ```
 🏠 Home Manager Option: programs.git.enable
 
@@ -256,6 +260,7 @@ nixai search service postgresql
 Automatically analyze a project and generate a Nix derivation using AI. This feature leverages LLMs to detect the build system, analyze dependencies, and generate a working Nix expression for packaging your project. It works for Go, Python, Node.js, Rust, and more.
 
 ### What does it do?
+
 - Detects the language and build system (Go, Python, Node.js, Rust, etc.)
 - Analyzes dependencies and project structure
 - Generates a complete Nix derivation (e.g., `buildGoModule`, `buildPythonPackage`, `buildNpmPackage`, `buildRustPackage`)
@@ -268,6 +273,7 @@ Automatically analyze a project and generate a Nix derivation using AI. This fea
 - Provides AI explanations for packaging challenges and caveats
 
 ### How does it work?
+
 - nixai inspects the repository (local path or remote URL), detects the language(s), and parses manifest files (e.g., go.mod, package.json, pyproject.toml, Cargo.toml).
 - It queries the selected AI provider, using context from official NixOS documentation, to generate a best-practice Nix derivation.
 - The tool can explain why certain packaging choices were made, and highlight any potential issues or manual steps required.
@@ -275,10 +281,13 @@ Automatically analyze a project and generate a Nix derivation using AI. This fea
 ### Real Life Examples
 
 **1. Package a local Go project:**
+
 ```sh
 nixai package-repo . --local
 ```
+
 _Output:_
+
 ```
 Detected Go project (go.mod found)
 Analyzing dependencies...
@@ -287,10 +296,13 @@ Saved to ./default.nix
 ```
 
 **2. Package a remote Python repository:**
+
 ```sh
 nixai package-repo https://github.com/psf/requests
 ```
+
 _Output:_
+
 ```
 Detected Python project (setup.py found)
 Analyzing pip dependencies...
@@ -299,10 +311,13 @@ Saved to ./requests.nix
 ```
 
 **3. Analyze a Node.js project and output to a custom directory:**
+
 ```sh
 nixai package-repo https://github.com/expressjs/express --output ./nixpkgs
 ```
+
 _Output:_
+
 ```
 Detected Node.js project (package.json found)
 Analyzing npm dependencies...
@@ -311,10 +326,13 @@ Saved to ./nixpkgs/express.nix
 ```
 
 **4. Analyze only, no derivation generation:**
+
 ```sh
 nixai package-repo . --analyze-only
 ```
+
 _Output:_
+
 ```
 Detected Rust project (Cargo.toml found)
 Crate dependencies: serde, tokio, clap
@@ -322,10 +340,13 @@ Project is ready for packaging. No derivation generated (analyze-only mode).
 ```
 
 **5. Advanced: Custom package name and output:**
+
 ```sh
 nixai package-repo https://github.com/user/rust-app --output ./derivations --name my-rust-app
 ```
+
 _Output:_
+
 ```
 Detected Rust project (Cargo.toml found)
 Analyzing dependencies...
@@ -334,10 +355,13 @@ Saved to ./derivations/my-rust-app.nix
 ```
 
 **6. Multi-language monorepo:**
+
 ```sh
 nixai package-repo https://github.com/user/monorepo
 ```
+
 _Output:_
+
 ```
 Detected multiple projects: Go (api/), Node.js (web/), Python (scripts/)
 Generated Nix derivations for each subproject
@@ -345,10 +369,13 @@ Saved to ./monorepo-api.nix, ./monorepo-web.nix, ./monorepo-scripts.nix
 ```
 
 **7. Private repository (with authentication):**
+
 ```sh
 nixai package-repo git@github.com:yourorg/private-repo.git --ssh-key ~/.ssh/id_ed25519
 ```
+
 _Output:_
+
 ```
 Detected Go project (go.mod found)
 Analyzing dependencies...
@@ -357,10 +384,13 @@ Saved to ./private-repo.nix
 ```
 
 **8. Custom build system (Makefile, CMake, etc.):**
+
 ```sh
 nixai package-repo . --analyze-only
 ```
+
 _Output:_
+
 ```
 Detected C project (Makefile found)
 AI Suggestion: Use stdenv.mkDerivation with custom buildPhase and installPhase
@@ -368,10 +398,13 @@ Manual review recommended for non-standard build systems.
 ```
 
 **9. Output as JSON for CI/CD integration:**
+
 ```sh
 nixai package-repo . --output-format json
 ```
+
 _Output:_
+
 ```
 {
   "project": "myapp",
@@ -382,12 +415,14 @@ _Output:_
 ```
 
 ### What kind of output can I expect?
+
 - A ready-to-use Nix derivation file (e.g., `default.nix`, `myapp.nix`)
 - AI-generated explanations for any manual steps or caveats
 - Dependency analysis and best-practice suggestions
 - Optionally, JSON output for automation
 
 ### Best Practices & Troubleshooting
+
 - For best results, ensure your project has a standard manifest (go.mod, package.json, pyproject.toml, etc.)
 - For private repos, use `--ssh-key` or ensure your SSH agent is running
 - If the generated derivation fails to build, review the AI explanation and check for missing dependencies or custom build steps
@@ -397,6 +432,7 @@ _Output:_
 - Always review the generated Nix code before using in production
 
 ### How does this help NixOS users?
+
 - Saves hours of manual packaging work
 - Handles complex dependency trees automatically
 - Ensures best practices for Nix packaging
@@ -693,25 +729,33 @@ nixai interactive
 ```
 
 In interactive mode, you can:
+
 - Run any command (diagnose, explain-option, search, etc.) in a conversational, guided way.
 - Use tab completion for commands and options.
 - Get instant feedback and suggestions for next steps.
 - Set or change your NixOS config path on the fly with:
+
   ```sh
   set-nixos-path /etc/nixos
   ```
+
 - Switch AI providers interactively:
+
   ```sh
   set ai openai
   set ai ollama llama3
   set ai gemini
   ```
+
 - View and update configuration settings:
+
   ```sh
   show-config
   set-log-level debug
   ```
+
 - Get help for any command:
+
   ```sh
   help explain-option
   help diagnose
@@ -720,6 +764,7 @@ In interactive mode, you can:
 ### Real Life Examples
 
 **Diagnose a log interactively:**
+
 ```
 > diagnose
 Paste or type your log, or use --log-file: /var/log/nixos/nixos-rebuild.log
@@ -727,12 +772,14 @@ Paste or type your log, or use --log-file: /var/log/nixos/nixos-rebuild.log
 ```
 
 **Explain a NixOS option:**
+
 ```
 > explain-option networking.firewall.enable
 [AI-powered explanation, best practices, and examples]
 ```
 
 **Search for a package and get config options:**
+
 ```
 > search pkg nginx
 [Numbered results]
@@ -741,18 +788,21 @@ Paste or type your log, or use --log-file: /var/log/nixos/nixos-rebuild.log
 ```
 
 **Switch provider and run a command:**
+
 ```
 > set ai gemini
 > explain-option services.openssh.enable
 ```
 
 **Get help and see available commands:**
+
 ```
 > help
 [Lists all available interactive commands]
 ```
 
 Interactive mode is ideal for:
+
 - New users who want a guided experience
 - Power users who want to chain commands and get instant feedback
 - Troubleshooting and exploring NixOS options, logs, and documentation in a conversational way
@@ -770,6 +820,7 @@ Complete VS Code integration with Copilot, Claude Dev, and other MCP-compatible 
 #### Quick Setup
 
 1. **Start the MCP server:**
+
 ```sh
 # Start the server in background mode
 nixai mcp-server start -d
@@ -845,6 +896,7 @@ nixai neovim-setup --config-dir=$HOME/.config/nvim
 ```
 
 This command:
+
 1. Creates a `nixai.lua` module in your Neovim configuration
 2. Provides instructions for adding it to your `init.lua` or `init.vim`
 3. Sets up keymaps for NixOS documentation lookup and option explanations
@@ -909,6 +961,7 @@ Both editors can be automatically configured through Home Manager:
   };
 }
 ```
+
     prompt_title = 'NixOS Query',
     finder = require('telescope.finders').new_dynamic({
       fn = function(prompt)
@@ -943,6 +996,7 @@ Both editors can be automatically configured through Home Manager:
 end
 
 vim.keymap.set('n', '<leader>nt', nixai_picker, {desc = 'Telescope NixOS Query'})
+
 ```
 
 #### Benefits of Neovim Integration
@@ -1092,16 +1146,20 @@ Based on comprehensive testing (May 2025), all three providers are fully functio
   - **Tested**: ✅ Working with llama3 model
   
 - **OpenAI**: Requires an OpenAI API key. Sign up at [OpenAI](https://platform.openai.com/). Set your API key as an environment variable:
+
   ```sh
   export OPENAI_API_KEY=sk-...
   ```
+
   - **Default Model**: Uses OpenAI's default GPT model
   - **Tested**: ✅ Working with environment variable configuration
   
 - **Gemini**: Requires a Gemini API key. Sign up at [Google AI Studio](https://ai.google.dev/). Set your API key as an environment variable:
+
   ```sh
   export GEMINI_API_KEY=your-gemini-key
   ```
+
   - **Current Model**: gemini-2.5-flash-preview-05-20 (updated from deprecated gemini-pro)
   - **Tested**: ✅ Working with updated API endpoints and model
 
@@ -1121,10 +1179,12 @@ nixai explain-option --provider gemini --model gemini-2.5-flash-preview-05-20 ne
 ```
 
 **Note:**
+
 - If using OpenAI or Gemini, the API key must be set in your environment or in the config file under `openai_api_key` or `gemini_api_key` (environment variable is preferred for security).
 - If no provider is set, Ollama is used by default for privacy.
 
-### Example config with API keys (not recommended, prefer env vars):
+### Example config with API keys (not recommended, prefer env vars)
+
 ```yaml
 ai_provider: openai
 ai_model: gpt-4
@@ -1250,5 +1310,72 @@ nixai now supports rapid creation of reproducible development environments for P
 
 - Run all tests: `go test ./internal/devenv/...`
 - Try creating projects with various options and check the generated `devenv.nix`
+
+---
+
+## 🔄 Migration Assistant
+
+nixai provides a robust migration assistant to help you safely convert your NixOS configuration between legacy channels and modern flakes. The migration assistant includes:
+
+**Features:**
+
+- Migration Analysis: Detects your current setup and analyzes migration complexity
+- Step-by-Step Guide: AI-generated migration steps with safety checks
+- Backup & Rollback: Automatic backup and rollback procedures
+- Validation: Comprehensive validation of migration success
+- Best Practices: Integration of flake best practices and optimizations
+
+### Usage
+
+**Analyze your current setup:**
+
+```sh
+nixai migrate analyze --nixos-path /etc/nixos
+```
+
+**Convert from channels to flakes:**
+
+```sh
+nixai migrate to-flakes --nixos-path /etc/nixos
+```
+
+- The assistant will walk you through the migration, create a backup, and validate the result.
+- All output is formatted with glamour for easy reading.
+- If anything goes wrong, you can roll back to your previous configuration.
+
+### Best Practices & Safety
+
+- Always review the migration analysis before proceeding
+- Backups are created automatically and can be restored if needed
+- All changes are validated before finalizing the migration
+
+### Example Workflow
+
+1. Analyze:
+
+   ```sh
+   nixai migrate analyze --nixos-path /etc/nixos
+   ```
+
+2. Migrate:
+
+   ```sh
+   nixai migrate to-flakes --nixos-path /etc/nixos
+   ```
+
+3. Rollback (if needed):
+   - Follow the instructions provided by nixai to restore from backup
+
+### Planned Features
+
+- `nixai migrate from-flakes` (convert back to channels)
+- `nixai migrate channel-upgrade` (safe channel upgrades)
+- `nixai migrate flake-inputs` (update/explain flake inputs)
+
+### Troubleshooting
+
+- If migration fails, check the backup directory for your previous configuration
+- Review AI explanations for manual steps or caveats
+- For complex setups, consult the official NixOS documentation or ask direct questions with `nixai --ask`
 
 ---
