@@ -52,6 +52,7 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 - [Neovim + Home Manager Integration](#neovim--home-manager-integration)
 - [Migration Assistant](#migration-assistant)
 - [Flake Creation & Correction (`nixai flake create`)](#flake-creation--correction-nixai-flake-create)
+- [🩺 Doctor Command: System Diagnostics & Troubleshooting](#doctor-command-system-diagnostics--troubleshooting)
 
 ---
 
@@ -1844,7 +1845,6 @@ nixai machines health-check --all --detailed
 
 # Schedule regular health monitoring
 nixai machines health-monitor --schedule "*/15 * * * *" \
-  --critical-alert-webhook "https://ops.company.com/alerts"
 ```
 
 **Documentation and Option Explanation**:
@@ -3459,13 +3459,42 @@ For more details and advanced usage, see the [Neovim Integration](neovim-integra
 
 ---
 
-## 📝 Neovim + Home Manager Integration
+## 🩺 Doctor Command: System Diagnostics & Troubleshooting
 
-For a bulletproof, copy-pasteable Neovim setup with Home Manager, see the [Neovim Integration Guide](neovim-integration.md). It covers:
-- Minimal working config for `home-manager.nix`
-- LSP and plugin setup
-- Troubleshooting and health checks
-- Best practices for reproducible Neovim environments
+The `nixai doctor` command provides a comprehensive diagnostics report for your nixai setup, including:
+
+- **MCP Server Health**: Checks if the documentation server is running, healthy, and accessible (port/socket, process, /healthz endpoint)
+- **AI Provider Health**: Verifies connectivity and configuration for Ollama, OpenAI, and Gemini (API reachability, key presence/validity)
+- **Actionable Feedback**: Glamour-formatted output with clear next steps for resolving common issues
+
+### Usage Example
+
+```sh
+nixai doctor
+```
+
+**Example Output:**
+
+```text
+🩺 nixai Doctor: System Diagnostics
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MCP Server Diagnostics
+━━━━━━━━━━━━━━━━━━━━━━
+✅ MCP server is running and healthy on http://localhost:8081.
+✅ Port is open: localhost:8081
+✅ MCP server process is running (pgrep matched).
+
+AI Provider Diagnostics
+━━━━━━━━━━━━━━━━━━━━━━━
+✅ Ollama API reachable at http://localhost:11434
+✅ OpenAI API reachable (key valid).
+✅ Gemini API reachable (key valid).
+
+ℹ️  See the README or docs/MANUAL.md for troubleshooting steps and more details.
+```
+
+If any issues are detected, nixai doctor will provide warnings, errors, and actionable suggestions (e.g., how to start the MCP server, set API keys, or check service status).
 
 ---
 
