@@ -55,6 +55,7 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 - [🩺 Doctor Command: System Diagnostics & Troubleshooting](#doctor-command-system-diagnostics--troubleshooting)
 - [🆕 Store Management and System Backup](#store-management-and-system-backup)
 - [🏪 Nix Store Management and System State Backup](#nix-store-management-and-system-state-backup)
+- [🐚 Shell Integration: Always-On nixai Assistant](#shell-integration-always-on-nixai-assistant)
 
 ---
 
@@ -968,7 +969,6 @@ Analyzing dependencies...
 Generated Nix derivation using buildRustPackage
 Saved to ./derivations/my-rust-app.nix
 ```
-
 **6. Multi-language monorepo:**
 
 ```sh

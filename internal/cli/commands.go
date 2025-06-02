@@ -282,7 +282,7 @@ func init() {
 	rootCmd.Flags().StringVarP(&askQuestion, "ask", "a", "", "Ask a question about NixOS configuration")
 
 	// Note: The following command would be registered here but are commented out to focus on the core build functionality first
-	// rootCmd.AddCommand(neovimCmd)
+	rootCmd.AddCommand(neovimCmd)
 
 	// --- Learning & Onboarding System Commands ---
 	rootCmd.AddCommand(learnCmd)

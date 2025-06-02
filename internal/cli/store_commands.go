@@ -105,5 +105,4 @@ func init() {
 	storeCmd.AddCommand(storeIntegrityCmd)
 	storeCmd.AddCommand(storePerformanceCmd)
 	storeBackupCmd.Flags().StringP("output", "o", "", "Output file for backup archive")
-	rootCmd.AddCommand(storeCmd)
 }

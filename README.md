@@ -83,6 +83,7 @@ All other dependencies are managed by the Nix flake and justfile.
 - [📄 License](#-license)
 - [🙏 Acknowledgments](#-acknowledgments)
 - [📸 Screenshots](#-screenshots)
+- [🐚 Shell Integration: Always-On nixai Assistant](#-shell-integration-always-on-nixai-assistant)
 
 ---
 
@@ -1854,4 +1855,131 @@ Below are example screenshots of `nixai` in action:
 
 ---
 
-> _nixai: Your AI-powered NixOS assistant, right in your terminal._
+## 🐚 Shell Integration: Always-On nixai Assistant
+
+You can integrate `nixai` into your shell for real-time help, error decoding, and system monitoring. Below are recommended setups for **zsh**, **bash**, **fish**, and **nushell**.
+
+---
+
+## 1. Quick Access Alias
+
+Add to your shell config for instant access:
+
+### zsh / bash
+```sh
+alias nxai='nixai'
+```
+
+### fish
+```fish
+alias nxai 'nixai'
+```
+
+### nushell
+```nu
+alias nxai = nixai $args
+```
+
+---
+
+## 2. Automatic Error Decoding
+
+### zsh
+Add to your `.zshrc`:
+```sh
+function TRAPERR() {
+  nixai decode-error "$BASH_COMMAND failed with exit code $?"
+}
+setopt ERR_EXIT
+trap TRAPERR ERR
+```
+
+### bash
+Add to your `.bashrc`:
+```sh
+nixai_on_error() {
+  local status=$?
+  if [[ $status -ne 0 && -n "$BASH_COMMAND" ]]; then
+    nixai decode-error "$BASH_COMMAND failed with exit code $status"
+  fi
+}
+trap nixai_on_error ERR
+```
+
+### fish
+Add to your `config.fish`:
+```fish
+function fish_postexec --on-event fish_postexec
+  if test $status -ne 0
+    nixai decode-error (history --max=1 | string trim)
+  end
+end
+```
+
+### nushell
+Add to your `config.nu`:
+```nu
+after-execution = { |cmd, exit_code|
+  if $exit_code != 0 {
+    nixai decode-error $"($cmd) failed with exit code ($exit_code)"
+  }
+}
+```
+
+---
+
+## 3. Real-Time Log & Resource Monitoring
+
+### journalctl error decoding
+```sh
+journalctl -xef | nixai decode-error
+```
+
+### Store health monitoring (all shells)
+```sh
+nixai store health --watch
+```
+
+---
+
+## 4. Shell Completion
+
+### zsh
+```sh
+nixai completion zsh > ~/.nixai-completion.zsh
+echo "source ~/.nixai-completion.zsh" >> ~/.zshrc
+```
+
+### bash
+```sh
+nixai completion bash > ~/.nixai-completion.bash
+echo "source ~/.nixai-completion.bash" >> ~/.bashrc
+```
+
+### fish
+```sh
+nixai completion fish > ~/.config/fish/completions/nixai.fish
+```
+
+### nushell
+```sh
+nixai completion nu > ~/.config/nushell/scripts/nixai-completion.nu
+source ~/.config/nushell/scripts/nixai-completion.nu
+```
+
+---
+
+## 5. Usage Examples
+
+- **Decode last error automatically:**  
+  Just run any command; if it fails, `nixai` will explain the error.
+- **Pipe logs for analysis:**  
+  `journalctl -xef | nixai decode-error`
+- **Monitor Nix store health:**  
+  `nixai store health --watch`
+- **Tab-complete nixai commands:**  
+  Type `nixai <TAB>` for completions.
+
+---
+
+> See `docs/MANUAL.md` for more advanced integration and troubleshooting tips.
