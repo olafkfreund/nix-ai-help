@@ -13,6 +13,7 @@ import (
 	"nix-ai-help/internal/config"
 	"nix-ai-help/pkg/logger"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -363,6 +364,25 @@ func NewServerWithDebug(addr string, documentationSources []string) *Server {
 
 // NewServerFromConfig creates a new MCP server from a YAML config file.
 func NewServerFromConfig(configPath string) (*Server, error) {
+	// If configPath is empty, use default user config path
+	if configPath == "" {
+		configPath = os.ExpandEnv("$HOME/.config/nixai/config.yaml")
+	}
+
+	// If config file does not exist, create it from default
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		defaultConfigPath := "configs/default.yaml"
+		input, err := os.ReadFile(defaultConfigPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read default config: %w", err)
+		}
+		os.MkdirAll(filepath.Dir(configPath), 0o755)
+		err = os.WriteFile(configPath, input, 0o644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create user config: %w", err)
+		}
+	}
+
 	cfg, err := config.LoadYAMLConfig(configPath)
 	if err != nil {
 		return nil, err
