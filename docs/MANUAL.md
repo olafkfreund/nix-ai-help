@@ -53,6 +53,8 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 - [Migration Assistant](#migration-assistant)
 - [Flake Creation & Correction (`nixai flake create`)](#flake-creation--correction-nixai-flake-create)
 - [🩺 Doctor Command: System Diagnostics & Troubleshooting](#doctor-command-system-diagnostics--troubleshooting)
+- [🆕 Store Management and System Backup](#store-management-and-system-backup)
+- [🏪 Nix Store Management and System State Backup](#nix-store-management-and-system-state-backup)
 
 ---
 
@@ -3876,7 +3878,6 @@ The `conflicts` subcommand detects and helps resolve package conflicts:
 - 📋 **Comprehensive Report**: Details all conflicts with their sources
 - 🛠️ **Resolution Suggestions**: Provides specific fix recommendations for each conflict
 - 📈 **Priority Analysis**: Determines which conflicts are most critical to resolve
-- 📊 **Before/After Comparison**: Shows the impact of proposed resolutions
 
 **Example Output:**
 
@@ -4745,5 +4746,82 @@ nixai flake create . --fix --force
 ```
 
 The AI will review, correct, and optionally overwrite your flake.nix, providing a summary of changes and best practices.
+
+---
+
+## 🏪 Nix Store Management and System State Backup
+
+nixai provides robust tools for managing, backing up, restoring, and analyzing your Nix store and system state. These features are essential for disaster recovery, migration, and ongoing system health.
+
+### Store Command Overview
+
+- **Backup:** Create a compressed archive of your Nix store and configuration files.
+- **Restore:** Restore your Nix store and configuration from a backup archive.
+- **Integrity:** Verify the integrity of your Nix store and configuration files.
+- **Performance:** Analyze store performance and usage patterns.
+
+### Usage Examples
+
+```sh
+# Create a Nix store backup (default output file)
+nixai store backup
+
+# Create a Nix store backup with a custom output file
+nixai store backup --output my-backup.tar.gz
+
+# Restore the Nix store and configuration from a backup
+nixai store restore my-backup.tar.gz
+
+# Check the integrity of the Nix store and configuration
+nixai store integrity
+
+# Analyze Nix store performance and usage
+nixai store performance
+```
+
+**Example Output:**
+
+```text
+🗄️ Nix Store Backup
+━━━━━━━━━━━━━━━━━━━
+Creating backup...
+✔️ Backup created at: my-backup.tar.gz
+
+♻️ Nix Store Restore
+━━━━━━━━━━━━━━━━━━━━
+Restoring from backup: my-backup.tar.gz
+✔️ Restore completed from: my-backup.tar.gz
+
+🔍 Nix Store Integrity Check
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Checking store integrity...
+✔️ Store integrity check completed (no issues found).
+
+⚡ Nix Store Performance Analysis
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Analyzing store performance...
+✔️ Store performance analysis completed.
+```
+
+### Best Practices
+
+- Schedule regular backups and store them in a secure, offsite location.
+- Validate backups periodically using `nixai store integrity` and test restores.
+- Use performance analysis to identify and resolve store bottlenecks.
+- Integrate store management into your disaster recovery and migration workflows.
+
+### Integration with Disaster Recovery
+
+Combine store management commands with system state backup and multi-machine features for comprehensive disaster recovery:
+
+```sh
+# Create a full backup before major upgrades or deployments
+nixai store backup --output /backups/pre-upgrade-$(date +%Y%m%d).tar.gz
+
+# Restore after a failure or migration
+nixai store restore /backups/pre-upgrade-20250601.tar.gz
+```
+
+For advanced disaster recovery, see the [Disaster Recovery and Backup Management](#disaster-recovery-and-backup-management) section.
 
 ---
