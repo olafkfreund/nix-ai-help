@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -263,6 +264,9 @@ func init() {
 
 	// The migration command is implemented in migration_commands.go
 	rootCmd.AddCommand(migrateCmd)
+
+	// Doctor command for diagnostics
+	rootCmd.AddCommand(doctorCmd)
 
 	diagnoseCmd.Flags().StringVarP(&logFile, "log-file", "l", "", "Path to a log file to analyze")
 	diagnoseCmd.Flags().StringVarP(&configSnippet, "config-snippet", "c", "", "NixOS configuration snippet to analyze")
@@ -3867,3 +3871,120 @@ func handleConfigValidate(provider ai.AIProvider)               {}
 func handleConfigOptimize(provider ai.AIProvider)               {}
 func handleConfigBackup()                                       {}
 func handleConfigRestore(args []string)                         {}
+
+// doctorCmd runs diagnostics for MCP server and AI providers
+var doctorCmd = &cobra.Command{
+	Use:   "doctor",
+	Short: "Run diagnostics for MCP server and AI providers",
+	Long:  `Diagnose common issues with the MCP server and AI providers. Checks server status, port/socket, process, and AI provider health.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(utils.FormatHeader("🩺 nixai Doctor: System Diagnostics"))
+		fmt.Println(utils.FormatDivider())
+
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to load user config: " + err.Error()))
+			os.Exit(1)
+		}
+
+		// MCP server diagnostics
+		fmt.Println(utils.FormatHeader("MCP Server Diagnostics"))
+		mcpStatus := diagnoseMCPServer(cfg)
+		fmt.Println(mcpStatus)
+		fmt.Println(utils.FormatDivider())
+
+		// AI provider diagnostics
+		fmt.Println(utils.FormatHeader("AI Provider Diagnostics"))
+		aiStatus := diagnoseAIProviders(cfg)
+		fmt.Println(aiStatus)
+		fmt.Println(utils.FormatDivider())
+
+		fmt.Println(utils.FormatInfo("See the README or docs/MANUAL.md for troubleshooting steps and more details."))
+	},
+}
+
+// diagnoseMCPServer checks MCP server status, port/socket, and process
+func diagnoseMCPServer(cfg *config.UserConfig) string {
+	var out strings.Builder
+	mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
+	// 1. Check /healthz endpoint
+	client := http.Client{Timeout: 2 * time.Second}
+	resp, err := client.Get(mcpURL + "/healthz")
+	if err == nil && resp.StatusCode == 200 {
+		out.WriteString(utils.FormatSuccess("MCP server is running and healthy on " + mcpURL + "."))
+		resp.Body.Close()
+	} else {
+		out.WriteString(utils.FormatError("MCP server is NOT running or not healthy on " + mcpURL))
+		out.WriteString("\n")
+		out.WriteString(utils.FormatInfo("Try: nixai mcp-server start -d"))
+	}
+	// 2. Check if port is in use (TCP)
+	address := fmt.Sprintf("%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
+	conn, err := net.DialTimeout("tcp", address, 1*time.Second)
+	if err == nil {
+		out.WriteString("\n" + utils.FormatSuccess("Port is open: "+address))
+		conn.Close()
+	} else {
+		out.WriteString("\n" + utils.FormatWarning("Port is not open: "+address))
+	}
+	// 3. Check if process is running (pgrep)
+	cmd := exec.Command("pgrep", "-f", "nixai mcp-server")
+	if err := cmd.Run(); err == nil {
+		out.WriteString("\n" + utils.FormatSuccess("MCP server process is running (pgrep matched)."))
+	} else {
+		out.WriteString("\n" + utils.FormatWarning("MCP server process not found (pgrep did not match)."))
+	}
+	return out.String()
+}
+
+// diagnoseAIProviders checks Ollama, OpenAI, and Gemini health
+func diagnoseAIProviders(cfg *config.UserConfig) string {
+	var out strings.Builder
+	// Ollama
+	ollamaHost := os.Getenv("OLLAMA_HOST")
+	if ollamaHost == "" {
+		ollamaHost = "http://localhost:11434"
+	}
+	ollamaResp, err := http.Get(ollamaHost + "/api/version")
+	if err == nil && ollamaResp.StatusCode == 200 {
+		out.WriteString(utils.FormatSuccess("Ollama API reachable at " + ollamaHost))
+		ollamaResp.Body.Close()
+	} else {
+		out.WriteString(utils.FormatError("Ollama API not reachable at " + ollamaHost))
+		out.WriteString("\n")
+		out.WriteString(utils.FormatInfo("Is Ollama running? Try: ollama serve"))
+	}
+	// OpenAI
+	openaiKey := os.Getenv("OPENAI_API_KEY")
+	if openaiKey == "" {
+		out.WriteString("\n" + utils.FormatWarning("OPENAI_API_KEY not set in environment."))
+	} else {
+		req, _ := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", strings.NewReader(`{"model":"gpt-3.5-turbo","messages":[{"role":"user","content":"ping"}]}`))
+		req.Header.Set("Authorization", "Bearer "+openaiKey)
+		req.Header.Set("Content-Type", "application/json")
+		client := &http.Client{Timeout: 5 * time.Second}
+		resp, err := client.Do(req)
+		if err == nil && resp.StatusCode == 200 {
+			out.WriteString("\n" + utils.FormatSuccess("OpenAI API reachable (key valid)."))
+			resp.Body.Close()
+		} else {
+			out.WriteString("\n" + utils.FormatError("OpenAI API not reachable or key invalid."))
+		}
+	}
+	// Gemini
+	geminiKey := os.Getenv("GEMINI_API_KEY")
+	if geminiKey == "" {
+		out.WriteString("\n" + utils.FormatWarning("GEMINI_API_KEY not set in environment."))
+	} else {
+		geminiURL := "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=" + geminiKey
+		body := `{"contents":[{"parts":[{"text":"ping"}]}]}`
+		resp, err := http.Post(geminiURL, "application/json", strings.NewReader(body))
+		if err == nil && resp.StatusCode == 200 {
+			out.WriteString("\n" + utils.FormatSuccess("Gemini API reachable (key valid)."))
+			resp.Body.Close()
+		} else {
+			out.WriteString("\n" + utils.FormatError("Gemini API not reachable or key invalid."))
+		}
+	}
+	return out.String()
+}

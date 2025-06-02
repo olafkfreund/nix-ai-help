@@ -59,6 +59,7 @@ All other dependencies are managed by the Nix flake and justfile.
 
 - [🚀 Project Overview](#-project-overview)
 - [✨ Features](#-features)
+- [🩺 Doctor Command: System Diagnostics & Troubleshooting](#-doctor-command-system-diagnostics--troubleshooting)
 - [🆕 Development Environment (devenv) Integration](#-development-environment-devenv-integration)
 - [🧩 Flake Input Analysis & AI Explanations](#-flake-input-analysis--ai-explanations)
 - [🔧 NixOS Option Explainer](#-nixos-option-explainer)
@@ -70,6 +71,7 @@ All other dependencies are managed by the Nix flake and justfile.
 - [🛠️ Installation & Usage](#%EF%B8%8F-installation--usage)
 - [📚 Flake Integration Guide](#-flake-integration-guide)
 - [📝 Commands & Usage](#-commands--usage)
+- [🩺 Doctor Command: Diagnose MCP Server & AI Providers](#-doctor-command-diagnose-mcp-server--ai-providers)
 - [🗺️ Project Plan](#%EF%B8%8F-project-plan)
 - [Configuration](#configuration)
 - [Build & Test](#build--test)
@@ -139,6 +141,93 @@ nixai is designed for privacy, productivity, and beautiful terminal output. Whet
 - **NEW:** 📝 **Configuration Templates & Snippets** — Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
 
 - **NEW:** 🖥️ **Multi-Machine Configuration Manager** — Register, manage, group, and deploy NixOS configurations to multiple machines with a single CLI. Includes machine registry, group management, configuration sync, deployment, diff analysis, and status monitoring.
+
+---
+
+## 🩺 Doctor Command: System Diagnostics & Troubleshooting
+
+The `nixai doctor` command provides a comprehensive diagnostics report for your nixai setup, including:
+- **MCP Server Health**: Checks if the documentation server is running, healthy, and accessible (port/socket, process, /healthz endpoint)
+- **AI Provider Health**: Verifies connectivity and configuration for Ollama, OpenAI, and Gemini (API reachability, key presence/validity)
+- **Actionable Feedback**: Glamour-formatted output with clear next steps for resolving common issues
+
+### Usage Example
+
+```sh
+nixai doctor
+```
+
+**Example Output:**
+
+```
+🩺 nixai Doctor: System Diagnostics
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MCP Server Diagnostics
+━━━━━━━━━━━━━━━━━━━━━━
+✅ MCP server is running and healthy on http://localhost:8081.
+✅ Port is open: localhost:8081
+✅ MCP server process is running (pgrep matched).
+
+AI Provider Diagnostics
+━━━━━━━━━━━━━━━━━━━━━━━
+✅ Ollama API reachable at http://localhost:11434
+✅ OpenAI API reachable (key valid).
+✅ Gemini API reachable (key valid).
+
+ℹ️  See the README or docs/MANUAL.md for troubleshooting steps and more details.
+```
+
+If any issues are detected, nixai doctor will provide warnings, errors, and actionable suggestions (e.g., how to start the MCP server, set API keys, or check service status).
+
+---
+
+## 🩺 Doctor Command: Diagnose MCP Server & AI Providers
+
+The `nixai doctor` command provides a comprehensive diagnostic checkup for your nixai environment. It helps you quickly identify and resolve common setup and runtime problems with the MCP server and all supported AI providers (Ollama, OpenAI, Gemini).
+
+### What It Does
+- Checks if the MCP server is running, healthy, and accessible (including port/socket and process status)
+- Diagnoses connectivity and configuration for Ollama, OpenAI, and Gemini AI providers
+- Detects missing or invalid API keys, unreachable endpoints, and common misconfigurations
+- Provides actionable, glamour-formatted feedback and next steps for troubleshooting
+
+### Usage
+
+```zsh
+nixai doctor
+```
+
+**Example Output:**
+
+```
+🩺 nixai Doctor: System Diagnostics
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MCP Server Diagnostics
+━━━━━━━━━━━━━━━━━━━━━━
+✅ MCP server is running and healthy on http://localhost:8081.
+✅ Port is open: localhost:8081
+✅ MCP server process is running (pgrep matched).
+
+AI Provider Diagnostics
+━━━━━━━━━━━━━━━━━━━━━━━
+✅ Ollama API reachable at http://localhost:11434
+✅ OpenAI API reachable (key valid).
+✅ Gemini API reachable (key valid).
+
+ℹ️  See the README or docs/MANUAL.md for troubleshooting steps and more details.
+```
+
+### Troubleshooting
+- If any check fails, the output will include clear error or warning messages and suggested next steps (e.g., start the MCP server, set API keys, check network connectivity).
+- For MCP server issues, try restarting with `nixai mcp-server start -d` or check your configuration in `~/.config/nixai/config.yaml`.
+- For AI provider issues, ensure the relevant API keys are set in your environment and the endpoints are reachable.
+
+### When to Use
+- After installation or upgrade
+- When experiencing issues with documentation queries or AI-powered features
+- To verify your environment before troubleshooting more complex problems
 
 ---
 
