@@ -39,6 +39,30 @@ func getOllamaModel(configModel string) string {
 	return "llama3" // Default model
 }
 
+// loadConfigWithEmbeddedFallback loads config from user file, creates from embedded if needed
+func loadConfigWithEmbeddedFallback() (*config.YAMLConfig, error) {
+	// Try to ensure user config exists (from embedded default)
+	_, err := config.EnsureConfigFileFromEmbedded()
+	if err != nil {
+		// If that fails, use embedded config directly
+		return config.LoadEmbeddedYAMLConfig()
+	}
+
+	// Load from user config file
+	userConfigPath, err := config.ConfigFilePath()
+	if err != nil {
+		return config.LoadEmbeddedYAMLConfig()
+	}
+
+	cfg, err := config.LoadYAMLConfig(userConfigPath)
+	if err != nil {
+		// Fallback to embedded config if user config is corrupted
+		return config.LoadEmbeddedYAMLConfig()
+	}
+
+	return cfg, nil
+}
+
 // filterDocumentationContent filters out HTML tags, wiki navigation, and other unwanted content
 func filterDocumentationContent(content string) string {
 	lines := strings.Split(content, "\n")
@@ -804,7 +828,7 @@ Examples:
 				fmt.Println(problemSummary)
 			}
 			prompt := "I ran 'nix flake" + " " + strings.Join(args, " ") + "' and got this output:\n" + string(out) + "\nHow can I fix this flake or configuration problem?"
-			cfg, _ := config.LoadYAMLConfig("configs/default.yaml")
+			cfg, _ := loadConfigWithEmbeddedFallback()
 			var provider ai.AIProvider
 			switch cfg.AIProvider {
 			case "ollama":
@@ -1035,7 +1059,7 @@ func ExplainFlakeInputs(inputs []string) {
 			fmt.Println(utils.RenderMarkdown("_No flake.nix found in repo._"))
 		}
 		// 4. Use AI to explain and suggest improvements
-		cfg, _ := config.LoadYAMLConfig("configs/default.yaml")
+		cfg, _ := loadConfigWithEmbeddedFallback()
 		var provider ai.AIProvider
 		switch cfg.AIProvider {
 		case "ollama":
@@ -1242,9 +1266,12 @@ var mcpServerStartCmd = &cobra.Command{
 			background = true
 		}
 
-		// Use default config path if not specified
+		// Use user config path if not specified
 		if configPath == "" {
-			configPath = "configs/default.yaml"
+			userConfigPath, err := config.ConfigFilePath()
+			if err == nil {
+				configPath = userConfigPath
+			}
 		}
 
 		// Check if NIXAI_SOCKET_PATH environment variable is set
@@ -1267,7 +1294,10 @@ var mcpServerStartCmd = &cobra.Command{
 			if socketPath != "" {
 				startCmd += fmt.Sprintf(" --socket-path=\"%s\"", socketPath)
 			}
-			if configPath != "configs/default.yaml" {
+
+			// Only add config flag if it's not the default user config path
+			defaultUserPath, _ := config.ConfigFilePath()
+			if configPath != "" && configPath != defaultUserPath {
 				startCmd += fmt.Sprintf(" --config=\"%s\"", configPath)
 			}
 
@@ -1306,14 +1336,14 @@ var mcpServerStopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop the running MCP server",
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg, err := config.LoadYAMLConfig("configs/default.yaml")
+		userCfg, err := config.LoadUserConfig()
 		if err != nil {
-			fmt.Println(utils.FormatError("Failed to load config: " + err.Error()))
+			fmt.Println(utils.FormatError("Failed to load user config: " + err.Error()))
 			os.Exit(1)
 		}
 
 		fmt.Println(utils.FormatProgress("Stopping MCP server..."))
-		addr := fmt.Sprintf("http://%s:%d/shutdown", cfg.MCPServer.Host, cfg.MCPServer.Port)
+		addr := fmt.Sprintf("http://%s:%d/shutdown", userCfg.MCPServer.Host, userCfg.MCPServer.Port)
 		resp, err := http.Get(addr)
 		if err != nil {
 			fmt.Println(utils.FormatError("Failed to contact MCP server: " + err.Error()))
@@ -1336,14 +1366,14 @@ var mcpServerStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show MCP server status",
 	Run: func(cmd *cobra.Command, args []string) {
-		cfg, err := config.LoadYAMLConfig("configs/default.yaml")
+		userCfg, err := config.LoadUserConfig()
 		if err != nil {
-			fmt.Println(utils.FormatError("Failed to load config: " + err.Error()))
+			fmt.Println(utils.FormatError("Failed to load user config: " + err.Error()))
 			os.Exit(1)
 		}
 
 		fmt.Println(utils.FormatProgress("Checking MCP server status..."))
-		addr := fmt.Sprintf("http://%s:%d/healthz", cfg.MCPServer.Host, cfg.MCPServer.Port)
+		addr := fmt.Sprintf("http://%s:%d/healthz", userCfg.MCPServer.Host, userCfg.MCPServer.Port)
 		client := http.Client{Timeout: 2 * time.Second}
 		resp, err := client.Get(addr)
 		if err != nil {
@@ -1354,10 +1384,28 @@ var mcpServerStatusCmd = &cobra.Command{
 		defer resp.Body.Close()
 		body, _ := io.ReadAll(resp.Body)
 
-		if resp.StatusCode == 200 && strings.TrimSpace(string(body)) == "ok" {
-			fmt.Println(utils.FormatSuccess("MCP server is running"))
-			fmt.Println(utils.FormatKeyValue("Address", addr))
-			fmt.Println(utils.FormatKeyValue("Status", "Healthy"))
+		if resp.StatusCode == 200 {
+			// Try to parse JSON response
+			var healthResponse struct {
+				Status string `json:"status"`
+				Uptime string `json:"uptime"`
+			}
+
+			// Check if it's JSON format
+			if err := json.Unmarshal(body, &healthResponse); err == nil && healthResponse.Status == "ok" {
+				fmt.Println(utils.FormatSuccess("MCP server is running"))
+				fmt.Println(utils.FormatKeyValue("Address", addr))
+				fmt.Println(utils.FormatKeyValue("Status", "Healthy"))
+				fmt.Println(utils.FormatKeyValue("Uptime", healthResponse.Uptime))
+			} else if strings.TrimSpace(string(body)) == "ok" {
+				// Fallback for plain text "ok" response
+				fmt.Println(utils.FormatSuccess("MCP server is running"))
+				fmt.Println(utils.FormatKeyValue("Address", addr))
+				fmt.Println(utils.FormatKeyValue("Status", "Healthy"))
+			} else {
+				fmt.Println(utils.FormatWarning("MCP server is responding but not healthy"))
+				fmt.Println(utils.FormatKeyValue("Response", strings.TrimSpace(string(body))))
+			}
 		} else {
 			fmt.Println(utils.FormatWarning("MCP server is responding but not healthy"))
 			fmt.Println(utils.FormatKeyValue("Response", strings.TrimSpace(string(body))))

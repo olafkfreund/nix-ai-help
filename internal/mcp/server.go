@@ -12,7 +12,6 @@ import (
 	"nix-ai-help/internal/config"
 	"nix-ai-help/pkg/logger"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -375,37 +374,33 @@ func NewServerFromConfig(configPath string) (*Server, error) {
 		configPath = os.ExpandEnv("$HOME/.config/nixai/config.yaml")
 	}
 
-	// If config file does not exist, create it from default
+	// If config file does not exist, create it from embedded default config
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
-		defaultConfigPath := "configs/default.yaml"
-		input, err := os.ReadFile(defaultConfigPath)
+		// Use embedded config instead of reading from file system
+		_, err := config.EnsureConfigFileFromEmbedded()
 		if err != nil {
-			return nil, fmt.Errorf("failed to read default config: %w", err)
-		}
-		os.MkdirAll(filepath.Dir(configPath), 0o755)
-		err = os.WriteFile(configPath, input, 0o644)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create user config: %w", err)
+			return nil, fmt.Errorf("failed to create user config from embedded default: %w", err)
 		}
 	}
 
-	cfg, err := config.LoadYAMLConfig(configPath)
+	// Use LoadUserConfig instead of LoadYAMLConfig since user configs don't have the "default:" wrapper
+	userCfg, err := config.LoadUserConfig()
 	if err != nil {
 		return nil, err
 	}
-	addr := fmt.Sprintf("%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
+	addr := fmt.Sprintf("%s:%d", userCfg.MCPServer.Host, userCfg.MCPServer.Port)
 	socketPath := "/tmp/nixai-mcp.sock" // Default
-	if cfg.MCPServer.SocketPath != "" {
-		socketPath = cfg.MCPServer.SocketPath
+	if userCfg.MCPServer.SocketPath != "" {
+		socketPath = userCfg.MCPServer.SocketPath
 	}
 
 	srv := &Server{
 		addr:                 addr,
 		socketPath:           socketPath,
-		documentationSources: cfg.MCPServer.DocumentationSources,
-		logger:               logger.NewLoggerWithLevel(cfg.LogLevel),
-		debugLogging:         strings.ToLower(cfg.LogLevel) == "debug",
-		mcpServer:            &MCPServer{logger: *logger.NewLoggerWithLevel(cfg.LogLevel)},
+		documentationSources: userCfg.MCPServer.DocumentationSources,
+		logger:               logger.NewLoggerWithLevel(userCfg.LogLevel),
+		debugLogging:         strings.ToLower(userCfg.LogLevel) == "debug",
+		mcpServer:            &MCPServer{logger: *logger.NewLoggerWithLevel(userCfg.LogLevel)},
 		configPath:           configPath,
 	}
 
@@ -432,9 +427,9 @@ func (s *Server) watchConfig() {
 			}
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				s.logger.Info("Config file changed, reloading...")
-				cfg, err := config.LoadYAMLConfig(s.configPath)
+				userCfg, err := config.LoadUserConfig()
 				if err == nil {
-					s.documentationSources = cfg.MCPServer.DocumentationSources
+					s.documentationSources = userCfg.MCPServer.DocumentationSources
 					s.logger.Info("Reloaded documentation sources from config.")
 					// Optionally reload log level, etc.
 				} else {
