@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"nix-ai-help/internal/ai"
+	"nix-ai-help/internal/community"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/learning"
 	"nix-ai-help/internal/mcp"
@@ -280,6 +281,14 @@ func init() {
 	learnCmd.AddCommand(learnQuizCmd)
 	learnCmd.AddCommand(learnPathCmd)
 	learnCmd.AddCommand(learnProgressCmd)
+
+	// --- Community Integration Platform Commands ---
+	rootCmd.AddCommand(communityCmd)
+	communityCmd.AddCommand(communitySearchCmd)
+	communityCmd.AddCommand(communityShareCmd)
+	communityCmd.AddCommand(communityValidateCmd)
+	communityCmd.AddCommand(communityTrendsCmd)
+	communityCmd.AddCommand(communityRateCmd)
 }
 
 // Diagnose command to analyze NixOS configuration issues
@@ -2292,14 +2301,6 @@ Examples:
 		// Step 6: Service Status Check
 		fmt.Print("  • [6/7] Checking critical system services...")
 		fmt.Println(" ✓")
-
-		// Step 7: Time Estimation
-		fmt.Print("  • [7/7] Calculating upgrade time estimates...")
-		fmt.Println(" ✓")
-
-		// Display current system information
-		fmt.Println()
-		fmt.Println(utils.FormatHeader("📊 Current System Information"))
 		fmt.Printf("🔧 NixOS Version: %s\n", utils.AccentStyle.Render(upgradeInfo.CurrentVersion))
 		fmt.Printf("📡 Current Channel: %s\n", utils.AccentStyle.Render(upgradeInfo.CurrentChannel))
 		fmt.Printf("⏱️  Estimated Upgrade Time: %s\n", utils.AccentStyle.Render(upgradeInfo.EstimatedTime))
@@ -3235,7 +3236,7 @@ var learnAdvancedCmd = &cobra.Command{
 			Description: "Deepen your NixOS knowledge: flakes, overlays, custom modules, advanced debugging, and system optimization.",
 			Steps: []learning.Step{
 				{Title: "Nix Flakes", Instruction: "Flakes are a new way to package and distribute Nix-based projects. They provide reproducibility, versioning, and input/output management.", Example: "nix flake show github:NixOS/nixpkgs/nixos-unstable", Exercise: "Try running 'nix flake show' on a public flake."},
-					{Title: "Overlays", Instruction: "Overlays let you extend or override packages in nixpkgs. Useful for patching or customizing packages globally.", Example: "# overlays = [ (self: super: { mypkg = super.hello.override { name = \"myhello\"; }; }) ];", Exercise: "Add a simple overlay to your configuration.nix."},
+				{Title: "Overlays", Instruction: "Overlays let you extend or override packages in nixpkgs. Useful for patching or customizing packages globally.", Example: "# overlays = [ (self: super: { mypkg = super.hello.override { name = \"myhello\"; }; }) ];", Exercise: "Add a simple overlay to your configuration.nix."},
 				{Title: "Custom Modules", Instruction: "Write your own NixOS modules to encapsulate reusable configuration logic. Modules can define options, defaults, and merge logic.", Example: "# See docs for mkOption, mkIf, and config._module.args", Exercise: "Create a minimal custom module that sets a system option."},
 				{Title: "Debugging & Troubleshooting", Instruction: "Use 'nixos-rebuild build-vm', 'journalctl', and 'nixos-option' for advanced debugging. AI-powered error decoding is available via 'nixai decode-error'.", Example: "journalctl -xe\nnixos-option services.nginx.enable", Exercise: "Trigger and diagnose a service failure, then use 'nixai decode-error' to get help."},
 				{Title: "System Optimization", Instruction: "Profile and optimize your system using 'nix-store --gc', 'nix-store --query', and the nixai GC advisor.", Example: "nixai gc analyze\nnix-store --gc", Exercise: "Analyze your system's store usage and perform a safe cleanup."},
@@ -3370,6 +3371,345 @@ var learnProgressCmd = &cobra.Command{
 		}
 		fmt.Println(utils.FormatDivider())
 		fmt.Println(utils.FormatTip("Keep learning! Try 'nixai learn path <topic>' for a new challenge."))
+	},
+}
+
+// --- Community Integration Platform Commands ---
+
+var communityCmd = &cobra.Command{
+	Use:   "community",
+	Short: "Access community features for configuration sharing and best practices",
+	Long: `Access community features including configuration sharing, best practice validation,
+trend analysis, and quality ratings for NixOS configurations.
+
+Available commands:
+  search    - Search for community configurations and best practices
+  share     - Share your configuration with the community
+  validate  - Validate configuration against community best practices
+  trends    - View popular packages and trending configurations
+  rate      - Rate and review community configurations`,
+}
+
+var communitySearchCmd = &cobra.Command{
+	Use:   "search [query]",
+	Short: "Search for community configurations and best practices",
+	Long: `Search the community database for configurations, best practices, and solutions.
+You can search by keywords, package names, or specific use cases.
+
+Examples:
+  nixai community search "docker setup"
+  nixai community search "gaming configuration"
+  nixai community search nvidia`,
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to load configuration: " + err.Error()))
+			return
+		}
+
+		var query string
+		if len(args) > 0 {
+			query = strings.Join(args, " ")
+		} else {
+			fmt.Print("Enter search query: ")
+			fmt.Scanln(&query)
+		}
+
+		if query == "" {
+			fmt.Println(utils.FormatError("Search query cannot be empty"))
+			return
+		}
+
+		fmt.Println(utils.FormatHeader("🔍 Searching Community Configurations"))
+		fmt.Printf("Query: %s\n\n", query)
+
+		manager := community.NewManager(cfg)
+		results, err := manager.SearchConfigurations(query)
+		if err != nil {
+			fmt.Println(utils.FormatError("Search failed: " + err.Error()))
+			return
+		}
+
+		if len(results) == 0 {
+			fmt.Println("No configurations found matching your query.")
+			fmt.Println(utils.FormatTip("Try using different keywords or check the trends with 'nixai community trends'"))
+			return
+		}
+
+		for i, config := range results {
+			fmt.Printf("%d. **%s** (Rating: %.1f/5.0)\n", i+1, config.Name, config.Rating)
+			fmt.Printf("   Author: %s | Tags: %s\n", config.Author, strings.Join(config.Tags, ", "))
+			if config.Description != "" {
+				fmt.Printf("   %s\n", config.Description)
+			}
+			if config.URL != "" {
+				fmt.Printf("   🔗 %s\n", config.URL)
+			}
+			fmt.Println()
+		}
+
+		fmt.Println(utils.FormatTip("Use 'nixai community rate <config-name>' to rate configurations"))
+	},
+}
+
+var communityShareCmd = &cobra.Command{
+	Use:   "share [file]",
+	Short: "Share your configuration with the community",
+	Long: `Share your NixOS configuration with the community to help others learn
+and contribute to the knowledge base.
+
+Examples:
+  nixai community share configuration.nix
+  nixai community share /etc/nixos/configuration.nix
+  nixai community share    # Interactive mode`,
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to load configuration: " + err.Error()))
+			return
+		}
+
+		var configPath string
+		if len(args) > 0 {
+			configPath = args[0]
+		} else {
+			fmt.Print("Enter path to configuration file: ")
+			fmt.Scanln(&configPath)
+		}
+
+		if configPath == "" {
+			fmt.Println(utils.FormatError("Configuration file path cannot be empty"))
+			return
+		}
+
+		if !utils.IsFile(configPath) {
+			fmt.Println(utils.FormatError("Configuration file does not exist: " + configPath))
+			return
+		}
+
+		fmt.Println(utils.FormatHeader("📤 Sharing Configuration"))
+		fmt.Printf("File: %s\n\n", configPath)
+
+		// Get additional metadata
+		var name, description, tagsStr string
+		fmt.Print("Configuration name: ")
+		fmt.Scanln(&name)
+		fmt.Print("Description (optional): ")
+		fmt.Scanln(&description)
+		fmt.Print("Tags (comma-separated, optional): ")
+		fmt.Scanln(&tagsStr)
+
+		tags := utils.ParseTags(tagsStr)
+
+		manager := community.NewManager(cfg)
+		config := &community.Configuration{
+			Name:        name,
+			Description: description,
+			Tags:        tags,
+			FilePath:    configPath,
+		}
+
+		err = manager.ShareConfiguration(config)
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to share configuration: " + err.Error()))
+			return
+		}
+
+		fmt.Println(utils.FormatSuccess("✅ Configuration shared successfully!"))
+		fmt.Println(utils.FormatTip("Others can now find your configuration with 'nixai community search'"))
+	},
+}
+
+var communityValidateCmd = &cobra.Command{
+	Use:   "validate [file]",
+	Short: "Validate configuration against community best practices",
+	Long: `Validate your NixOS configuration against community best practices
+and get recommendations for improvements.
+
+Examples:
+  nixai community validate configuration.nix
+  nixai community validate /etc/nixos/configuration.nix
+  nixai community validate    # Interactive mode`,
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to load configuration: " + err.Error()))
+			return
+		}
+
+		var configPath string
+		if len(args) > 0 {
+			configPath = args[0]
+		} else {
+			fmt.Print("Enter path to configuration file: ")
+			fmt.Scanln(&configPath)
+		}
+
+		if configPath == "" {
+			fmt.Println(utils.FormatError("Configuration file path cannot be empty"))
+			return
+		}
+
+		if !utils.IsFile(configPath) {
+			fmt.Println(utils.FormatError("Configuration file does not exist: " + configPath))
+			return
+		}
+
+		fmt.Println(utils.FormatHeader("✅ Validating Configuration"))
+		fmt.Printf("File: %s\n\n", configPath)
+
+		manager := community.NewManager(cfg)
+		result, err := manager.ValidateConfiguration(configPath)
+		if err != nil {
+			fmt.Println(utils.FormatError("Validation failed: " + err.Error()))
+			return
+		}
+
+		// Display validation results
+		fmt.Printf("Overall Score: %.1f/10.0\n\n", result.Score)
+
+		if result.IsValid {
+			fmt.Println(utils.FormatSuccess("✅ Configuration follows community best practices!"))
+		} else {
+			fmt.Println(utils.FormatWarning("⚠️  Configuration has some issues"))
+		}
+
+		if len(result.Issues) > 0 {
+			fmt.Println("\n" + utils.FormatHeader("Issues Found:"))
+			for i, issue := range result.Issues {
+				severity := "INFO"
+				if strings.Contains(strings.ToLower(issue), "error") {
+					severity = "ERROR"
+				} else if strings.Contains(strings.ToLower(issue), "warning") {
+					severity = "WARNING"
+				}
+				fmt.Printf("%d. [%s] %s\n", i+1, severity, issue)
+			}
+		}
+
+		if len(result.Suggestions) > 0 {
+			fmt.Println("\n" + utils.FormatHeader("Suggestions:"))
+			for i, suggestion := range result.Suggestions {
+				fmt.Printf("%d. %s\n", i+1, suggestion)
+			}
+		}
+
+		fmt.Println("\n" + utils.FormatTip("Use 'nixai community trends' to see what's popular in the community"))
+	},
+}
+
+var communityTrendsCmd = &cobra.Command{
+	Use:   "trends",
+	Short: "View popular packages and trending configurations",
+	Long: `View trending packages, popular configurations, and community statistics
+to discover what the NixOS community is using.
+
+This command shows:
+- Most popular packages this month
+- Trending configurations
+- Community statistics and insights`,
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to load configuration: " + err.Error()))
+			return
+		}
+
+		fmt.Println(utils.FormatHeader("📈 Community Trends & Statistics"))
+
+		manager := community.NewManager(cfg)
+		trends, err := manager.GetTrends()
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to fetch trends: " + err.Error()))
+			return
+		}
+
+		// Popular packages
+		if len(trends.PopularPackages) > 0 {
+			fmt.Println(utils.FormatSubheader("🔥 Popular Packages This Month"))
+			for i, pkg := range trends.PopularPackages {
+				if i >= 10 { // Show top 10
+					break
+				}
+				fmt.Printf("%d. %s (%d downloads)\n", i+1, pkg.Name, pkg.Downloads)
+			}
+			fmt.Println()
+		}
+
+		// Trending configurations
+		if len(trends.TrendingConfigs) > 0 {
+			fmt.Println(utils.FormatSubheader("⭐ Trending Configurations"))
+			for i, config := range trends.TrendingConfigs {
+				if i >= 5 { // Show top 5
+					break
+				}
+				fmt.Printf("%d. **%s** (Rating: %.1f, Views: %d)\n",
+					i+1, config.Name, config.Rating, config.Views)
+				if config.Description != "" {
+					fmt.Printf("   %s\n", config.Description)
+				}
+			}
+			fmt.Println()
+		}
+
+		// Community stats
+		fmt.Println(utils.FormatSubheader("📊 Community Statistics"))
+		fmt.Printf("Total Configurations: %d\n", trends.TotalConfigurations)
+		fmt.Printf("Active Contributors: %d\n", trends.ActiveContributors)
+		fmt.Printf("Packages Tracked: %d\n", trends.PackagesTracked)
+		fmt.Printf("Last Updated: %s\n", trends.LastUpdated.Format("2006-01-02 15:04"))
+
+		fmt.Println("\n" + utils.FormatTip("Use 'nixai community search <package>' to find configurations using specific packages"))
+	},
+}
+
+var communityRateCmd = &cobra.Command{
+	Use:   "rate <config-name> <rating>",
+	Short: "Rate and review community configurations",
+	Long: `Rate community configurations to help others discover quality setups.
+Provide a rating from 1-5 and optionally add a review comment.
+
+Examples:
+  nixai community rate "gaming-setup" 5
+  nixai community rate "docker-config" 4`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if len(args) < 2 {
+			fmt.Println(utils.FormatError("Usage: nixai community rate <config-name> <rating>"))
+			fmt.Println("Rating should be between 1-5")
+			return
+		}
+
+		configName := args[0]
+		rating := utils.ParseFloat(args[1])
+		if rating < 1 || rating > 5 {
+			fmt.Println(utils.FormatError("Rating must be a number between 1 and 5"))
+			return
+		}
+
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to load configuration: " + err.Error()))
+			return
+		}
+
+		fmt.Println(utils.FormatHeader("⭐ Rating Configuration"))
+		fmt.Printf("Configuration: %s\n", configName)
+		fmt.Printf("Your Rating: %.1f/5.0\n\n", rating)
+
+		// Optional review comment
+		var comment string
+		fmt.Print("Add a review comment (optional): ")
+		fmt.Scanln(&comment)
+
+		manager := community.NewManager(cfg)
+		err = manager.RateConfiguration(configName, rating, comment)
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to submit rating: " + err.Error()))
+			return
+		}
+
+		fmt.Println(utils.FormatSuccess("✅ Rating submitted successfully!"))
+		fmt.Println(utils.FormatTip("Thank you for helping the community discover quality configurations"))
 	},
 }
 
