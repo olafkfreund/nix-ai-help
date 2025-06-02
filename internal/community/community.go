@@ -1,6 +1,7 @@
 package community
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -74,10 +75,11 @@ type ValidationResult struct {
 
 // Manager handles community integration functionality
 type Manager struct {
-	config       *config.UserConfig
-	cache        *CacheManager
-	githubClient *GitHubClient
-	logger       *logger.Logger
+	config          *config.UserConfig
+	cache           *CacheManager
+	githubClient    *GitHubClient
+	discourseClient *DiscourseClient
+	logger          *logger.Logger
 }
 
 // NewManager creates a new community manager instance
@@ -86,18 +88,33 @@ func NewManager(cfg *config.UserConfig) *Manager {
 	cache := NewCacheManager(cacheDir)
 
 	githubClient := NewGitHubClient("")
+
+	// Initialize Discourse client with environment variables or config values
+	discourseAPIKey := os.Getenv("DISCOURSE_API_KEY")
+	if discourseAPIKey == "" {
+		discourseAPIKey = cfg.Discourse.APIKey
+	}
+
+	discourseUsername := os.Getenv("DISCOURSE_USERNAME")
+	if discourseUsername == "" {
+		discourseUsername = cfg.Discourse.Username
+	}
+
+	discourseClient := NewDiscourseClient(cfg.Discourse.BaseURL, discourseAPIKey, discourseUsername)
+
 	log := logger.NewLoggerWithLevel(cfg.LogLevel)
 
 	return &Manager{
-		config:       cfg,
-		cache:        cache,
-		githubClient: githubClient,
-		logger:       log,
+		config:          cfg,
+		cache:           cache,
+		githubClient:    githubClient,
+		discourseClient: discourseClient,
+		logger:          log,
 	}
 }
 
 // SearchConfigurations searches for configurations based on query
-func (m *Manager) SearchConfigurations(query string) ([]Configuration, error) {
+func (m *Manager) SearchConfigurations(query string, limit int) ([]Configuration, error) {
 	m.logger.Info("Searching configurations for query: " + query)
 
 	// Check cache first
@@ -107,13 +124,25 @@ func (m *Manager) SearchConfigurations(query string) ([]Configuration, error) {
 		return cachedResults, nil
 	}
 
-	// Simulate search results (in real implementation, this would query external sources)
-	configs := m.generateMockConfigurations(query)
-
-	// Filter based on query
 	var results []Configuration
+
+	// Search Discourse if enabled
+	if m.config.Discourse.Enabled {
+		ctx := context.Background()
+		discourseResults, err := m.searchDiscourse(ctx, query)
+		if err != nil {
+			m.logger.Info("Discourse search failed: " + err.Error())
+		} else {
+			results = append(results, discourseResults...)
+		}
+	}
+
+	// Also get mock configurations (keeping existing functionality)
+	mockConfigs := m.generateMockConfigurations(query)
+
+	// Filter mock configs based on query
 	queryLower := strings.ToLower(query)
-	for _, config := range configs {
+	for _, config := range mockConfigs {
 		if m.matchesQuery(config, queryLower) {
 			results = append(results, config)
 		}
@@ -126,6 +155,48 @@ func (m *Manager) SearchConfigurations(query string) ([]Configuration, error) {
 
 	// Cache results
 	m.cache.Set(cacheKey, results, "search")
+
+	return results, nil
+}
+
+// SearchByCategory searches configurations within a specific category
+func (m *Manager) SearchByCategory(category string, query string, limit int) ([]Configuration, error) {
+	m.logger.Info(fmt.Sprintf("Searching in category '%s' for: %s", category, query))
+
+	// Check cache first
+	cacheKey := GetCacheKey("category_search", category+":"+query)
+	var cachedResults []Configuration
+	if found, err := m.cache.Get(cacheKey, &cachedResults); err == nil && found {
+		return cachedResults, nil
+	}
+
+	var results []Configuration
+
+	// Search Discourse if available and category is discourse-related
+	if m.discourseClient != nil && m.config.Discourse.Enabled {
+		if discourseResults, err := m.searchDiscourseByCategory(category, query, limit); err == nil {
+			results = append(results, discourseResults...)
+		} else {
+			m.logger.Warn("Failed to search Discourse by category: " + err.Error())
+		}
+	}
+
+	// Add mock results for demonstration
+	mockResults := m.generateMockCategoryResults(category, query, limit)
+	results = append(results, mockResults...)
+
+	// Sort by relevance
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].Rating > results[j].Rating
+	})
+
+	// Limit results
+	if len(results) > limit {
+		results = results[:limit]
+	}
+
+	// Cache results
+	m.cache.Set(cacheKey, results, "category_search")
 
 	return results, nil
 }
@@ -230,6 +301,13 @@ func (m *Manager) GetTrends() (*TrendData, error) {
 		LastUpdated:         time.Now(),
 	}
 
+	// Enhance with Discourse trending topics if available
+	if m.discourseClient != nil && m.config.Discourse.Enabled {
+		if err := m.enhanceTrendsWithDiscourse(trends); err != nil {
+			m.logger.Warn("Failed to fetch Discourse trends: " + err.Error())
+		}
+	}
+
 	// Cache trends
 	m.cache.Set(cacheKey, trends, "trends")
 
@@ -255,6 +333,118 @@ func (m *Manager) RateConfiguration(configName string, rating float64, comment s
 	m.cache.Set(cacheKey, ratingData, "rating")
 
 	return nil
+}
+
+// GetDiscourseStatus returns the status of Discourse integration
+func (m *Manager) GetDiscourseStatus() map[string]interface{} {
+	status := map[string]interface{}{
+		"enabled":       m.config.Discourse.Enabled,
+		"base_url":      m.config.Discourse.BaseURL,
+		"authenticated": m.config.Discourse.APIKey != "" && m.config.Discourse.Username != "",
+		"available":     false,
+		"last_error":    nil,
+	}
+
+	if m.discourseClient != nil && m.config.Discourse.Enabled {
+		// Test connection
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		_, err := m.discourseClient.GetCategories(ctx)
+		if err != nil {
+			status["last_error"] = err.Error()
+			m.logger.Warn("Discourse connection test failed: " + err.Error())
+		} else {
+			status["available"] = true
+		}
+	}
+
+	return status
+}
+
+// searchWithFallback performs search with fallback mechanisms
+func (m *Manager) searchWithFallback(query string, limit int) ([]Configuration, error) {
+	var allResults []Configuration
+	var lastError error
+
+	// Try Discourse search first if available
+	if m.discourseClient != nil && m.config.Discourse.Enabled {
+		ctx := context.Background()
+		searchResp, err := m.discourseClient.SearchPosts(ctx, query, limit)
+		if err == nil && searchResp != nil {
+			// Convert posts to configurations
+			for _, post := range searchResp.Posts {
+				config := Configuration{
+					ID:          fmt.Sprintf("discourse-post-%d", post.ID),
+					Name:        fmt.Sprintf("Post #%d in topic %s", post.PostNumber, post.TopicSlug),
+					Author:      post.Username,
+					Description: m.extractDescription(post.Cooked, 200),
+					Tags:        []string{"discourse", "community", "post"},
+					Rating:      3.5,
+					URL:         fmt.Sprintf("%s/t/%s/%d/%d", m.config.Discourse.BaseURL, post.TopicSlug, post.TopicID, post.PostNumber),
+					CreatedAt:   post.CreatedAt,
+					UpdatedAt:   post.UpdatedAt,
+					Language:    "markdown",
+				}
+				allResults = append(allResults, config)
+			}
+			m.logger.Info(fmt.Sprintf("Found %d results from Discourse", len(allResults)))
+		} else {
+			lastError = err
+			m.logger.Warn("Discourse search failed, falling back to mock data: " + err.Error())
+		}
+	}
+
+	// Always add mock results as fallback
+	mockResults := m.generateMockSearchResults(query, limit)
+	allResults = append(allResults, mockResults...)
+
+	// If we have no results and there was an error, return the error
+	if len(allResults) == 0 && lastError != nil {
+		return nil, fmt.Errorf("all search methods failed, last error: %w", lastError)
+	}
+
+	return allResults, nil
+}
+
+// generateMockSearchResults generates mock search results for fallback
+func (m *Manager) generateMockSearchResults(query string, limit int) []Configuration {
+	// Create mock configurations based on common NixOS topics
+	mockConfigs := []Configuration{
+		{
+			ID:          utils.GenerateID(),
+			Name:        "NixOS Configuration for " + query,
+			Author:      "community-contributor",
+			Description: fmt.Sprintf("Sample NixOS configuration related to %s", query),
+			Tags:        []string{"nixos", "configuration", strings.ToLower(query)},
+			Rating:      4.2,
+			Downloads:   150,
+			Views:       500,
+			URL:         "https://example.com/config/sample",
+			CreatedAt:   time.Now().AddDate(0, -1, 0),
+			UpdatedAt:   time.Now().AddDate(0, 0, -5),
+			Language:    "nix",
+		},
+		{
+			ID:          utils.GenerateID(),
+			Name:        "Advanced " + query + " Setup",
+			Author:      "nixos-expert",
+			Description: fmt.Sprintf("Advanced configuration and tips for %s", query),
+			Tags:        []string{"advanced", "tips", strings.ToLower(query)},
+			Rating:      4.7,
+			Downloads:   89,
+			Views:       320,
+			URL:         "https://example.com/config/advanced",
+			CreatedAt:   time.Now().AddDate(0, -2, 0),
+			UpdatedAt:   time.Now().AddDate(0, 0, -10),
+			Language:    "nix",
+		},
+	}
+
+	if len(mockConfigs) > limit {
+		return mockConfigs[:limit]
+	}
+	return mockConfigs
 }
 
 // Helper methods
@@ -306,6 +496,30 @@ func (m *Manager) generateMockConfigurations(query string) []Configuration {
 		},
 	}
 	return configs
+}
+
+func (m *Manager) generateMockCategoryResults(category string, query string, limit int) []Configuration {
+	// This would be replaced with real category-specific search logic
+	mockConfigs := []Configuration{
+		{
+			ID:          utils.GenerateID(),
+			Name:        fmt.Sprintf("%s Configuration for %s", strings.Title(category), query),
+			Author:      "community-user",
+			Description: fmt.Sprintf("Sample %s configuration matching %s", category, query),
+			Tags:        []string{category, "mock", "example"},
+			Rating:      4.2,
+			Downloads:   150,
+			Views:       500,
+			CreatedAt:   time.Now().AddDate(0, -1, 0),
+			UpdatedAt:   time.Now().AddDate(0, 0, -5),
+			Language:    "nix",
+		},
+	}
+
+	if len(mockConfigs) > limit {
+		return mockConfigs[:limit]
+	}
+	return mockConfigs
 }
 
 func (m *Manager) generateTrendingConfigurations() []Configuration {
@@ -372,4 +586,244 @@ func (m *Manager) validateMaintainability(content string, result *ValidationResu
 		result.Issues = append(result.Issues, "State version not specified")
 		result.Suggestions = append(result.Suggestions, "Add system.stateVersion = \"YY.MM\" for your NixOS version")
 	}
+}
+
+// enhanceTrendsWithDiscourse enhances trend data with Discourse popular topics
+func (m *Manager) enhanceTrendsWithDiscourse(trends *TrendData) error {
+	ctx := context.Background()
+
+	// Get top topics from Discourse (weekly period)
+	topTopicsResp, err := m.discourseClient.GetTopTopics(ctx, "weekly", 10)
+	if err != nil {
+		return fmt.Errorf("failed to get top topics: %w", err)
+	}
+
+	// Get latest topics for additional trending content
+	latestTopicsResp, err := m.discourseClient.GetLatestTopics(ctx, 5)
+	if err != nil {
+		m.logger.Warn("Failed to get latest topics: " + err.Error())
+	}
+
+	// Combine topics from both responses
+	allTopics := make([]DiscourseTopic, 0)
+	if topTopicsResp != nil {
+		allTopics = append(allTopics, topTopicsResp.TopicList.Topics...)
+	}
+	if latestTopicsResp != nil {
+		allTopics = append(allTopics, latestTopicsResp.TopicList.Topics...)
+	}
+
+	// Convert topics to configurations
+	discourseConfigs := make([]Configuration, 0, len(allTopics))
+
+	for _, topic := range allTopics {
+		// Get category name - we'll need to fetch this separately or use ID
+		categoryName := fmt.Sprintf("category-%d", topic.CategoryID)
+
+		config := Configuration{
+			ID:          fmt.Sprintf("discourse-%d", topic.ID),
+			Name:        topic.Title,
+			Author:      "discourse-user", // Will be enhanced later with proper user lookup
+			Description: m.extractDescription(topic.Excerpt, 200),
+			Tags:        []string{"discourse", "community", categoryName},
+			Rating:      m.calculateTopicRating(topic),
+			Views:       topic.Views,
+			URL:         fmt.Sprintf("%s/t/%s/%d", m.config.Discourse.BaseURL, topic.Slug, topic.ID),
+			CreatedAt:   topic.CreatedAt,
+			UpdatedAt:   topic.LastPostedAt,
+			Language:    "markdown",
+		}
+
+		// Add any existing tags from the topic
+		if len(topic.Tags) > 0 {
+			config.Tags = append(config.Tags, topic.Tags...)
+		}
+
+		// Add common NixOS related tags
+		config.Tags = append(config.Tags, "nixos", "configuration")
+
+		discourseConfigs = append(discourseConfigs, config)
+	}
+
+	// Add top Discourse configurations to trending configs
+	// Sort by rating and add best ones
+	sort.Slice(discourseConfigs, func(i, j int) bool {
+		return discourseConfigs[i].Rating > discourseConfigs[j].Rating
+	})
+
+	// Add up to 5 top Discourse topics to trending configs
+	maxDiscourseConfigs := 5
+	if len(discourseConfigs) < maxDiscourseConfigs {
+		maxDiscourseConfigs = len(discourseConfigs)
+	}
+
+	if len(discourseConfigs) > 0 {
+		trends.TrendingConfigs = append(trends.TrendingConfigs, discourseConfigs[:maxDiscourseConfigs]...)
+	}
+
+	// Update statistics
+	trends.TotalConfigurations += len(discourseConfigs)
+
+	return nil
+}
+
+// searchDiscourse searches Discourse for relevant posts and topics
+func (m *Manager) searchDiscourse(ctx context.Context, query string) ([]Configuration, error) {
+	// Search Discourse posts
+	searchResults, err := m.discourseClient.SearchPosts(ctx, query, 10)
+	if err != nil {
+		return nil, fmt.Errorf("failed to search Discourse: %w", err)
+	}
+
+	var configs []Configuration
+	userMap := make(map[int]DiscourseUser)
+
+	// Build user map for easy lookup
+	for _, user := range searchResults.Users {
+		userMap[user.ID] = user
+	}
+
+	// Convert posts to configurations
+	for _, post := range searchResults.Posts {
+		if _, exists := userMap[post.UserID]; exists {
+			config := Configuration{
+				ID:          fmt.Sprintf("discourse_post_%d", post.ID),
+				Name:        fmt.Sprintf("Post: %s", post.TopicSlug),
+				Author:      post.Username,
+				Description: m.extractDescription(post.Cooked, 200),
+				Tags:        []string{"discourse", "community", "help"},
+				Rating:      4.0, // Default rating for Discourse posts
+				Downloads:   0,
+				Views:       0,
+				URL:         fmt.Sprintf("%s/t/%s/%d/%d", m.config.Discourse.BaseURL, post.TopicSlug, post.TopicID, post.PostNumber),
+				FilePath:    "",
+				Content:     post.Raw,
+				CreatedAt:   post.CreatedAt,
+				UpdatedAt:   post.UpdatedAt,
+				Size:        int64(len(post.Raw)),
+				Language:    "markdown",
+			}
+			configs = append(configs, config)
+		}
+	}
+
+	// Convert topics to configurations
+	for _, topic := range searchResults.Topics {
+		config := Configuration{
+			ID:          fmt.Sprintf("discourse_topic_%d", topic.ID),
+			Name:        topic.Title,
+			Author:      "", // Will be filled from first post
+			Description: topic.Excerpt,
+			Tags:        append([]string{"discourse", "community"}, topic.Tags...),
+			Rating:      m.calculateTopicRating(topic),
+			Downloads:   0,
+			Views:       topic.Views,
+			URL:         fmt.Sprintf("%s/t/%s/%d", m.config.Discourse.BaseURL, topic.Slug, topic.ID),
+			FilePath:    "",
+			Content:     "",
+			CreatedAt:   topic.CreatedAt,
+			UpdatedAt:   topic.LastPostedAt,
+			Size:        int64(topic.WordCount),
+			Language:    "markdown",
+		}
+		configs = append(configs, config)
+	}
+
+	return configs, nil
+}
+
+// searchDiscourseByCategory searches Discourse within a specific category
+func (m *Manager) searchDiscourseByCategory(category string, query string, limit int) ([]Configuration, error) {
+	ctx := context.Background()
+
+	// Map common category names to potential Discourse categories
+	categoryMap := map[string][]string{
+		"guides":      {"guides", "tutorials", "howto"},
+		"help":        {"help", "support", "troubleshooting"},
+		"development": {"development", "dev", "programming"},
+		"packages":    {"packages", "nixpkgs"},
+		"flakes":      {"flakes", "nix-flakes"},
+		"hardware":    {"hardware", "nixos-hardware"},
+	}
+
+	// Get category search terms
+	searchTerms, exists := categoryMap[strings.ToLower(category)]
+	if !exists {
+		searchTerms = []string{category}
+	}
+
+	var allResults []Configuration
+
+	// Search for each category term
+	for _, term := range searchTerms {
+		searchQuery := fmt.Sprintf("%s category:%s", query, term)
+		searchResp, err := m.discourseClient.SearchPosts(ctx, searchQuery, limit)
+		if err != nil {
+			continue // Skip failed searches
+		}
+
+		// Convert posts to configurations
+		for _, post := range searchResp.Posts {
+			config := Configuration{
+				ID:          fmt.Sprintf("discourse-post-%d", post.ID),
+				Name:        fmt.Sprintf("Post #%d in topic %s", post.PostNumber, post.TopicSlug),
+				Author:      post.Username,
+				Description: m.extractDescription(post.Cooked, 200),
+				Tags:        []string{"discourse", category, "post"},
+				Rating:      3.5, // Default rating for posts
+				URL:         fmt.Sprintf("%s/t/%s/%d/%d", m.config.Discourse.BaseURL, post.TopicSlug, post.TopicID, post.PostNumber),
+				CreatedAt:   post.CreatedAt,
+				UpdatedAt:   post.UpdatedAt,
+				Language:    "markdown",
+			}
+			allResults = append(allResults, config)
+		}
+	}
+
+	return allResults, nil
+}
+
+// extractDescription extracts a description from HTML content with a maximum length
+func (m *Manager) extractDescription(htmlContent string, maxLength int) string {
+	// Simple HTML tag removal (in production, use a proper HTML parser)
+	description := strings.ReplaceAll(htmlContent, "<p>", "")
+	description = strings.ReplaceAll(description, "</p>", " ")
+	description = strings.ReplaceAll(description, "<br>", " ")
+	description = strings.ReplaceAll(description, "<div>", "")
+	description = strings.ReplaceAll(description, "</div>", " ")
+
+	// Remove any remaining HTML tags
+	for strings.Contains(description, "<") && strings.Contains(description, ">") {
+		start := strings.Index(description, "<")
+		end := strings.Index(description[start:], ">")
+		if end == -1 {
+			break
+		}
+		description = description[:start] + description[start+end+1:]
+	}
+
+	// Trim whitespace and limit length
+	description = strings.TrimSpace(description)
+	if len(description) > maxLength {
+		description = description[:maxLength] + "..."
+	}
+
+	return description
+}
+
+// calculateTopicRating calculates a rating for a Discourse topic based on engagement
+func (m *Manager) calculateTopicRating(topic DiscourseTopic) float64 {
+	// Simple rating calculation based on likes, views, and posts
+	likesScore := float64(topic.LikeCount) * 0.1
+	viewsScore := float64(topic.Views) * 0.001
+	postsScore := float64(topic.PostsCount) * 0.05
+
+	rating := 3.0 + likesScore + viewsScore + postsScore
+
+	// Cap at 5.0
+	if rating > 5.0 {
+		rating = 5.0
+	}
+
+	return rating
 }

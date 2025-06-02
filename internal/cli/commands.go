@@ -323,6 +323,8 @@ func init() {
 	communityCmd.AddCommand(communityValidateCmd)
 	communityCmd.AddCommand(communityTrendsCmd)
 	communityCmd.AddCommand(communityRateCmd)
+	communityCmd.AddCommand(communityCategorySearchCmd)
+	communityCmd.AddCommand(communityDiscourseStatusCmd)
 
 	// --- MCP Server Management Commands ---
 	mcpServerCmd.AddCommand(mcpServerStartCmd)
@@ -3652,11 +3654,13 @@ var communityCmd = &cobra.Command{
 trend analysis, and quality ratings for NixOS configurations.
 
 Available commands:
-  search    - Search for community configurations and best practices
-  share     - Share your configuration with the community
-  validate  - Validate configuration against community best practices
-  trends    - View popular packages and trending configurations
-  rate      - Rate and review community configurations`,
+  search           - Search for community configurations and best practices
+  search-category  - Search within a specific category (guides, help, development, etc.)
+  share            - Share your configuration with the community
+  validate         - Validate configuration against community best practices
+  trends           - View popular packages and trending configurations
+  rate             - Rate and review community configurations
+  discourse-status - Check Discourse forum integration status`,
 }
 
 var communitySearchCmd = &cobra.Command{
@@ -3693,7 +3697,7 @@ Examples:
 		fmt.Printf("Query: %s\n\n", query)
 
 		manager := community.NewManager(cfg)
-		results, err := manager.SearchConfigurations(query)
+		results, err := manager.SearchConfigurations(query, 20) // Default limit of 20
 		if err != nil {
 			fmt.Println(utils.FormatError("Search failed: " + err.Error()))
 			return
@@ -3982,6 +3986,135 @@ Examples:
 	},
 }
 
+var communityCategorySearchCmd = &cobra.Command{
+	Use:   "search-category <category> [query]",
+	Short: "Search for configurations within a specific category",
+	Long: `Search for community configurations within a specific category.
+Categories include: guides, help, development, packages, flakes, hardware.
+
+Examples:
+  nixai community search-category guides "docker setup"
+  nixai community search-category hardware nvidia
+  nixai community search-category packages firefox`,
+	Args: cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to load configuration: " + err.Error()))
+			return
+		}
+
+		category := args[0]
+		var query string
+		if len(args) > 1 {
+			query = strings.Join(args[1:], " ")
+		}
+
+		fmt.Println(utils.FormatHeader("🔍 Searching Category: " + category))
+		if query != "" {
+			fmt.Printf("Query: %s\n", query)
+		}
+		fmt.Println()
+
+		manager := community.NewManager(cfg)
+		results, err := manager.SearchByCategory(category, query, 20)
+		if err != nil {
+			fmt.Println(utils.FormatError("Category search failed: " + err.Error()))
+			return
+		}
+
+		if len(results) == 0 {
+			fmt.Printf("No configurations found in category '%s'", category)
+			if query != "" {
+				fmt.Printf(" matching '%s'", query)
+			}
+			fmt.Println()
+			fmt.Println(utils.FormatTip("Try a different category or search term"))
+			return
+		}
+
+		for i, config := range results {
+			fmt.Printf("%d. **%s** (Rating: %.1f/5.0)\n", i+1, config.Name, config.Rating)
+			fmt.Printf("   Author: %s | Category: %s\n", config.Author, category)
+			if len(config.Tags) > 0 {
+				fmt.Printf("   Tags: %s\n", strings.Join(config.Tags, ", "))
+			}
+			if config.Description != "" {
+				fmt.Printf("   %s\n", config.Description)
+			}
+			if config.URL != "" {
+				fmt.Printf("   🔗 %s\n", config.URL)
+			}
+			fmt.Println()
+		}
+
+		fmt.Println(utils.FormatTip("Use 'nixai community rate <config-name>' to rate configurations"))
+	},
+}
+
+var communityDiscourseStatusCmd = &cobra.Command{
+	Use:   "discourse-status",
+	Short: "Check the status of Discourse integration",
+	Long: `Check the current status of Discourse forum integration including
+connectivity, authentication, and available features.
+
+This command shows:
+- Whether Discourse integration is enabled
+- Connection status and base URL
+- Authentication status
+- Last error (if any)`,
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to load configuration: " + err.Error()))
+			return
+		}
+
+		fmt.Println(utils.FormatHeader("💬 Discourse Integration Status"))
+
+		manager := community.NewManager(cfg)
+		status := manager.GetDiscourseStatus()
+
+		// Display status information
+		enabled := status["enabled"].(bool)
+		baseURL := status["base_url"].(string)
+		authenticated := status["authenticated"].(bool)
+		available := status["available"].(bool)
+
+		fmt.Printf("Status: %s\n", func() string {
+			if !enabled {
+				return utils.FormatWarning("❌ Disabled")
+			} else if available {
+				return utils.FormatSuccess("✅ Connected")
+			} else {
+				return utils.FormatError("❌ Connection Failed")
+			}
+		}())
+
+		fmt.Printf("Base URL: %s\n", baseURL)
+		fmt.Printf("Enabled: %v\n", enabled)
+		fmt.Printf("Authenticated: %v\n", authenticated)
+		fmt.Printf("Available: %v\n", available)
+
+		if lastError := status["last_error"]; lastError != nil {
+			fmt.Printf("Last Error: %s\n", utils.FormatError(lastError.(string)))
+		}
+
+		fmt.Println()
+
+		if !enabled {
+			fmt.Println(utils.FormatTip("Enable Discourse integration in your config to access community features"))
+			fmt.Println("Set discourse.enabled = true in your configuration")
+		} else if !authenticated {
+			fmt.Println(utils.FormatTip("Set DISCOURSE_API_KEY and DISCOURSE_USERNAME environment variables for full access"))
+		} else if !available {
+			fmt.Println(utils.FormatTip("Check your internet connection and Discourse server status"))
+		} else {
+			fmt.Println(utils.FormatTip("Discourse integration is working! Try 'nixai community search' to explore"))
+		}
+	},
+}
+
 // --- Minimal config handler stubs for build ---
 func handleConfigShow(provider ai.AIProvider)                   {}
 func handleConfigSet(args []string, provider ai.AIProvider)     {}
@@ -4041,7 +4174,7 @@ func diagnoseMCPServer(cfg *config.UserConfig) string {
 		out.WriteString(utils.FormatInfo("Try: nixai mcp-server start -d"))
 	}
 	// 2. Check if port is in use (TCP)
-	address := fmt.Sprintf("%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
+	address := net.JoinHostPort(cfg.MCPServer.Host, fmt.Sprintf("%d", cfg.MCPServer.Port))
 	conn, err := net.DialTimeout("tcp", address, 1*time.Second)
 	if err == nil {
 		out.WriteString("\n" + utils.FormatSuccess("Port is open: "+address))

@@ -59,6 +59,11 @@ const EmbeddedDefaultConfig = `default:
             golang:
                 enabled: true
                 default_version: "1.21"
+    discourse:
+        base_url: "https://discourse.nixos.org"
+        api_key: ""  # Optional: set via DISCOURSE_API_KEY environment variable
+        username: ""  # Optional: set via DISCOURSE_USERNAME environment variable
+        enabled: true
 `
 
 type Config struct {
@@ -109,6 +114,14 @@ type CustomAIConfig struct {
 	Headers map[string]string `yaml:"headers" json:"headers"`
 }
 
+// DiscourseConfig holds configuration for Discourse integration
+type DiscourseConfig struct {
+	BaseURL  string `yaml:"base_url" json:"base_url"`
+	APIKey   string `yaml:"api_key" json:"api_key"`
+	Username string `yaml:"username" json:"username"`
+	Enabled  bool   `yaml:"enabled" json:"enabled"`
+}
+
 type YAMLConfig struct {
 	AIProvider  string            `yaml:"ai_provider" json:"ai_provider"`
 	LogLevel    string            `yaml:"log_level" json:"log_level"`
@@ -118,6 +131,7 @@ type YAMLConfig struct {
 	Commands    CommandsConfig    `yaml:"commands" json:"commands"`
 	Devenv      DevenvConfig      `yaml:"devenv" json:"devenv"`
 	CustomAI    CustomAIConfig    `yaml:"custom_ai" json:"custom_ai"`
+	Discourse   DiscourseConfig   `yaml:"discourse" json:"discourse"`
 }
 
 type UserConfig struct {
@@ -131,6 +145,7 @@ type UserConfig struct {
 	Commands    CommandsConfig    `yaml:"commands" json:"commands"`
 	Devenv      DevenvConfig      `yaml:"devenv" json:"devenv"`
 	CustomAI    CustomAIConfig    `yaml:"custom_ai" json:"custom_ai"`
+	Discourse   DiscourseConfig   `yaml:"discourse" json:"discourse"`
 }
 
 func DefaultUserConfig() *UserConfig {
@@ -181,6 +196,12 @@ func DefaultUserConfig() *UserConfig {
 					DefaultVersion: "1.21",
 				},
 			},
+		},
+		Discourse: DiscourseConfig{
+			BaseURL:  "https://discourse.nixos.org",
+			APIKey:   "", // Optional, can be set via environment variable
+			Username: "", // Optional, can be set via environment variable
+			Enabled:  true,
 		},
 	}
 }
@@ -334,6 +355,7 @@ func EnsureConfigFileFromEmbedded() (string, error) {
 			Commands:    embeddedCfg.Commands,
 			Devenv:      embeddedCfg.Devenv,
 			CustomAI:    embeddedCfg.CustomAI,
+			Discourse:   embeddedCfg.Discourse,
 		}
 
 		// Marshal to YAML and write to user config file
