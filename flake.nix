@@ -15,7 +15,8 @@
         pname = "nixai";
         version = "0.1.0";
         src = ./.;
-        vendorHash = null; # Let Nix manage vendoring
+        vendorHash = "sha256-jYVCwL0MhJXfit+LIPKoyf9MHuYXPgMfasxwBqOFntE="; # Updated hash for dependency management
+        proxyVendor = true; # Use Go module proxy for dependencies
         doCheck = false; # Disable tests in Nix build due to network/sandbox restrictions
 
         # Specify the main package to build
