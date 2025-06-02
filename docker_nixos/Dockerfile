@@ -28,6 +28,7 @@ RUN nix-env -iA nixpkgs.git \
     nixpkgs.just \
     nixpkgs.tree \
     nixpkgs.jq \
+    nixpkgs.sed \
     nixpkgs.inetutils \
     nixpkgs.netcat \
     nixpkgs.host \

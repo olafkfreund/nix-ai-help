@@ -20,5 +20,5 @@ in {
   # Required for Home Manager
   home.username = "test";
   home.homeDirectory = "/home/test";
-  home.stateVersion = "23.11";
+  home.stateVersion = "25.05";
 }

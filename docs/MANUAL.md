@@ -38,14 +38,19 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 - [Searching for Packages and Services](#searching-for-packages-and-services)
 - [AI-Powered Package Repository Analysis](#ai-powered-package-repository-analysis)
 - [System Health Checks](#system-health-checks)
+- [🖥️ Multi-Machine Configuration Manager](#multi-machine-configuration-manager)
+- [Configuration Templates & Snippets](#configuration-templates--snippets)
 - [Interactive Mode](#interactive-mode)
 - [Editor Integration](#editor-integration)
   - [Neovim Integration](#neovim-integration)
 - [Advanced Usage](#advanced-usage)
+  - [Enhanced Build Troubleshooter](#enhanced-build-troubleshooter)
+  - [Dependency & Import Graph Analyzer](#dependency--import-graph-analyzer)
 - [Configuration](#configuration)
 - [Tips & Troubleshooting](#tips--troubleshooting)
 - [Development Environment (devenv) Feature](#development-environment-devenv-feature)
 - [Neovim + Home Manager Integration](#neovim--home-manager-integration)
+- [Migration Assistant](#migration-assistant)
 
 ---
 
@@ -88,6 +93,7 @@ nixai integrates with an MCP (Model Context Protocol) server to retrieve officia
 ```
 
 The MCP server queries official documentation sources including:
+
 - NixOS Wiki
 - Nix Manual
 - Nixpkgs Manual  
@@ -179,6 +185,7 @@ nixai explain-option services.nginx.enable
 ```
 
 **Example Output:**
+
 ```
 🖥️ NixOS Option: services.nginx.enable
 
@@ -204,6 +211,7 @@ nixai explain-home-option programs.git.enable
 ```
 
 **Example Output:**
+
 ```
 🏠 Home Manager Option: programs.git.enable
 
@@ -255,6 +263,7 @@ nixai search service postgresql
 Automatically analyze a project and generate a Nix derivation using AI. This feature leverages LLMs to detect the build system, analyze dependencies, and generate a working Nix expression for packaging your project. It works for Go, Python, Node.js, Rust, and more.
 
 ### What does it do?
+
 - Detects the language and build system (Go, Python, Node.js, Rust, etc.)
 - Analyzes dependencies and project structure
 - Generates a complete Nix derivation (e.g., `buildGoModule`, `buildPythonPackage`, `buildNpmPackage`, `buildRustPackage`)
@@ -267,6 +276,7 @@ Automatically analyze a project and generate a Nix derivation using AI. This fea
 - Provides AI explanations for packaging challenges and caveats
 
 ### How does it work?
+
 - nixai inspects the repository (local path or remote URL), detects the language(s), and parses manifest files (e.g., go.mod, package.json, pyproject.toml, Cargo.toml).
 - It queries the selected AI provider, using context from official NixOS documentation, to generate a best-practice Nix derivation.
 - The tool can explain why certain packaging choices were made, and highlight any potential issues or manual steps required.
@@ -274,10 +284,13 @@ Automatically analyze a project and generate a Nix derivation using AI. This fea
 ### Real Life Examples
 
 **1. Package a local Go project:**
+
 ```sh
 nixai package-repo . --local
 ```
+
 _Output:_
+
 ```
 Detected Go project (go.mod found)
 Analyzing dependencies...
@@ -286,10 +299,13 @@ Saved to ./default.nix
 ```
 
 **2. Package a remote Python repository:**
+
 ```sh
 nixai package-repo https://github.com/psf/requests
 ```
+
 _Output:_
+
 ```
 Detected Python project (setup.py found)
 Analyzing pip dependencies...
@@ -298,10 +314,13 @@ Saved to ./requests.nix
 ```
 
 **3. Analyze a Node.js project and output to a custom directory:**
+
 ```sh
 nixai package-repo https://github.com/expressjs/express --output ./nixpkgs
 ```
+
 _Output:_
+
 ```
 Detected Node.js project (package.json found)
 Analyzing npm dependencies...
@@ -310,10 +329,13 @@ Saved to ./nixpkgs/express.nix
 ```
 
 **4. Analyze only, no derivation generation:**
+
 ```sh
 nixai package-repo . --analyze-only
 ```
+
 _Output:_
+
 ```
 Detected Rust project (Cargo.toml found)
 Crate dependencies: serde, tokio, clap
@@ -321,10 +343,13 @@ Project is ready for packaging. No derivation generated (analyze-only mode).
 ```
 
 **5. Advanced: Custom package name and output:**
+
 ```sh
 nixai package-repo https://github.com/user/rust-app --output ./derivations --name my-rust-app
 ```
+
 _Output:_
+
 ```
 Detected Rust project (Cargo.toml found)
 Analyzing dependencies...
@@ -333,10 +358,13 @@ Saved to ./derivations/my-rust-app.nix
 ```
 
 **6. Multi-language monorepo:**
+
 ```sh
 nixai package-repo https://github.com/user/monorepo
 ```
+
 _Output:_
+
 ```
 Detected multiple projects: Go (api/), Node.js (web/), Python (scripts/)
 Generated Nix derivations for each subproject
@@ -344,10 +372,13 @@ Saved to ./monorepo-api.nix, ./monorepo-web.nix, ./monorepo-scripts.nix
 ```
 
 **7. Private repository (with authentication):**
+
 ```sh
 nixai package-repo git@github.com:yourorg/private-repo.git --ssh-key ~/.ssh/id_ed25519
 ```
+
 _Output:_
+
 ```
 Detected Go project (go.mod found)
 Analyzing dependencies...
@@ -356,10 +387,13 @@ Saved to ./private-repo.nix
 ```
 
 **8. Custom build system (Makefile, CMake, etc.):**
+
 ```sh
 nixai package-repo . --analyze-only
 ```
+
 _Output:_
+
 ```
 Detected C project (Makefile found)
 AI Suggestion: Use stdenv.mkDerivation with custom buildPhase and installPhase
@@ -367,10 +401,13 @@ Manual review recommended for non-standard build systems.
 ```
 
 **9. Output as JSON for CI/CD integration:**
+
 ```sh
 nixai package-repo . --output-format json
 ```
+
 _Output:_
+
 ```
 {
   "project": "myapp",
@@ -381,12 +418,14 @@ _Output:_
 ```
 
 ### What kind of output can I expect?
+
 - A ready-to-use Nix derivation file (e.g., `default.nix`, `myapp.nix`)
 - AI-generated explanations for any manual steps or caveats
 - Dependency analysis and best-practice suggestions
 - Optionally, JSON output for automation
 
 ### Best Practices & Troubleshooting
+
 - For best results, ensure your project has a standard manifest (go.mod, package.json, pyproject.toml, etc.)
 - For private repos, use `--ssh-key` or ensure your SSH agent is running
 - If the generated derivation fails to build, review the AI explanation and check for missing dependencies or custom build steps
@@ -396,6 +435,7 @@ _Output:_
 - Always review the generated Nix code before using in production
 
 ### How does this help NixOS users?
+
 - Saves hours of manual packaging work
 - Handles complex dependency trees automatically
 - Ensures best practices for Nix packaging
@@ -407,57 +447,368 @@ _Output:_
 
 ## System Health Checks
 
-Run a comprehensive health check on your NixOS system to detect common issues, misconfigurations, and get actionable AI-powered recommendations.
-
-```sh
-nixai health
-```
+The `nixai health` command provides comprehensive health checks for your NixOS system, with AI-powered analysis and recommendations.
 
 ### What does `nixai health` check?
+
 - NixOS configuration validity
-- Service status (e.g., failed or inactive services)
-- Disk space and filesystem health
-- Outdated or broken packages
-- Security warnings and best practices
-- AI-powered suggestions for improving system reliability and security
+- Failed system services
+- Disk space usage
+- Nix channel status
+- Boot integrity
+- Network connectivity
+- Nix store health
 
 ### Real Life Examples
 
-**Basic health check:**
 ```sh
+# Run comprehensive health check
 nixai health
-```
-_Output:_
-```
-[✓] NixOS configuration is valid
-[✓] All critical services are running
-[!] Disk space low on /home (2% free)
-[!] 3 packages are outdated
-[AI] Suggestion: Consider enabling automatic updates for security
-```
 
-**Check health for a custom NixOS config path:**
-```sh
-nixai health --nixos-path ~/my-nixos-config
-```
-
-**Get detailed output and recommendations:**
-```sh
-nixai health --log-level debug
+# Output includes:
+# ✓ Configuration validation passed
+# ⚠ Low disk space on /nix/store (85% full)
+# ✗ Service postgresql.service failed
+# ✓ Network connectivity OK
+# ... plus AI recommendations
 ```
 
 **Example: Fixing a failed service**
+
 ```
-> nixai health
-[!] Service 'nginx' is failed
-[AI] Suggestion: Check nginx config syntax with `nginx -t` and review recent changes in /etc/nixos/configuration.nix
+⚠ Failed Services:
+   postgresql.service - PostgreSQL database server
+
+💡 AI Analysis:
+   PostgreSQL service failure is commonly caused by:
+   1. Incorrect data directory permissions
+   2. Port conflicts with existing services
+   3. Invalid configuration syntax
+   
+   Recommended actions:
+   1. Check service logs: systemctl status postgresql.service
+   2. Verify data directory: ls -la /var/lib/postgresql/
+   3. Review configuration: nixos-option services.postgresql
 ```
 
 **Example: Security recommendations**
+
 ```
-> nixai health
-[AI] Security: SSH root login is enabled. It is recommended to set `services.openssh.permitRootLogin = "no";`
+🔒 Security Analysis:
+   - SSH root login is enabled (consider disabling)
+   - Firewall has open ports: 22, 80, 443, 8080
+   - Automatic updates are disabled
+   
+   Recommendations:
+   1. Disable SSH root login: services.openssh.permitRootLogin = "no";
+   2. Review open ports and close unnecessary ones
+   3. Enable automatic security updates
 ```
+
+---
+
+## 🖥️ Multi-Machine Configuration Manager
+
+The Multi-Machine Configuration Manager lets you centrally manage, synchronize, and deploy NixOS configurations across multiple machines—all from the command line.
+
+### What It Does
+
+- Register and manage multiple NixOS machines in a central registry
+- Group machines for fleet operations (e.g., deploy to all web servers)
+- Sync configurations between local and remote machines
+- Deploy configuration changes with rollback support
+- Compare configurations across machines (diff)
+- Check connectivity and status of all registered machines
+- All features available via the `nixai machines` command and subcommands
+
+### Real Life Examples
+
+#### Registering and Managing Machines
+
+```sh
+# Register machines
+nixai machines add web1 192.168.1.10 --description "Web server 1"
+nixai machines add db1 192.168.1.20 --description "Database server"
+
+# List all machines
+nixai machines list
+
+# Show details for a machine
+nixai machines show web1
+
+# Remove a machine
+nixai machines remove db1 --force
+```
+
+#### Group Management and Fleet Operations
+
+```sh
+# Create a group and add machines
+nixai machines groups add production web1 db1
+
+# List all groups
+nixai machines groups list
+
+# Deploy config to all machines in a group
+nixai machines deploy --group production
+```
+
+#### Sync, Diff, and Status
+
+```sh
+# Sync configuration to a machine
+nixai machines sync web1
+
+# Compare configurations across machines
+nixai machines diff
+
+# Check status of all machines
+nixai machines status
+```
+
+### Best Practices
+
+- Use descriptive names and descriptions for machines
+- Organize machines into logical groups for easier fleet management
+- Always check status before deploying changes
+- Use `--force` when removing machines to skip confirmation
+- Review diffs before deploying to multiple machines
+
+### Troubleshooting
+
+- If a machine is unreachable, check SSH connectivity and credentials
+- Ensure the correct NixOS config path is set for each machine
+- Use `nixai machines show <name>` for detailed info and troubleshooting tips
+
+### Command Reference
+
+- `nixai machines list` — List all registered machines
+- `nixai machines add <name> <host> [--description ...]` — Register a new machine
+- `nixai machines show <name>` — Show details for a machine
+- `nixai machines remove <name> --force` — Remove a machine
+- `nixai machines groups ...` — Manage machine groups
+- `nixai machines sync <machine>` — Sync configs to a machine
+- `nixai machines deploy [--group <group>]` — Deploy to one or more machines
+- `nixai machines diff` — Compare configurations
+- `nixai machines status` — Check machine status
+
+See the [Project Plan](../PROJECT_PLAN.md#17-multi-machine-configuration-manager-) for implementation details and roadmap.
+
+---
+
+## Configuration Templates & Snippets
+
+nixai provides a powerful template and snippet management system to help you quickly set up and reuse NixOS configurations. This feature includes curated templates for common setups and personal snippet management for your custom configurations.
+
+### Templates
+
+Templates are pre-built NixOS configurations for common use cases. nixai includes built-in templates and can search GitHub for real-world configurations.
+
+#### Browsing Templates
+
+```sh
+# List all available templates
+nixai templates list
+
+# Show template categories
+nixai templates categories
+
+# Search templates by keyword
+nixai templates search gaming
+nixai templates search desktop kde
+nixai templates search server nginx
+```
+
+#### Viewing Template Details
+
+```sh
+# Show complete template details and content
+nixai templates show desktop-minimal
+nixai templates show gaming-config
+nixai templates show server-basic
+```
+
+#### Applying Templates
+
+```sh
+# Apply template to default location (/etc/nixos/configuration.nix)
+nixai templates apply desktop-minimal
+
+# Apply template to specific file
+nixai templates apply gaming-config --output ./gaming.nix
+
+# Merge template with existing configuration
+nixai templates apply server-basic --merge --output /etc/nixos/server.nix
+```
+
+#### GitHub Integration
+
+Search GitHub for real-world NixOS configurations:
+
+```sh
+# Search GitHub for configurations
+nixai templates github "gaming nixos configuration"
+nixai templates github "kde plasma nixos"
+nixai templates github "thinkpad nixos hardware"
+nixai templates github "server nginx configuration.nix"
+```
+
+#### Saving Custom Templates
+
+```sh
+# Save local configuration file as template
+nixai templates save my-desktop /etc/nixos/configuration.nix --category Desktop --description "My custom desktop setup"
+
+# Save from GitHub URL
+nixai templates save nvidia-gaming https://github.com/user/repo/blob/main/nixos/gaming.nix --category Gaming
+
+# Add tags for better organization
+nixai templates save my-template config.nix --tags "nvidia,gaming,performance"
+```
+
+### Snippets
+
+Snippets allow you to save and reuse small configuration fragments. Perfect for commonly used service configurations, hardware settings, or package lists.
+
+#### Managing Snippets
+
+```sh
+# List all saved snippets
+nixai snippets list
+
+# Search snippets by name or tag
+nixai snippets search nvidia
+nixai snippets search gaming
+nixai snippets search development
+```
+
+#### Adding Snippets
+
+```sh
+# Save configuration file as snippet
+nixai snippets add nvidia-drivers --file ./hardware.nix --description "NVIDIA driver configuration" --tags "nvidia,graphics"
+
+# Save from stdin (pipe content)
+cat hardware-config.nix | nixai snippets add my-hardware --description "Custom hardware config"
+
+# Add snippet with multiple tags
+nixai snippets add gaming-packages --file packages.nix --tags "gaming,steam,lutris"
+```
+
+#### Using Snippets
+
+```sh
+# Show snippet content
+nixai snippets show nvidia-drivers
+
+# Apply snippet to file
+nixai snippets apply gaming-setup --output ./gaming.nix
+
+# Apply snippet to stdout (for copying)
+nixai snippets apply my-config
+```
+
+#### Organizing Snippets
+
+```sh
+# Remove old or unused snippets
+nixai snippets remove old-config
+
+# Search by multiple criteria
+nixai snippets search "nvidia AND gaming"
+```
+
+### Built-in Templates
+
+nixai includes curated templates for common NixOS configurations:
+
+#### Desktop Environments
+
+- **desktop-minimal**: Minimal GNOME desktop with essential applications
+- **desktop-kde**: Full KDE Plasma desktop environment
+- **desktop-xfce**: Lightweight XFCE desktop setup
+
+#### Gaming Configurations
+
+- **gaming-config**: Gaming-optimized configuration with Steam, drivers, and performance tweaks
+- **gaming-nvidia**: NVIDIA-specific gaming setup with proper drivers and settings
+
+#### Server Configurations
+
+- **server-basic**: Basic server with SSH, firewall, and essential tools
+- **server-web**: Web server with nginx, SSL, and security hardening
+- **server-database**: Database server with PostgreSQL or MySQL
+
+#### Development Environments
+
+- **development-env**: Development setup with common programming tools, git, and editors
+- **development-nix**: Nix development environment for nixpkgs contributions
+
+### Real-World Examples
+
+#### Setting up a Gaming System
+
+```sh
+# Browse gaming templates
+nixai templates search gaming
+
+# View gaming template details
+nixai templates show gaming-config
+
+# Apply gaming template
+nixai templates apply gaming-config --output /etc/nixos/gaming.nix
+
+# Save your custom gaming tweaks as snippet
+nixai snippets add my-gaming-tweaks --file ./performance.nix --tags "gaming,performance"
+```
+
+#### Creating a Development Environment
+
+```sh
+# Search for development templates
+nixai templates search development
+
+# Look for specific language setups on GitHub
+nixai templates github "rust development nixos"
+
+# Apply development template
+nixai templates apply development-env --merge
+
+# Save your editor configuration as snippet
+nixai snippets add neovim-config --file ./editor.nix --tags "neovim,development"
+```
+
+#### Server Setup Workflow
+
+```sh
+# Browse server templates
+nixai templates categories
+nixai templates search server
+
+# Apply basic server template
+nixai templates apply server-basic --output /etc/nixos/server.nix
+
+# Add specific service snippets
+nixai snippets apply nginx-config --output ./services.nix
+nixai snippets apply postgresql-setup --output ./database.nix
+```
+
+### Tips and Best Practices
+
+- **Use Categories**: Templates are organized by category (Desktop, Gaming, Server, Development) for easy browsing
+- **Tag Everything**: Use descriptive tags when saving templates and snippets for better searchability
+- **GitHub Discovery**: Use the GitHub search to find real-world configurations for inspiration
+- **Incremental Building**: Start with a base template and add snippets to customize your configuration
+- **Backup First**: Always backup your existing configuration before applying templates
+- **Test Configurations**: Use `nixos-rebuild test` to test configurations before committing them
+
+### Integration with Other Features
+
+The template and snippet system integrates seamlessly with other nixai features:
+
+- **Health Checks**: `nixai health` can validate templates before applying them
+- **Option Explanation**: Use `nixai explain-option` to understand options used in templates
+- **Direct Questions**: Ask questions about template configurations with `nixai "how does this gaming template work?"`
 
 ---
 
@@ -470,25 +821,33 @@ nixai interactive
 ```
 
 In interactive mode, you can:
+
 - Run any command (diagnose, explain-option, search, etc.) in a conversational, guided way.
 - Use tab completion for commands and options.
 - Get instant feedback and suggestions for next steps.
 - Set or change your NixOS config path on the fly with:
+
   ```sh
   set-nixos-path /etc/nixos
   ```
+
 - Switch AI providers interactively:
+
   ```sh
   set ai openai
   set ai ollama llama3
   set ai gemini
   ```
+
 - View and update configuration settings:
+
   ```sh
   show-config
   set-log-level debug
   ```
+
 - Get help for any command:
+
   ```sh
   help explain-option
   help diagnose
@@ -497,6 +856,7 @@ In interactive mode, you can:
 ### Real Life Examples
 
 **Diagnose a log interactively:**
+
 ```
 > diagnose
 Paste or type your log, or use --log-file: /var/log/nixos/nixos-rebuild.log
@@ -504,12 +864,14 @@ Paste or type your log, or use --log-file: /var/log/nixos/nixos-rebuild.log
 ```
 
 **Explain a NixOS option:**
+
 ```
 > explain-option networking.firewall.enable
 [AI-powered explanation, best practices, and examples]
 ```
 
 **Search for a package and get config options:**
+
 ```
 > search pkg nginx
 [Numbered results]
@@ -518,25 +880,26 @@ Paste or type your log, or use --log-file: /var/log/nixos/nixos-rebuild.log
 ```
 
 **Switch provider and run a command:**
+
 ```
 > set ai gemini
 > explain-option services.openssh.enable
 ```
 
 **Get help and see available commands:**
+
 ```
 > help
 [Lists all available interactive commands]
 ```
 
 Interactive mode is ideal for:
+
 - New users who want a guided experience
 - Power users who want to chain commands and get instant feedback
 - Troubleshooting and exploring NixOS options, logs, and documentation in a conversational way
 
 ---
-
-## Editor Integration
 
 ## Editor Integration
 
@@ -549,6 +912,7 @@ Complete VS Code integration with Copilot, Claude Dev, and other MCP-compatible 
 #### Quick Setup
 
 1. **Start the MCP server:**
+
 ```sh
 # Start the server in background mode
 nixai mcp-server start -d
@@ -624,6 +988,7 @@ nixai neovim-setup --config-dir=$HOME/.config/nvim
 ```
 
 This command:
+
 1. Creates a `nixai.lua` module in your Neovim configuration
 2. Provides instructions for adding it to your `init.lua` or `init.vim`
 3. Sets up keymaps for NixOS documentation lookup and option explanations
@@ -688,6 +1053,7 @@ Both editors can be automatically configured through Home Manager:
   };
 }
 ```
+
     prompt_title = 'NixOS Query',
     finder = require('telescope.finders').new_dynamic({
       fn = function(prompt)
@@ -722,6 +1088,7 @@ Both editors can be automatically configured through Home Manager:
 end
 
 vim.keymap.set('n', '<leader>nt', nixai_picker, {desc = 'Telescope NixOS Query'})
+
 ```
 
 #### Benefits of Neovim Integration
@@ -829,6 +1196,436 @@ nixai package-repo . --analyze-only --output-format json > analysis.json
 - For custom build systems, use `--analyze-only` and follow AI suggestions for manual packaging tweaks.
 - Always validate generated Nix code with `nix build` or `nix flake check` before deploying.
 
+### Enhanced Build Troubleshooter
+
+The Enhanced Build Troubleshooter is a comprehensive tool for analyzing build failures, optimizing build performance, and resolving common Nix build issues. It provides AI-powered analysis and actionable recommendations through a set of specialized subcommands.
+
+#### Basic Build with AI Assistance
+
+```sh
+# Build a package with AI assistance for any failures
+nixai build .#mypackage
+
+# Build the current flake with AI assistance
+nixai build
+```
+
+When using the basic `build` command, nixai will:
+1. Run the standard `nix build` command
+2. Capture any build failures
+3. Provide an AI-generated summary of the problem
+4. Suggest fixes based on the error patterns detected
+
+#### Deep Build Analysis
+
+```sh
+nixai build debug firefox
+```
+
+The `debug` subcommand performs comprehensive analysis of build failures:
+
+- 🔍 **Error Pattern Recognition**: Identifies common error types (dependency issues, compiler errors, missing inputs)
+- 📊 **Detailed Analysis**: Provides step-by-step explanation of the error chain
+- 🛠️ **Actionable Recommendations**: Suggests specific fixes for each identified issue
+- 📚 **Documentation Links**: References relevant NixOS/Nixpkgs documentation
+- 📋 **Comprehensive Report**: Generates a detailed failure analysis report
+
+**Example Output:**
+
+```
+🔍 Deep Build Analysis: firefox
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 Build Environment
+├─ Nixpkgs Version: 23.11
+├─ System: x86_64-linux
+├─ Cores Available: 8
+└─ Memory Available: 16.0 GB
+
+📊 Error Analysis
+├─ Error Type: Missing Dependency
+├─ Phase: Configure
+├─ Component: firefox-112.0.2
+└─ Root Cause: Required dependency 'libwebp' not found
+
+🛠️ Recommended Fixes
+1. Add missing dependency to buildInputs:
+   buildInputs = old.buildInputs ++ [ pkgs.libwebp ];
+
+2. Verify package is available in your nixpkgs version:
+   nix-env -qA nixpkgs.libwebp
+
+3. Apply this patch to your firefox derivation:
+   [Detailed patch instructions]
+
+💡 Additional Context
+The error occurred because the build system expects libwebp for image processing,
+but it wasn't included in the build environment. Firefox recently made this a
+required dependency rather than optional.
+```
+
+#### Intelligent Retry with Automatic Fixes
+
+```sh
+nixai build retry
+```
+
+The `retry` subcommand:
+
+- Analyzes the last build failure
+- Automatically identifies common issues that can be fixed
+- Applies recommended fixes and retries the build
+- Provides detailed progress updates during the retry process
+- Shows a comparison of before/after states
+
+This command is particularly useful for common failure patterns like missing dependencies, permission issues, or simple configuration problems that have standard solutions.
+
+#### Cache Miss Analysis
+
+```sh
+nixai build cache-miss
+```
+
+The `cache-miss` subcommand analyzes why builds aren't using the binary cache:
+
+- 📊 **Cache Statistics**: Hit/miss rates and patterns
+- 🔍 **Miss Reasons**: Identifies why specific builds aren't found in the cache
+- 🌐 **Cache Configuration**: Analyzes substituter settings and connectivity
+- 🔑 **Key Verification**: Checks for trusted keys and signing issues
+- 📈 **Optimization Recommendations**: Suggests settings to improve cache utilization
+
+**Example Output:**
+
+```
+📊 Cache Analysis Results
+
+Cache Performance
+├─ Hit Rate: 75%
+├─ Miss Rate: 25%
+├─ Cache Size: 2.5GB
+├─ Recent Hits: 42
+└─ Recent Misses: 14
+
+Miss Reasons
+├─ 8 misses due to missing trusted keys
+├─ 4 misses due to custom package overrides
+├─ 2 misses due to network connectivity issues
+
+🛠️ Recommended Optimizations
+1. Add missing trusted keys:
+   nix-env --option trusted-public-keys 'cache.nixos.org-1:...'
+
+2. Configure additional binary caches:
+   nix.settings.substituters = [
+     "https://cache.nixos.org"
+     "https://nixpkgs-wayland.cachix.org"
+   ];
+
+3. Verify network connectivity to cache.nixos.org
+```
+
+#### Sandbox Debugging
+
+```sh
+nixai build sandbox-debug
+```
+
+The `sandbox-debug` subcommand helps resolve sandbox-related build issues:
+
+- 🔒 **Sandbox Configuration**: Analyzes current sandbox settings
+- 🔍 **Permission Analysis**: Identifies permission and access issues
+- 🌐 **Network Access**: Diagnoses network-related sandbox problems
+- 📁 **Path Access**: Identifies missing or inaccessible paths
+- 🛠️ **Fix Recommendations**: Suggests sandbox configuration changes
+
+This command is particularly useful for builds that fail with permission errors, network access issues, or path-related problems.
+
+#### Build Performance Profiling
+
+```sh
+nixai build profile --package vim
+```
+
+The `profile` subcommand analyzes build performance and identifies optimization opportunities:
+
+- ⏱️ **Time Analysis**: Breaks down where build time is spent
+- 🧮 **Resource Usage**: CPU, memory, and I/O utilization 
+- 🔍 **Bottleneck Detection**: Identifies performance bottlenecks
+- 📊 **Comparison**: Benchmarks against typical build times
+- 🚀 **Optimization Suggestions**: Recommendations to improve build speed
+
+**Example Output:**
+
+```
+⚡ Build Performance Profile: vim
+
+Build Time Breakdown
+├─ Total Time: 4m 32s
+├─ CPU Usage: 85%
+├─ Memory Peak: 2.1GB
+├─ Network Time: 45s  
+├─ Compilation Time: 3m 20s
+└─ Download Time: 27s
+
+🔍 Bottlenecks Identified
+1. Single-threaded compilation phase (3m 20s)
+2. Limited parallelization in test phase
+3. High memory usage during linking
+
+🚀 Optimization Recommendations
+1. Increase parallelization:
+   nix.settings.max-jobs = 8;
+   
+2. Allocate more memory to builds:
+   nix.settings.cores = 0;  # Use all cores
+   
+3. Consider using ccache:
+   nix.settings.extra-sandbox-paths = [ "/var/cache/ccache" ];
+```
+
+#### Integration with Other nixai Features
+
+The Enhanced Build Troubleshooter integrates seamlessly with other nixai features:
+
+- **Documentation Integration**: Links to relevant NixOS docs via the MCP server
+- **AI-Powered Analysis**: Uses the configured AI provider for intelligent analysis
+- **System Health Context**: Incorporates system health data for better recommendations
+- **Configuration Awareness**: Respects your NixOS config path settings
+- **Terminal Formatting**: Beautiful, colorized terminal output with progress indicators
+
+---
+
+### Dependency & Import Graph Analyzer
+
+The Dependency & Import Graph Analyzer helps you understand, visualize, and optimize the relationships between packages and configuration files in your NixOS system. This powerful tool provides AI-powered insights into your dependency tree and suggests optimizations to improve your system's performance and maintainability.
+
+#### Analyzing Dependency Trees
+
+```sh
+nixai deps analyze
+```
+
+The `analyze` subcommand provides a comprehensive view of your system's package dependencies:
+
+- 🔍 **Full System Analysis**: Maps all package relationships in your current configuration
+- 📊 **Hierarchy Visualization**: Shows parent-child relationships between packages
+- 🔎 **Circular Dependency Detection**: Identifies potential circular dependencies
+- 📝 **AI-Powered Summary**: Provides an overview of your dependency structure with insights
+- 🚩 **Issue Flagging**: Highlights potential problems like outdated packages or uncommon version constraints
+
+**Example Output:**
+
+```
+📊 Dependency Analysis
+
+System Overview
+├─ Total Packages: 1,248
+├─ Direct Dependencies: 142
+├─ Indirect Dependencies: 1,106
+├─ Deepest Chain: 15 levels
+└─ Potential Issues: 3 found
+
+Key Dependencies
+├─ gcc [10.3.0] - Used by 428 packages
+├─ glibc [2.35] - Used by 1,052 packages
+├─ python3 [3.10.9] - Used by 89 packages
+└─ openssl [3.0.8] - Used by 124 packages
+
+🚩 Issues Detected
+1. Circular dependency: python3 → pip → setuptools → python3
+2. Multiple python versions: python 3.9 and 3.10
+3. Outdated dependency: openssl 3.0.8 (3.0.9 available)
+
+🤖 AI Analysis
+Your system has a moderate-sized dependency tree with some outdated packages
+and a circular dependency that may cause build issues. Consider updating
+openssl and standardizing on a single Python version.
+```
+
+#### Understanding Package Inclusion
+
+```sh
+nixai deps why firefox
+```
+
+The `why` subcommand explains why a specific package is installed on your system:
+
+- 🔍 **Origin Tracing**: Identifies the source of package inclusion
+- 📋 **Full Path**: Shows the complete dependency chain leading to the package
+- 🔍 **Alternative Paths**: Identifies multiple inclusion paths if they exist
+- 🔄 **Version Resolution**: Explains version selection logic
+- 🗑️ **Removal Impact**: Analysis of what would happen if the package were removed
+
+**Example Output:**
+
+```
+❓ Why is firefox installed?
+
+📋 Primary Inclusion Path:
+configuration.nix
+└─ environment.systemPackages
+   └─ firefox [114.0.2]
+
+📋 Alternative Paths:
+home-manager
+└─ home.packages
+   └─ firefox [114.0.2]
+
+💪 Direct Dependency: Yes
+   This package was explicitly requested in your configuration.
+
+🔄 Version Selection:
+   Version 114.0.2 was selected from nixpkgs (override in /etc/nixos/overlays/firefox.nix)
+   Default version would have been 113.0.1
+
+🗑️ Removal Impact:
+   Removing firefox would not break any other packages.
+   2 user configurations reference this package.
+```
+
+#### Finding and Resolving Conflicts
+
+```sh
+nixai deps conflicts
+```
+
+The `conflicts` subcommand detects and helps resolve package conflicts:
+
+- 🔍 **Conflict Detection**: Identifies conflicting package versions or flags
+- 📋 **Comprehensive Report**: Details all conflicts with their sources
+- 🛠️ **Resolution Suggestions**: Provides specific fix recommendations for each conflict
+- 📈 **Priority Analysis**: Determines which conflicts are most critical to resolve
+- 📊 **Before/After Comparison**: Shows the impact of proposed resolutions
+
+**Example Output:**
+
+```
+🚫 Dependency Conflicts
+
+Found 3 package conflicts in your configuration:
+
+1. 🔴 Critical: openssl version conflict
+   ├─ Path 1: nixpkgs.openssl [3.0.8] via environment.systemPackages
+   ├─ Path 2: nixpkgs.openssl [1.1.1t] via letsencrypt
+   └─ Resolution: Add the following to your configuration.nix:
+      nixpkgs.config.packageOverrides = pkgs: {
+        letsencrypt = pkgs.letsencrypt.override {
+          openssl = pkgs.openssl;
+        };
+      };
+
+2. 🟠 Important: python package conflict
+   ├─ Path 1: python39
+   ├─ Path 2: python310
+   └─ Resolution: Standardize on one Python version:
+      environment.systemPackages = with pkgs; [
+        (python310.withPackages (ps: with ps; [ 
+          # your Python packages here
+        ]))
+      ];
+
+3. 🟡 Minor: gtk theme conflict
+   ├─ Path 1: gnome.adwaita-icon-theme
+   ├─ Path 2: custom-icon-theme
+   └─ Resolution: Set GTK_THEME environment variable:
+      environment.variables.GTK_THEME = "Adwaita";
+```
+
+#### Optimizing Dependencies
+
+```sh
+nixai deps optimize
+```
+
+The `optimize` subcommand analyzes your dependency structure and suggests optimizations:
+
+- 🔍 **Inefficiency Detection**: Identifies redundant or unnecessary dependencies
+- 📊 **Size Impact Analysis**: Shows the impact of each dependency on system size
+- 🚀 **Performance Suggestions**: Recommends changes to improve build/runtime performance
+- 💾 **Disk Usage Optimization**: Identifies opportunities to reduce system size
+- 📝 **Configuration Recommendations**: Suggests specific configuration changes
+
+**Example Output:**
+
+```
+⚡ Dependency Optimization
+
+System Analysis
+├─ Current Closure Size: 8.2 GB
+├─ Redundant Packages: 14 found
+├─ Unnecessary Dev Deps: 8 found
+└─ Optimization Potential: ~1.1 GB (~13%)
+
+🔍 Optimization Opportunities
+
+1. 💾 Remove unnecessary development dependencies (~650 MB)
+   ├─ Current: python310Full [includes dev tools, docs, tests]
+   ├─ Suggested: python310 [minimal runtime only]
+   └─ Configuration Change:
+      - environment.systemPackages = with pkgs; [ python310Full ];
+      + environment.systemPackages = with pkgs; [ python310 ];
+
+2. 🚀 Consolidate duplicate libraries (~250 MB)
+   ├─ Issue: Multiple versions of openssl, glib, and gtk
+   └─ Resolution: Add overlay to standardize versions
+     
+3. 🧹 Clean up unused dependencies (~200 MB)
+   ├─ kde-frameworks [only kdeconnect is used]
+   └─ texlive-full [only basic LaTeX commands used]
+
+📈 Expected Impact
+├─ Storage Saved: ~1.1 GB
+├─ Build Time Reduction: ~15%
+└─ Boot Time Improvement: ~8%
+```
+
+#### Generating Dependency Graphs
+
+```sh
+nixai deps graph
+```
+
+The `graph` subcommand generates visual representations of your dependency structure:
+
+- 📊 **Visualization**: Creates DOT or SVG graph of package relationships
+- 🔍 **Interactive Exploration**: Optional output for interactive graph viewers
+- 🎯 **Focused Views**: Generate graphs for specific packages or subsystems
+- 🎨 **Customizable Display**: Options for detail level and graph layout
+- 📁 **Import Maps**: Visualizes relationships between your configuration files
+
+**Example Output:**
+
+The command generates a dependency graph visualization and outputs:
+
+```
+📊 Dependency Graph Generated
+
+Generated Files:
+├─ nixos-deps.dot - DOT format graph (for processing)
+└─ nixos-deps.svg - SVG visualization (for viewing)
+
+Graph Statistics:
+├─ Nodes: 248 packages
+├─ Edges: 1,047 relationships
+└─ Clusters: 12 major dependency groups
+
+To view the interactive graph:
+xdg-open nixos-deps.svg
+
+To generate a focused graph for a specific package:
+nixai deps graph --focus firefox
+```
+
+#### Integration with Other nixai Features
+
+The Dependency & Import Graph Analyzer integrates with other nixai features:
+
+- **Build Troubleshooter**: Provides dependency context for build failure analysis
+- **Package Repository Analysis**: Leverages dependency information for better Nix derivations
+- **System Health**: Incorporates dependency data in health reports
+- **Configuration Management**: Shows the impact of configuration changes on dependencies
+
 ---
 
 ## Configuration
@@ -871,16 +1668,20 @@ Based on comprehensive testing (May 2025), all three providers are fully functio
   - **Tested**: ✅ Working with llama3 model
   
 - **OpenAI**: Requires an OpenAI API key. Sign up at [OpenAI](https://platform.openai.com/). Set your API key as an environment variable:
+
   ```sh
   export OPENAI_API_KEY=sk-...
   ```
+
   - **Default Model**: Uses OpenAI's default GPT model
   - **Tested**: ✅ Working with environment variable configuration
   
 - **Gemini**: Requires a Gemini API key. Sign up at [Google AI Studio](https://ai.google.dev/). Set your API key as an environment variable:
+
   ```sh
   export GEMINI_API_KEY=your-gemini-key
   ```
+
   - **Current Model**: gemini-2.5-flash-preview-05-20 (updated from deprecated gemini-pro)
   - **Tested**: ✅ Working with updated API endpoints and model
 
@@ -900,10 +1701,12 @@ nixai explain-option --provider gemini --model gemini-2.5-flash-preview-05-20 ne
 ```
 
 **Note:**
+
 - If using OpenAI or Gemini, the API key must be set in your environment or in the config file under `openai_api_key` or `gemini_api_key` (environment variable is preferred for security).
 - If no provider is set, Ollama is used by default for privacy.
 
-### Example config with API keys (not recommended, prefer env vars):
+### Example config with API keys (not recommended, prefer env vars)
+
 ```yaml
 ai_provider: openai
 ai_model: gpt-4
@@ -1029,5 +1832,72 @@ nixai now supports rapid creation of reproducible development environments for P
 
 - Run all tests: `go test ./internal/devenv/...`
 - Try creating projects with various options and check the generated `devenv.nix`
+
+---
+
+## 🔄 Migration Assistant
+
+nixai provides a robust migration assistant to help you safely convert your NixOS configuration between legacy channels and modern flakes. The migration assistant includes:
+
+**Features:**
+
+- Migration Analysis: Detects your current setup and analyzes migration complexity
+- Step-by-Step Guide: AI-generated migration steps with safety checks
+- Backup & Rollback: Automatic backup and rollback procedures
+- Validation: Comprehensive validation of migration success
+- Best Practices: Integration of flake best practices and optimizations
+
+### Usage
+
+**Analyze your current setup:**
+
+```sh
+nixai migrate analyze --nixos-path /etc/nixos
+```
+
+**Convert from channels to flakes:**
+
+```sh
+nixai migrate to-flakes --nixos-path /etc/nixos
+```
+
+- The assistant will walk you through the migration, create a backup, and validate the result.
+- All output is formatted with glamour for easy reading.
+- If anything goes wrong, you can roll back to your previous configuration.
+
+### Best Practices & Safety
+
+- Always review the migration analysis before proceeding
+- Backups are created automatically and can be restored if needed
+- All changes are validated before finalizing the migration
+
+### Example Workflow
+
+1. Analyze:
+
+   ```sh
+   nixai migrate analyze --nixos-path /etc/nixos
+   ```
+
+2. Migrate:
+
+   ```sh
+   nixai migrate to-flakes --nixos-path /etc/nixos
+   ```
+
+3. Rollback (if needed):
+   - Follow the instructions provided by nixai to restore from backup
+
+### Planned Features
+
+- `nixai migrate from-flakes` (convert back to channels)
+- `nixai migrate channel-upgrade` (safe channel upgrades)
+- `nixai migrate flake-inputs` (update/explain flake inputs)
+
+### Troubleshooting
+
+- If migration fails, check the backup directory for your previous configuration
+- Review AI explanations for manual steps or caveats
+- For complex setups, consult the official NixOS documentation or ask direct questions with `nixai --ask`
 
 ---

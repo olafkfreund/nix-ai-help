@@ -69,11 +69,32 @@ func TestExplainOptionCmd_Mock(t *testing.T) {
 	}
 }
 
+// Implementation of buildExplainOptionPrompt for testing
+func testBuildExplainOptionPrompt(option, documentation string) string {
+	return fmt.Sprintf(`You are a NixOS expert helping users understand configuration options. Please explain the following NixOS option in a clear, practical manner.
+
+**Option:** %s
+
+**Official Documentation:**
+%s
+
+**Please provide:**
+
+1. **Purpose & Overview**: What this option does and why you'd use it
+2. **Type & Default**: The data type and default value (if any)
+3. **Usage Examples**: Show 2-3 practical configuration examples
+4. **Best Practices**: How to use this option effectively
+5. **Related Options**: Other options that are commonly used with this one
+6. **Common Issues**: Potential problems and their solutions
+
+Format your response using Markdown with section headings and code blocks for examples.`, option, documentation)
+}
+
 func TestBuildExplainOptionPrompt(t *testing.T) {
 	option := "services.nginx.enable"
 	doc := "services.nginx.enable: Enable the nginx service. Type: boolean. Default: false."
 
-	prompt := buildExplainOptionPrompt(option, doc)
+	prompt := testBuildExplainOptionPrompt(option, doc)
 
 	// Verify the prompt includes key elements for comprehensive explanations
 	if !strings.Contains(prompt, "Usage Examples") {

@@ -12,15 +12,18 @@ See the full [nixai User Manual](docs/MANUAL.md) for comprehensive feature docum
 
 ### This is development code. Things may not work or are broken. I'm changing the code all the time. Don't expect something production ready
 
-## 🚀 What's New (May 2025)
+## 🚀 What's New (June 2025)
 
-- **🆕 Direct Question Assistant**: Ask questions instantly with `nixai "your question"` or `nixai --ask "question"` for immediate AI-powered NixOS help with documentation context.
+- **🔧 Enhanced Build Troubleshooter:** New `build` command with advanced build failure analysis, intelligent retry mechanisms, cache analysis, sandbox debugging, and performance profiling.
+- **🤖 Direct Question Assistant**: Ask questions instantly with `nixai "your question"` or `nixai --ask "question"` for immediate AI-powered NixOS help with documentation context.
 - **Config Path Awareness Everywhere:** All features now respect the NixOS config path, settable via `--nixos-path`, config file, or interactively. If unset or invalid, you'll get clear guidance on how to fix it.
-- **Automated Service Option Lookup:** When searching for services, nixai now lists all available options for a service using `nixos-option --find services.<name>`, not just the top-level enable flag.
+- **Automated Service Option Lookup:** When searching for services, nixai now lists all available options for a service using `nixos-option --find services.<n>`, not just the top-level enable flag.
 - **Enhanced Error Handling:** If your config path is missing or invalid, nixai will print actionable instructions for setting it (CLI flag, config, or interactive command).
 - **🏠 Home Manager vs NixOS Visual Distinction:** Smart detection automatically shows `🖥️ NixOS Option` or `🏠 Home Manager Option` headers with appropriate documentation sources.
 - **🆕 Dedicated Home Manager Command:** New `explain-home-option` command specifically for Home Manager configuration options.
 - **🆕 AI-Powered Package Repository Analysis:** New `package-repo` command automatically analyzes Git repositories and generates complete Nix derivations using AI-powered build system detection and dependency analysis.
+- **📝 Configuration Templates & Snippets:** Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
+- **🖥️ Multi-Machine Configuration Manager:** Centrally manage, synchronize, and deploy NixOS configurations across multiple machines. Register, group, sync, deploy, and monitor fleets of NixOS systems from the CLI. See below for details and usage examples.
 - **More Tests:** New tests cover service option lookup, diagnostics, error handling, and packaging features for robust reliability.
 
 ## Prerequisites
@@ -55,7 +58,9 @@ All other dependencies are managed by the Nix flake and justfile.
 - [🔧 NixOS Option Explainer](#-nixos-option-explainer)
 - [📦 AI-Powered Package Repository Analysis](#-ai-powered-package-repository-analysis)
 - [🔄 MCP Server Configuration & Autostart](#-mcp-server-configuration--autostart)
+- [🔄 Migration Assistant (Channels ↔ Flakes)](#-migration-assistant-channels--flakes)
 - [🎨 Terminal Output Formatting](#-terminal-output-formatting)
+- [🖥️ Multi-Machine Configuration Manager](#-multi-machine-configuration-manager)
 - [🛠️ Installation & Usage](#%EF%B8%8F-installation--usage)
 - [📝 Commands & Usage](#-commands--usage)
 - [🗺️ Project Plan](#%EF%B8%8F-project-plan)
@@ -113,6 +118,10 @@ All other dependencies are managed by the Nix flake and justfile.
 - **NEW:** 🏠 **Home Manager Option Support** — Dedicated `nixai explain-home-option <option>` command with visual distinction between Home Manager and NixOS options.
 
 - **NEW:** 📦 **AI-Powered Package Repository Analysis** — Automatically analyze Git repositories and generate Nix derivations with `nixai package-repo <path>`, supporting Go, Python, Node.js, and Rust projects.
+
+- **NEW:** 📝 **Configuration Templates & Snippets** — Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
+
+- **NEW:** 🖥️ **Multi-Machine Configuration Manager** — Register, manage, group, and deploy NixOS configurations to multiple machines with a single CLI. Includes machine registry, group management, configuration sync, deployment, diff analysis, and status monitoring.
 
 ---
 
@@ -273,6 +282,42 @@ See [Autostart Options Documentation](docs/autostart-options.md) for more detail
 
 ---
 
+## 🔄 Migration Assistant (Channels ↔ Flakes)
+
+nixai includes a comprehensive migration assistant to help you convert your NixOS configuration between legacy channels and modern flakes, with safety checks, backup/rollback, and AI-powered guidance.
+
+**Key Features:**
+
+- Analyze your current setup and migration complexity
+- Step-by-step migration guide with best practices
+- Automatic backup and rollback procedures
+- Validation of migration success
+- AI-powered explanations and troubleshooting
+
+**Usage Examples:**
+
+```sh
+nixai migrate analyze --nixos-path /etc/nixos
+```
+
+```sh
+nixai migrate to-flakes --nixos-path /etc/nixos
+```
+
+- The assistant will walk you through the migration, create a backup, and validate the result.
+- All output is formatted with glamour for easy reading.
+- If anything goes wrong, you can roll back to your previous configuration.
+
+**Planned:**
+
+- `nixai migrate from-flakes` (convert back to channels)
+- `nixai migrate channel-upgrade` (safe channel upgrades)
+- `nixai migrate flake-inputs` (update/explain flake inputs)
+
+See the [User Manual](docs/MANUAL.md#migration-assistant) for full details and troubleshooting.
+
+---
+
 ## ✨ Latest Features & Updates
 
 ### Recent Fixes & Improvements (May 2025)
@@ -290,6 +335,7 @@ See [Autostart Options Documentation](docs/autostart-options.md) for more detail
 - **🎯 Config Path Awareness Everywhere:** All features respect the NixOS config path, settable via `--nixos-path`, config file, or interactively. If unset or invalid, you'll get clear guidance on how to fix it.
 - **🔍 Automated Service Option Lookup:** When searching for services, nixai lists all available options for a service using `nixos-option --find services.<name>`, not just the top-level enable flag.
 - **📦 AI-Powered Package Repository Analysis:** Analyze Git repositories and generate complete Nix derivations with support for Go, Python, Node.js, and Rust projects.
+- **📝 Configuration Templates & Snippets:** Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
 - **🧩 Flake Input Analysis:** Analyze and explain flake inputs using AI, with upstream README/flake.nix summaries.
 - **🏥 System Health Checks:** Run comprehensive NixOS system health checks with AI-powered analysis and recommendations.
 - **✅ Comprehensive Test Coverage:** Extensive test coverage for service option lookup, diagnostics, error handling, packaging features, and HTML filtering for robust reliability.
@@ -419,6 +465,126 @@ nixai package-repo https://github.com/user/project
 
 ---
 
+## 🖥️ Multi-Machine Configuration Manager
+
+The Multi-Machine Configuration Manager lets you centrally manage and synchronize NixOS configurations across many machines. You can register machines, organize them into groups, sync and deploy configurations, compare differences, and monitor status—all from the command line.
+
+### Key Features
+- Register and manage multiple NixOS machines in a central registry
+- Group machines for fleet operations (e.g., deploy to all web servers)
+- Sync configurations between local and remote machines
+- Deploy configuration changes with rollback support
+- Compare configurations across machines (diff)
+- Check connectivity and status of all registered machines
+- All features available via the `nixai machines` command and subcommands
+
+### Example Workflow
+
+```sh
+# Register machines
+nixai machines add web1 192.168.1.10 --description "Web server 1"
+nixai machines add db1 192.168.1.20 --description "Database server"
+
+# List all machines
+nixai machines list
+
+# Show details for a machine
+nixai machines show web1
+
+# Group machines
+nixai machines groups add production web1 db1
+nixai machines groups list
+
+# Deploy config to all machines in a group
+nixai machines deploy --group production
+
+# Check status
+nixai machines status
+
+# Remove a machine
+nixai machines remove db1 --force
+```
+
+### Commands Overview
+
+- `nixai machines list` — List all registered machines
+- `nixai machines add <name> <host> [--description ...]` — Register a new machine
+- `nixai machines show <name>` — Show details for a machine
+- `nixai machines remove <name> --force` — Remove a machine
+- `nixai machines groups ...` — Manage machine groups
+- `nixai machines sync <machine>` — Sync configs to a machine
+- `nixai machines deploy [--group <group>]` — Deploy to one or more machines
+- `nixai machines diff` — Compare configurations
+- `nixai machines status` — Check machine status
+
+See the [User Manual](docs/MANUAL.md#multi-machine-configuration-manager) for more real-world examples and advanced usage.
+
+---
+
+## 📝 Configuration Templates & Snippets
+
+Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
+
+#### Templates
+
+```sh
+# Browse available templates
+nixai templates list
+
+# Search templates by keyword or category
+nixai templates search gaming
+nixai templates search desktop kde
+
+# Show template details and content
+nixai templates show desktop-minimal
+
+# Apply template to current configuration
+nixai templates apply gaming-config
+
+# Save configuration as template
+nixai templates save my-template /path/to/config.nix
+
+# List template categories
+nixai templates categories
+
+# Search GitHub for NixOS configurations
+nixai templates github "gaming nixos configuration"
+nixai templates github "kde plasma nixos"
+```
+
+#### Snippets
+
+```sh
+# List saved snippets
+nixai snippets list
+
+# Search snippets by name or tag
+nixai snippets search nvidia
+
+# Save current config as snippet
+nixai snippets add my-nvidia-config --file /etc/nixos/hardware.nix
+
+# Apply snippet to configuration
+nixai snippets apply gaming-setup --output ./gaming.nix
+
+# Show snippet content
+nixai snippets show my-snippet
+
+# Remove saved snippet
+nixai snippets remove old-config
+```
+
+**Key Features:**
+
+- **Built-in Templates**: Curated templates for desktop, gaming, server, and development environments
+- **GitHub Integration**: Search real-world NixOS configurations from the community
+- **Personal Snippets**: Save and organize your own configuration snippets with tags
+- **Template Categories**: Organized by Desktop, Gaming, Server, Development, etc.
+- **YAML Persistence**: Templates and snippets stored as structured YAML files
+- **Merge Support**: Apply templates with merge capabilities for existing configurations
+
+---
+
 ## 🎨 Terminal Output Formatting
 
 All Markdown and HTML output from nixai is rendered as beautiful, colorized terminal output using [glamour](https://github.com/charmbracelet/glamour) and [termenv](https://github.com/muesli/termenv). This makes AI explanations, documentation, and search results easy to read and visually appealing.
@@ -426,6 +592,40 @@ All Markdown and HTML output from nixai is rendered as beautiful, colorized term
 - Works in all modern terminals.
 - Respects your terminal theme (light/dark).
 - Makes complex output (tables, code, links) readable at a glance.
+
+---
+
+## 🔧 Enhanced Build Troubleshooter
+
+```sh
+# Basic build with AI assistance
+nixai build .#mypackage
+
+# Deep analysis of build failures
+nixai build debug firefox
+
+# Intelligent retry with automated fixes
+nixai build retry
+
+# Cache miss analysis
+nixai build cache-miss
+
+# Sandbox debugging
+nixai build sandbox-debug
+
+# Build performance profiling
+nixai build profile --package vim
+```
+
+The Enhanced Build Troubleshooter provides comprehensive build failure analysis and resolution capabilities:
+
+- **🔍 Deep Analysis**: Pattern recognition for common failure types with detailed explanations
+- **🤖 Intelligent Retry**: Automated application of fixes for common issues with progress feedback
+- **📊 Cache Analysis**: Detailed analysis of cache hit/miss patterns with optimization recommendations
+- **🔐 Sandbox Debugging**: Resolve permission issues and sandbox environment problems
+- **⚡ Performance Profiling**: Identify build bottlenecks and optimization opportunities
+
+Each subcommand provides focused analysis and actionable recommendations, helping you resolve build failures faster and optimize your build process.
 
 ---
 
@@ -888,6 +1088,97 @@ nixai package-repo https://github.com/user/rust-app --output ./derivations --nam
 - **AI Generation**: Creates complete, valid derivations with proper structure and metadata
 - **Validation**: Ensures generated derivations include all required attributes
 - **Git Integration**: Automatic source URL and commit information extraction
+
+### Dependency & Import Graph Analyzer
+
+```sh
+# Show dependency tree with AI insights
+nixai deps analyze
+
+# Explain why a package is installed
+nixai deps why firefox
+
+# Find and resolve conflicts
+nixai deps conflicts
+
+# Suggest dependency optimizations
+nixai deps optimize
+
+# Generate visual dependency graph
+nixai deps graph
+```
+
+The Dependency & Import Graph Analyzer provides comprehensive tools for visualizing and optimizing your NixOS configuration dependencies:
+
+- **🔍 Dependency Mapping**: Build comprehensive dependency graphs with insight into package relationships
+- **❓ Package Explanation**: Get clear explanations of why specific packages are installed in your system
+- **🚫 Conflict Detection**: Identify and resolve package conflicts and overlapping dependencies
+- **⚡ Optimization Analysis**: Find opportunities to streamline your dependency tree for better performance
+- **📊 Visual Graphs**: Generate visual dependency graphs for better understanding of your system
+
+This feature is particularly useful for debugging complex dependency issues, optimizing system performance, and understanding the relationships between packages in your NixOS configuration.
+
+### Configuration Templates & Snippets
+
+Manage curated NixOS configuration templates and personal configuration snippets:
+
+#### Templates
+
+```sh
+# Browse available templates
+nixai templates list
+
+# Search templates by keyword or category
+nixai templates search gaming
+nixai templates search desktop kde
+
+# Show template details and content
+nixai templates show desktop-minimal
+
+# Apply template to current configuration
+nixai templates apply gaming-config
+
+# Save configuration as template
+nixai templates save my-template /path/to/config.nix
+
+# List template categories
+nixai templates categories
+
+# Search GitHub for NixOS configurations
+nixai templates github "gaming nixos configuration"
+nixai templates github "kde plasma nixos"
+```
+
+#### Snippets
+
+```sh
+# List saved snippets
+nixai snippets list
+
+# Search snippets by name or tag
+nixai snippets search nvidia
+
+# Save current config as snippet
+nixai snippets add my-nvidia-config --file /etc/nixos/hardware.nix
+
+# Apply snippet to configuration
+nixai snippets apply gaming-setup --output ./gaming.nix
+
+# Show snippet content
+nixai snippets show my-snippet
+
+# Remove saved snippet
+nixai snippets remove old-config
+```
+
+**Key Features:**
+
+- **Built-in Templates**: Curated templates for desktop, gaming, server, and development environments
+- **GitHub Integration**: Search real-world NixOS configurations from the community
+- **Personal Snippets**: Save and organize your own configuration snippets with tags
+- **Template Categories**: Organized by Desktop, Gaming, Server, Development, etc.
+- **YAML Persistence**: Templates and snippets stored as structured YAML files
+- **Merge Support**: Apply templates with merge capabilities for existing configurations
 
 ### System Health Check
 

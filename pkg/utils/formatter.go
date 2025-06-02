@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -93,6 +94,11 @@ func FormatSection(title, content string) string {
 // FormatSubsection creates a subsection with a subtitle and content
 func FormatSubsection(subtitle, content string) string {
 	return fmt.Sprintf("%s\n%s\n", SubtitleStyle.Render("### "+subtitle), content)
+}
+
+// FormatSubheader creates a bold subheader (used for section headers)
+func FormatSubheader(msg string) string {
+	return SubtitleStyle.Render(msg + ":")
 }
 
 // FormatSuccess creates a success message with checkmark
@@ -290,4 +296,27 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// RenderMarkdown renders markdown text for terminal display
+func RenderMarkdown(markdown string) string {
+	if markdown == "" {
+		return ""
+	}
+
+	renderer, err := glamour.NewTermRenderer(
+		glamour.WithAutoStyle(),
+		glamour.WithWordWrap(100),
+	)
+
+	if err != nil {
+		return markdown // fallback to original text on error
+	}
+
+	rendered, err := renderer.Render(markdown)
+	if err != nil {
+		return markdown // fallback to original text on error
+	}
+
+	return rendered
 }
