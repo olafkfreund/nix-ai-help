@@ -440,6 +440,7 @@ func handleCommand(command string) {
 		os.Exit(0)
 	default:
 		fmt.Println("You entered:", command)
+		fmt.Println("Type 'help' to see available commands.")
 	}
 }
 

@@ -293,6 +293,12 @@ func init() {
 	communityCmd.AddCommand(communityValidateCmd)
 	communityCmd.AddCommand(communityTrendsCmd)
 	communityCmd.AddCommand(communityRateCmd)
+
+	// --- MCP Server Management Commands ---
+	mcpServerCmd.AddCommand(mcpServerStartCmd)
+	mcpServerCmd.AddCommand(mcpServerStopCmd)
+	mcpServerCmd.AddCommand(mcpServerStatusCmd)
+	rootCmd.AddCommand(mcpServerCmd)
 }
 
 // Diagnose command to analyze NixOS configuration issues
