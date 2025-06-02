@@ -21,6 +21,12 @@ func InitializeAIProvider(cfg *config.UserConfig) ai.AIProvider {
 		)
 	case "openai":
 		return ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+	case "custom":
+		if cfg.CustomAI.BaseURL != "" {
+			return ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+		}
+		// fallback to Ollama if not configured
+		return ai.NewOllamaProvider("llama3")
 	default:
 		return ai.NewOllamaProvider("llama3")
 	}
