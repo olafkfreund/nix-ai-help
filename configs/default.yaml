@@ -1,5 +1,11 @@
 default:
-    ai_provider: openai
+    ai_provider: openai  # Options: openai, ollama, gemini, custom
+    # Custom AI provider configuration (used if ai_provider: custom)
+    custom_ai:
+        base_url: http://localhost:8080/api/generate  # HTTP API endpoint URL
+        headers:  # Optional custom headers (e.g., for authentication)
+            Authorization: "Bearer your-api-key-here"
+            # Content-Type: "application/json"  # Set automatically if not provided
     log_level: debug
     mcp_server:
         host: localhost

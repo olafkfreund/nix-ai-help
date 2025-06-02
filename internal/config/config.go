@@ -52,6 +52,12 @@ type DevenvConfig struct {
 	Templates        map[string]DevenvTemplateConfig `yaml:"templates" json:"templates"`
 }
 
+// CustomAIConfig holds config for a custom AI provider
+type CustomAIConfig struct {
+	BaseURL string            `yaml:"base_url" json:"base_url"`
+	Headers map[string]string `yaml:"headers" json:"headers"`
+}
+
 type YAMLConfig struct {
 	AIProvider  string            `yaml:"ai_provider" json:"ai_provider"`
 	LogLevel    string            `yaml:"log_level" json:"log_level"`
@@ -60,6 +66,7 @@ type YAMLConfig struct {
 	Diagnostics DiagnosticsConfig `yaml:"diagnostics" json:"diagnostics"`
 	Commands    CommandsConfig    `yaml:"commands" json:"commands"`
 	Devenv      DevenvConfig      `yaml:"devenv" json:"devenv"`
+	CustomAI    CustomAIConfig    `yaml:"custom_ai" json:"custom_ai"`
 }
 
 type UserConfig struct {
@@ -72,6 +79,7 @@ type UserConfig struct {
 	Diagnostics DiagnosticsConfig `yaml:"diagnostics" json:"diagnostics"`
 	Commands    CommandsConfig    `yaml:"commands" json:"commands"`
 	Devenv      DevenvConfig      `yaml:"devenv" json:"devenv"`
+	CustomAI    CustomAIConfig    `yaml:"custom_ai" json:"custom_ai"`
 }
 
 func DefaultUserConfig() *UserConfig {

@@ -31,6 +31,8 @@ See the full [nixai User Manual](docs/MANUAL.md) for comprehensive feature docum
 - **📝 Configuration Templates & Snippets:** Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
 - **🖥️ Multi-Machine Configuration Manager:** Centrally manage, synchronize, and deploy NixOS configurations across multiple machines. Register, group, sync, deploy, and monitor fleets of NixOS systems from the CLI. See below for details and usage examples.
 - **More Tests:** New tests cover service option lookup, diagnostics, error handling, and packaging features for robust reliability.
+- **🆕 Nix Store Management**: Backup, restore, verify, and analyze the Nix store directly from the CLI.
+- **System State Backup & Restore**: Comprehensive backup/restore with validation and incremental support.
 
 ## Prerequisites
 
@@ -141,6 +143,10 @@ nixai is designed for privacy, productivity, and beautiful terminal output. Whet
 - **NEW:** 📝 **Configuration Templates & Snippets** — Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
 
 - **NEW:** 🖥️ **Multi-Machine Configuration Manager** — Register, manage, group, and deploy NixOS configurations to multiple machines with a single CLI. Includes machine registry, group management, configuration sync, deployment, diff analysis, and status monitoring.
+
+- **NEW:** 🆕 **Nix Store Management** — Backup, restore, verify, and analyze the Nix store directly from the CLI.
+
+- **NEW:** **System State Backup & Restore** — Comprehensive backup/restore with validation and incremental support.
 
 ---
 
@@ -445,6 +451,8 @@ See the [User Manual](docs/MANUAL.md#migration-assistant) for full details and t
 - **🧩 Flake Input Analysis:** Analyze and explain flake inputs using AI, with upstream README/flake.nix summaries.
 - **🏥 System Health Checks:** Run comprehensive NixOS system health checks with AI-powered analysis and recommendations.
 - **✅ Comprehensive Test Coverage:** Extensive test coverage for service option lookup, diagnostics, error handling, packaging features, and HTML filtering for robust reliability.
+- **🆕 Nix Store Management**: Backup, restore, verify, and analyze the Nix store directly from the CLI.
+- **System State Backup & Restore**: Comprehensive backup/restore with validation and incremental support.
 
 ---
 
@@ -1343,6 +1351,69 @@ The Dependency & Import Graph Analyzer provides comprehensive tools for visualiz
 - **📊 Visual Graphs**: Generate visual dependency graphs for better understanding of your system
 
 This feature is particularly useful for debugging complex dependency issues, optimizing system performance, and understanding the relationships between packages in your NixOS configuration.
+
+---
+
+## 🏪 Nix Store Management
+
+Manage, backup, restore, and analyze your Nix store directly from the CLI. These commands help ensure the integrity, recoverability, and performance of your NixOS system.
+
+### Store Command Usage
+
+```sh
+# Create a Nix store backup (default output file)
+nixai store backup
+
+# Create a Nix store backup with a custom output file
+nixai store backup --output my-backup.tar.gz
+
+# Restore the Nix store and configuration from a backup
+nixai store restore my-backup.tar.gz
+
+# Check the integrity of the Nix store and configuration
+nixai store integrity
+
+# Analyze Nix store performance and usage
+nixai store performance
+```
+
+**Example Output:**
+
+```text
+🗄️ Nix Store Backup
+━━━━━━━━━━━━━━━━━━━
+Creating backup...
+✔️ Backup created at: my-backup.tar.gz
+
+♻️ Nix Store Restore
+━━━━━━━━━━━━━━━━━━━━
+Restoring from backup: my-backup.tar.gz
+✔️ Restore completed from: my-backup.tar.gz
+
+🔍 Nix Store Integrity Check
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Checking store integrity...
+✔️ Store integrity check completed (no issues found).
+
+⚡ Nix Store Performance Analysis
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Analyzing store performance...
+✔️ Store performance analysis completed.
+```
+
+See the manual for advanced options and integration with disaster recovery workflows.
+
+---
+
+### System State Backup (Planned/Preview)
+
+```sh
+nixai backup create               # Create comprehensive backup
+nixai backup restore <backup>     # Restore from backup
+nixai backup schedule             # Schedule automated backups
+nixai backup verify               # Verify backup integrity
+nixai backup list                 # List available backups
+```
 
 ### Configuration Templates & Snippets
 

@@ -394,6 +394,11 @@ func initializeAIProvider(cfg *config.UserConfig) ai.AIProvider {
 		return ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 	case "openai":
 		return ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+	case "custom":
+		if cfg.CustomAI.BaseURL != "" {
+			return ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+		}
+		return ai.NewOllamaProvider("llama3")
 	default:
 		return ai.NewOllamaProvider("llama3")
 	}

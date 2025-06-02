@@ -152,6 +152,12 @@ You can also ask questions directly, e.g.:
 			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 		case "openai":
 			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		case "custom":
+			if cfg.CustomAI.BaseURL != "" {
+				provider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+			} else {
+				provider = ai.NewOllamaProvider(getOllamaModel(""))
+			}
 		default:
 			provider = ai.NewOllamaProvider(getOllamaModel(""))
 		}
@@ -299,6 +305,15 @@ func init() {
 	mcpServerCmd.AddCommand(mcpServerStopCmd)
 	mcpServerCmd.AddCommand(mcpServerStatusCmd)
 	rootCmd.AddCommand(mcpServerCmd)
+
+	// Register flags for mcp-server start (must be after AddCommand)
+	mcpServerStartCmd.Flags().BoolP("daemon", "d", false, "Run the MCP server in background (daemon) mode")
+	mcpServerStartCmd.Flags().Bool("background", false, "Run the MCP server in background (legacy; use --daemon/-d)")
+	mcpServerStartCmd.Flags().String("socket-path", "", "Custom Unix socket path for MCP server")
+	mcpServerStartCmd.Flags().String("config", "", "Path to MCP server config file (YAML)")
+
+	// --- Store Management Commands ---
+	rootCmd.AddCommand(storeCmd)
 }
 
 // Diagnose command to analyze NixOS configuration issues
@@ -379,6 +394,12 @@ Options:
 				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			case "custom":
+				if cfg.CustomAI.BaseURL != "" {
+					provider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+				} else {
+					provider = ai.NewOllamaProvider("llama3")
+				}
 			default:
 				provider = ai.NewOllamaProvider("llama3")
 			}
@@ -643,11 +664,17 @@ Examples:
 				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			case "custom":
+				if cfg.CustomAI.BaseURL != "" {
+					provider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+				} else {
+					provider = ai.NewOllamaProvider(getOllamaModel(""))
+				}
 			default:
-				provider = ai.NewOllamaProvider("llama3")
+				provider = ai.NewOllamaProvider(getOllamaModel(""))
 			}
 		} else {
-			provider = ai.NewOllamaProvider("llama3")
+			provider = ai.NewOllamaProvider(getOllamaModel(""))
 		}
 
 		// Handle different subcommands
@@ -786,6 +813,12 @@ Examples:
 				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			case "custom":
+				if cfg.CustomAI.BaseURL != "" {
+					provider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+				} else {
+					provider = ai.NewOllamaProvider("llama3")
+				}
 			default:
 				provider = ai.NewOllamaProvider("llama3")
 			}
@@ -840,6 +873,12 @@ var flakeCreateCmd = &cobra.Command{
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 			} else if cfg.AIProvider == "gemini" {
 				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
+			} else if cfg.AIProvider == "custom" {
+				if cfg.CustomAI.BaseURL != "" {
+					provider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+				} else {
+					provider = ai.NewOllamaProvider("llama3")
+				}
 			}
 			prompt := "Review and correct this Nix flake.nix file. Fix any errors, fill in missing fields, and suggest best practices.\n\n" + string(content)
 			aiResp, aiErr := provider.Query(prompt)
@@ -1005,6 +1044,12 @@ func ExplainFlakeInputs(inputs []string) {
 			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 		case "openai":
 			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		case "custom":
+			if cfg.CustomAI.BaseURL != "" {
+				provider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+			} else {
+				provider = ai.NewOllamaProvider("llama3")
+			}
 		default:
 			provider = ai.NewOllamaProvider("llama3")
 		}
@@ -1138,6 +1183,20 @@ func summarizeText(text string) string {
 		return text[:1500] + "..."
 	}
 	return text
+}
+
+// buildServiceExamplesPrompt creates a comprehensive prompt for AI to generate real-world NixOS service configuration examples
+func buildServiceExamplesPrompt(serviceName string) string {
+	return fmt.Sprintf(`You are a NixOS expert. Provide real-world configuration examples and explanations for the NixOS service: '%s'.
+
+Please include:
+1. A brief overview of what this service does
+2. At least 2-3 practical configuration examples (basic, common, and advanced usage)
+3. Explanations for each example
+4. Any important options, best practices, or security tips
+5. Links to official documentation if available
+
+Format your response in Markdown with code blocks for configuration examples.`, serviceName)
 }
 
 // Execute runs the root command
@@ -1532,8 +1591,14 @@ var explainOptionCmd = &cobra.Command{
 			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 		case "openai":
 			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		case "custom":
+			if cfg.CustomAI.BaseURL != "" {
+				provider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+			} else {
+				provider = ai.NewOllamaProvider(getOllamaModel(""))
+			}
 		default:
-			provider = ai.NewOllamaProvider("llama3")
+			provider = ai.NewOllamaProvider(getOllamaModel(""))
 		}
 
 		prompt := buildExplainOptionPrompt(option, doc)
@@ -1653,6 +1718,12 @@ var explainHomeOptionCmd = &cobra.Command{
 			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 		case "openai":
 			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		case "custom":
+			if cfg.CustomAI.BaseURL != "" {
+				provider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+			} else {
+				provider = ai.NewOllamaProvider(cfg.AIModel)
+			}
 		default:
 			provider = ai.NewOllamaProvider("llama3")
 		}
@@ -1705,6 +1776,12 @@ Examples:
 			provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 		case "openai":
 			provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		case "custom":
+			if cfg.CustomAI.BaseURL != "" {
+				provider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+			} else {
+				provider = ai.NewOllamaProvider(cfg.AIModel)
+			}
 		default:
 			provider = ai.NewOllamaProvider("llama3")
 		}
@@ -1843,7 +1920,7 @@ func runHealthCheck(cfg *config.UserConfig) {
 	healthReport = append(healthReport, channelStatus...)
 	issues = append(issues, channelIssues...)
 
-	fmt.Print(utils.FormatProgress("🚀 Checking boot system"))
+	fmt.Print(utils.FormatProgress("🚀 Checking boot system..."))
 	fmt.Println()
 
 	// 5. Check boot system integrity
@@ -2205,6 +2282,12 @@ Be specific and actionable. Focus on NixOS-specific solutions.`
 		provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 	case "openai":
 		provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+	case "custom":
+		if cfg.CustomAI.BaseURL != "" {
+			provider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+		} else {
+			provider = ai.NewOllamaProvider(cfg.AIModel)
+		}
 	default:
 		provider = ai.NewOllamaProvider("llama3")
 	}
@@ -2301,6 +2384,12 @@ Examples:
 				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			case "custom":
+				if cfg.CustomAI.BaseURL != "" {
+					provider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+				} else {
+					provider = ai.NewOllamaProvider(cfg.AIModel)
+				}
 			default:
 				provider = ai.NewOllamaProvider("llama3")
 			}
@@ -2381,6 +2470,12 @@ Examples:
 				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			case "custom":
+				if cfg.CustomAI.BaseURL != "" {
+					provider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+				} else {
+					provider = ai.NewOllamaProvider(cfg.AIModel)
+				}
 			default:
 				provider = ai.NewOllamaProvider("llama3")
 			}
@@ -2480,6 +2575,7 @@ Examples:
 			}
 		}
 
+		// Display pre-upgrade checks with real-time progress
 		// Display pre-upgrade checks with real-time progress
 		fmt.Println(utils.FormatHeader("🔍 Pre-Upgrade System Checks"))
 		fmt.Print(utils.FormatProgress("Running comprehensive system analysis..."))
@@ -2736,6 +2832,12 @@ The generated derivation will follow nixpkgs conventions and include:
 			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		case "custom":
+			if cfg.CustomAI.BaseURL != "" {
+				aiProvider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+			} else {
+				aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			}
 		default:
 			aiProvider = ai.NewOllamaProvider("llama3")
 		}
@@ -2855,6 +2957,7 @@ The generated derivation will follow nixpkgs conventions and include:
 			fmt.Printf("📦 Generated derivation for: %s\n", result.Analysis.ProjectName)
 			fmt.Printf("🔧 Build system: %s\n", result.Analysis.BuildSystem)
 			fmt.Printf("📝 Language: %s\n", result.Analysis.Language)
+			fmt.Printf("📄 Derivation:\n%s\n", result.Derivation)
 		}
 
 		// Display validation issues if any
@@ -2918,6 +3021,12 @@ Examples:
 				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			case "custom":
+				if cfg.CustomAI.BaseURL != "" {
+					provider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+				} else {
+					provider = ai.NewOllamaProvider(cfg.AIModel)
+				}
 			default:
 				provider = ai.NewOllamaProvider("llama3")
 			}
@@ -3018,6 +3127,12 @@ Examples:
 				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 			case "openai":
 				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			case "custom":
+				if cfg.CustomAI.BaseURL != "" {
+					provider = ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+				} else {
+					provider = ai.NewOllamaProvider(cfg.AIModel)
+				}
 			default:
 				provider = ai.NewOllamaProvider("llama3")
 			}
@@ -3059,53 +3174,6 @@ Examples:
 		fmt.Println()
 		fmt.Println(utils.FormatNote("💡 Tip: Test your configuration with 'sudo nixos-rebuild dry-run' before applying changes"))
 	},
-}
-
-// buildServiceExamplesPrompt creates a comprehensive prompt for service examples
-func buildServiceExamplesPrompt(serviceName string) string {
-	return fmt.Sprintf(`You are a NixOS expert providing real-world configuration examples for services.
-
-**Service:** %s
-
-Please provide comprehensive examples and explanations:
-
-## 🛠️ Service Overview
-- What this service does and why you'd use it
-- Common use cases and scenarios
-
-## ⚙️ Basic Configuration
-- Minimal working configuration
-- Essential options that must be set
-- Default behavior when enabled
-
-## 🔧 Common Configurations
-- Popular real-world setups
-- Different use case scenarios
-- Configuration variations
-
-## 🚀 Advanced Examples
-- Complex configurations
-- Integration with other services
-- Performance and security optimizations
-
-## 💡 Best Practices
-- Security considerations
-- Performance recommendations
-- Common pitfalls to avoid
-- Maintenance tips
-
-## 🔗 Related Services
-- Services that work well together
-- Dependencies or prerequisites
-- Complementary tools
-
-**Format your response using clear Markdown with:**
-- Code blocks for all configuration examples (use `+"`nix`"+` code blocks)
-- Clear headings and sections
-- Practical, working examples
-- Explanations for each configuration option
-
-Focus on real-world, practical examples that users can actually use and adapt.`, serviceName)
 }
 
 // performBasicSyntaxCheck performs basic Nix syntax validation
