@@ -51,6 +51,7 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 - [Development Environment (devenv) Feature](#development-environment-devenv-feature)
 - [Neovim + Home Manager Integration](#neovim--home-manager-integration)
 - [Migration Assistant](#migration-assistant)
+- [Flake Creation & Correction (`nixai flake create`)](#flake-creation--correction-nixai-flake-create)
 
 ---
 
@@ -4645,5 +4646,75 @@ nixai migrate to-flakes --nixos-path /etc/nixos
 - If migration fails, check the backup directory for your previous configuration
 - Review AI explanations for manual steps or caveats
 - For complex setups, consult the official NixOS documentation or ask direct questions with `nixai --ask`
+
+---
+
+## Flake Creation & Correction (`nixai flake create`)
+
+The `nixai flake create` command helps you quickly create, correct, or upgrade a `flake.nix` for any project folder, with AI-powered build system detection and best-practice suggestions.
+
+### Features
+
+- Create a minimal flake from scratch (`--from-scratch`)
+- Analyze a project folder and generate a flake for Go, Node, Rust, Python, or generic projects (`--analyze`)
+- Correct and upgrade an existing `flake.nix` with AI assistance (`--fix`)
+- Overwrite with `--force`
+- Customize system and description
+
+### Usage Examples
+
+#### Create a minimal flake.nix in the current directory
+
+```sh
+nixai flake create --from-scratch
+```
+
+#### Analyze a project folder and generate a flake.nix
+
+```sh
+nixai flake create . --analyze
+```
+
+#### Fix and update an existing flake.nix using AI
+
+```sh
+nixai flake create . --fix --force
+```
+
+#### Specify system and description
+
+```sh
+nixai flake create myproject --from-scratch --system x86_64-linux --desc "My Project Flake"
+```
+
+#### Real-life Example: Node.js Project
+
+Suppose you have a Node.js project with a `package.json` file. Run:
+
+```sh
+nixai flake create . --analyze
+```
+
+This will generate a `flake.nix` using `buildNpmPackage` and fill in the project name and metadata. The output will include an AI explanation and best practices for your flake.
+
+#### Real-life Example: Rust Project
+
+For a Rust project with a `Cargo.toml` file:
+
+```sh
+nixai flake create . --analyze
+```
+
+The tool will detect Rust, use `buildRustPackage`, and generate a suitable flake.nix.
+
+#### Real-life Example: Fixing an Existing Flake
+
+If you have a `flake.nix` that is incomplete or broken:
+
+```sh
+nixai flake create . --fix --force
+```
+
+The AI will review, correct, and optionally overwrite your flake.nix, providing a summary of changes and best practices.
 
 ---
