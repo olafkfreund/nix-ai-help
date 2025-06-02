@@ -48,6 +48,7 @@ A console-based Linux application to help solve NixOS configuration problems and
 - ✅ **Fixed interactive mode EOF handling** for proper graceful exit with piped input
 - ✅ **Comprehensive testing** with MCP server integration and all features validated
 - ✅ **NEW: AI-Powered Package Repository Analysis** with `package-repo` command for automated Nix derivation generation
+- ✅ **NEW: Learning & Onboarding System** with comprehensive interactive learning modules, AI-powered quizzes, and personalized learning paths
 
 ---
 
