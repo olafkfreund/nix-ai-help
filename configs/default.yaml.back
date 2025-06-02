@@ -1,0 +1,48 @@
+default:
+    ai_provider: openai  # Options: openai, ollama, gemini, custom
+    # Custom AI provider configuration (used if ai_provider: custom)
+    custom_ai:
+        base_url: http://localhost:8080/api/generate  # HTTP API endpoint URL
+        headers:  # Optional custom headers (e.g., for authentication)
+            Authorization: "Bearer your-api-key-here"
+            # Content-Type: "application/json"  # Set automatically if not provided
+    log_level: debug
+    mcp_server:
+        host: localhost
+        port: 8081
+        socket_path: /tmp/nixai-mcp.sock
+        auto_start: false
+        documentation_sources:
+            - nixos-options-es://options  # Special endpoint for NixOS options via ElasticSearch
+            - https://wiki.nixos.org/wiki/NixOS_Wiki
+            - https://nix.dev/manual/nix
+            - https://nixos.org/manual/nixpkgs/stable/
+            - https://nix.dev/manual/nix/2.28/language/
+            - https://nix-community.github.io/home-manager/
+    nixos:
+        config_path: /etc/nixos/configuration.nix
+        log_path: /var/log/nixos.log
+    diagnostics:
+        enabled: true
+        threshold: 5
+    commands:
+        timeout: 30
+        retries: 3
+    devenv:
+        default_directory: "."
+        auto_init_git: true
+        templates:
+            python:
+                enabled: true
+                default_version: "311"
+                default_package_manager: "pip"
+            rust:
+                enabled: true
+                default_version: "stable"
+            nodejs:
+                enabled: true
+                default_version: "20"
+                default_package_manager: "npm"
+            golang:
+                enabled: true
+                default_version: "1.21"

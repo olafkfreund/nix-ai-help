@@ -2,13 +2,64 @@ package config
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"os/user"
 	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
+
+// EmbeddedDefaultConfig contains the default configuration YAML that gets compiled into the binary.
+// This eliminates the need for external config files when installing via nix build.
+const EmbeddedDefaultConfig = `default:
+    ai_provider: ollama  # Options: openai, ollama, gemini, custom
+    ai_model: llama3
+    # Custom AI provider configuration (used if ai_provider: custom)
+    custom_ai:
+        base_url: http://localhost:8080/api/generate  # HTTP API endpoint URL
+        headers:  # Optional custom headers (e.g., for authentication)
+            Authorization: "Bearer your-api-key-here"
+            # Content-Type: "application/json"  # Set automatically if not provided
+    log_level: info
+    mcp_server:
+        host: localhost
+        port: 8081
+        socket_path: /tmp/nixai-mcp.sock
+        auto_start: false
+        documentation_sources:
+            - https://wiki.nixos.org/wiki/NixOS_Wiki
+            - https://nix.dev/manual/nix
+            - https://nixos.org/manual/nixpkgs/stable/
+            - https://nix.dev/manual/nix/2.28/language/
+            - https://nix-community.github.io/home-manager/
+    nixos:
+        config_path: /etc/nixos/configuration.nix
+        log_path: /var/log/nixos.log
+    diagnostics:
+        enabled: true
+        threshold: 5
+    commands:
+        timeout: 30
+        retries: 3
+    devenv:
+        default_directory: "."
+        auto_init_git: true
+        templates:
+            python:
+                enabled: true
+                default_version: "311"
+                default_package_manager: "pip"
+            rust:
+                enabled: true
+                default_version: "stable"
+            nodejs:
+                enabled: true
+                default_version: "20"
+                default_package_manager: "npm"
+            golang:
+                enabled: true
+                default_version: "1.21"
+`
 
 type Config struct {
 	AIProvider string `json:"ai_provider"`
@@ -199,13 +250,7 @@ func SaveUserConfig(cfg *UserConfig) error {
 
 func LoadConfig(filePath string) (*Config, error) {
 	// #nosec G304 -- Config file paths are validated and not user-supplied
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	bytes, err := ioutil.ReadAll(file)
+	bytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -225,18 +270,12 @@ func SaveConfig(filePath string, config *Config) error {
 	}
 
 	// #nosec G306 -- Config files are not sensitive, 0644 is intentional for user config
-	return ioutil.WriteFile(filePath, bytes, 0644)
+	return os.WriteFile(filePath, bytes, 0644)
 }
 
 func LoadYAMLConfig(filePath string) (*YAMLConfig, error) {
 	// #nosec G304 -- Config file paths are validated and not user-supplied
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	bytes, err := ioutil.ReadAll(file)
+	bytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -249,4 +288,63 @@ func LoadYAMLConfig(filePath string) (*YAMLConfig, error) {
 	}
 
 	return &config.Default, nil
+}
+
+// LoadEmbeddedYAMLConfig loads the embedded YAML configuration
+func LoadEmbeddedYAMLConfig() (*YAMLConfig, error) {
+	var config struct {
+		Default YAMLConfig `yaml:"default"`
+	}
+	if err := yaml.Unmarshal([]byte(EmbeddedDefaultConfig), &config); err != nil {
+		return nil, err
+	}
+
+	return &config.Default, nil
+}
+
+// EnsureConfigFileFromEmbedded creates user config from embedded default if it doesn't exist
+func EnsureConfigFileFromEmbedded() (string, error) {
+	path, err := ConfigFilePath()
+	if err != nil {
+		return "", err
+	}
+
+	// If config file doesn't exist, create it from embedded default
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		dir := filepath.Dir(path)
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			return "", err
+		}
+
+		// Parse embedded config and extract the content under 'default:' key
+		embeddedCfg, err := LoadEmbeddedYAMLConfig()
+		if err != nil {
+			return "", err
+		}
+
+		// Convert to UserConfig structure and write as YAML
+		userCfg := &UserConfig{
+			AIProvider:  embeddedCfg.AIProvider,
+			AIModel:     "llama3",         // Default model
+			NixosFolder: "~/nixos-config", // Default folder
+			LogLevel:    embeddedCfg.LogLevel,
+			MCPServer:   embeddedCfg.MCPServer,
+			Nixos:       embeddedCfg.Nixos,
+			Diagnostics: embeddedCfg.Diagnostics,
+			Commands:    embeddedCfg.Commands,
+			Devenv:      embeddedCfg.Devenv,
+			CustomAI:    embeddedCfg.CustomAI,
+		}
+
+		// Marshal to YAML and write to user config file
+		data, err := yaml.Marshal(userCfg)
+		if err != nil {
+			return "", err
+		}
+
+		if err := os.WriteFile(path, data, 0600); err != nil {
+			return "", err
+		}
+	}
+	return path, nil
 }

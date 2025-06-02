@@ -11,17 +11,25 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 ### Documentation Display Enhancements (May 2025)
 
 - **🧹 HTML Filtering**: Complete removal of HTML tags, DOCTYPE declarations, wiki navigation elements, and raw content from all documentation output
+
 - **🎨 Enhanced Formatting**: Consistent use of headers, dividers, key-value pairs, and glamour markdown rendering for improved readability
+
 - **🏠 Smart Option Detection**: Automatic visual distinction between NixOS options (`🖥️ NixOS Option`) and Home Manager options (`🏠 Home Manager Option`)
+
 - **🔧 Robust Error Handling**: Better error messages, graceful fallbacks when MCP server is unavailable, and clear feedback for configuration issues
+
 - **🧪 Comprehensive Testing**: All improvements are backed by extensive test coverage to ensure reliability
 
 ### Core Capabilities
 
 - **🤖 Direct Question Assistant**: Ask questions directly with `nixai "your question"` for instant AI-powered help
+
 - **📖 Documentation Integration**: Enhanced MCP server integration for official NixOS documentation retrieval
+
 - **🔌 Editor Integration**: Full support for Neovim and VS Code with automatic setup and configuration
+
 - **📦 Package Analysis**: AI-powered repository analysis with Nix derivation generation
+
 - **🔍 Option Explanation**: Comprehensive explanations for NixOS and Home Manager options with examples and best practices
 
 ---
@@ -29,33 +37,62 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 ## Table of Contents
 
 - [Getting Started](#getting-started)
+
   - [Prerequisites](#prerequisites)
+
   - [Basic Setup](#basic-setup)
+
   - [MCP Server for Documentation](#mcp-server-for-documentation)
+
   - [Direct Question Assistant](#direct-question-assistant)
+
 - [Diagnosing NixOS Issues](#diagnosing-nixos-issues)
+
 - [Explaining NixOS and Home Manager Options](#explaining-nixos-and-home-manager-options)
+
 - [Searching for Packages and Services](#searching-for-packages-and-services)
+
 - [AI-Powered Package Repository Analysis](#ai-powered-package-repository-analysis)
+
 - [System Health Checks](#system-health-checks)
+
 - [🖥️ Multi-Machine Configuration Manager](#multi-machine-configuration-manager)
+
 - [Configuration Templates & Snippets](#configuration-templates--snippets)
+
 - [Interactive Mode](#interactive-mode)
+
 - [Editor Integration](#editor-integration)
+
   - [Neovim Integration](#neovim-integration)
+
 - [Advanced Usage](#advanced-usage)
+
   - [Enhanced Build Troubleshooter](#enhanced-build-troubleshooter)
+
   - [Dependency & Import Graph Analyzer](#dependency--import-graph-analyzer)
+
 - [Configuration](#configuration)
+
 - [Tips & Troubleshooting](#tips--troubleshooting)
+
 - [Development Environment (devenv) Feature](#development-environment-devenv-feature)
+
 - [Neovim + Home Manager Integration](#neovim--home-manager-integration)
+
 - [Migration Assistant](#migration-assistant)
+
 - [Flake Creation & Correction (`nixai flake create`)](#flake-creation--correction-nixai-flake-create)
+
 - [🩺 Doctor Command: System Diagnostics & Troubleshooting](#doctor-command-system-diagnostics--troubleshooting)
+
 - [🆕 Store Management and System Backup](#store-management-and-system-backup)
+
 - [🏪 Nix Store Management and System State Backup](#nix-store-management-and-system-state-backup)
+
 - [🐚 Shell Integration: Always-On nixai Assistant](#shell-integration-always-on-nixai-assistant)
+
+- [MCP Server: Advanced Features](#mcp-server-advanced-features)
 
 ---
 
@@ -64,54 +101,18 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 ### Prerequisites
 
 - Nix (with flakes enabled)
+
 - Go (if developing outside Nix shell)
+
 - just (for development tasks)
+
 - Ollama (for local LLM inference, recommended)
+
 - git
 
 ### Basic Setup
 
 ```sh
-# Enter the Nix development environment
-nix develop
-
-# Build the application
-just build
-
-# Run help
-./nixai --help
-```
-
-### MCP Server for Documentation
-
-nixai integrates with an MCP (Model Context Protocol) server to retrieve official NixOS documentation. For optimal performance, start the MCP server:
-
-```sh
-# Start MCP server in background (recommended)
-./nixai mcp-server start
-
-# Check server status
-./nixai mcp-server status
-
-# Stop server when done
-./nixai mcp-server stop
-```
-
-The MCP server queries official documentation sources including:
-
-- NixOS Wiki
-- Nix Manual
-- Nixpkgs Manual  
-- Nix Language Reference
-- Home Manager Manual
-
-**Note**: The MCP server runs on `localhost:8081` by default and provides enhanced documentation context for all AI providers.
-
-### Direct Question Assistant
-
-The simplest and most direct way to use nixai is by asking questions about NixOS directly from the command line. This feature makes nixai incredibly accessible for both beginners and experts.
-
-#### Basic Usage
 
 ```sh
 # Ask questions directly by providing them as arguments
@@ -4825,3 +4826,98 @@ nixai store restore /backups/pre-upgrade-20250601.tar.gz
 For advanced disaster recovery, see the [Disaster Recovery and Backup Management](#disaster-recovery-and-backup-management) section.
 
 ---
+
+## MCP Server: Advanced Features
+
+### Hot-Reloading Configuration
+- The MCP server watches its YAML config file (default: `~/.config/nixai/config.yaml`) and automatically reloads documentation sources and settings at runtime. No restart is required for config changes. Reload events are logged.
+
+### Structured Logging
+- All logging uses the `pkg/logger` structured logger. Log level is set via config and can be reloaded at runtime. Logs are consistent and include context for debugging and monitoring.
+
+#### Example Log Output
+```
+INFO[2025-06-02T12:34:56Z] Starting MCP server | addr=127.0.0.1:8081
+INFO[2025-06-02T12:35:01Z] Config file changed, reloading...
+INFO[2025-06-02T12:35:01Z] Reloaded documentation sources from config.
+```
+
+### Health and Metrics Endpoints
+- `/healthz`: Returns JSON with status and uptime.
+- `/metrics`: Prometheus-compatible metrics (uptime, request counters, etc.).
+
+### Graceful Shutdown
+- `/shutdown`: Triggers a clean shutdown of the MCP server. All shutdown events are logged.
+
+### Testable Logger
+- The logger can be injected with a custom writer for integration tests, allowing assertions on log output.
+
+### Usage Example: Hot-Reload
+1. Edit your MCP config YAML (e.g. add/remove documentation sources).
+2. The server will detect changes and reload settings automatically. Check logs for reload confirmation.
+
+### Usage Example: Query Endpoint
+```
+curl -X POST http://localhost:8081/query -d '{"query": "services.nginx.enable"}' -H 'Content-Type: application/json'
+```
+
+### Notes
+- All features are covered by integration and unit tests.
+- For more details, see the README and source code in `internal/mcp/` and `pkg/logger/`.
+
+---
+
+## 🐚 Shell Integration: Always-On nixai Assistant
+
+The nixai shell integration provides an always-on assistant for your terminal, enabling you to access nixai features without leaving your shell environment. This integration is ideal for developers and system administrators who want quick access to NixOS assistance while working in the terminal.
+
+### Features
+
+- Persistent nixai assistant in your shell
+- Context-aware commands and suggestions
+- Integration with your shell prompt
+- Quick access to nixai features
+
+### Setup
+
+To enable shell integration, add the following to your shell configuration file (`~/.bashrc`, `~/.zshrc`, or `~/.config/fish/config.fish`):
+
+```sh
+# nixai shell integration
+export NIXAI_SHELL_INTEGRATION=true
+export NIXAI_CONFIG_PATH=~/.config/nixai/config.yaml
+source /path/to/nixai/shell-integration.sh
+```
+
+### Usage
+
+Once enabled, you can use nixai commands directly in your shell:
+
+```sh
+# Ask a question
+nixai "How do I enable SSH in NixOS?"
+
+# Search for a package
+nixai search pkg nginx
+
+# Diagnose a log file
+nixai diagnose --log-file /var/log/nixos/nixos-rebuild.log
+
+# Explain an option
+nixai explain-option services.nginx.enable
+```
+
+### Benefits
+
+- Always-on assistant for quick access to nixai features
+- Seamless integration with your shell environment
+- Context-aware suggestions and commands
+- Ideal for developers and system administrators
+
+---
+
+## Conclusion
+
+nixai is your ultimate NixOS assistant, providing powerful features for diagnostics, documentation, automation, and more. Whether you're a beginner or an advanced user, nixai has the tools you need to make the most of your NixOS experience.
+
+For more information, visit the [nixai GitHub repository](https://github.com/olafkfreund/nix-ai-help) or consult the [nixai User Manual](docs/MANUAL.md).
