@@ -1,3 +1,0 @@
-ls
-nix develop
-exit

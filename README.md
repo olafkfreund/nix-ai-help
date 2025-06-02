@@ -16,7 +16,7 @@ See the full [nixai User Manual](docs/MANUAL.md) for comprehensive feature docum
 
 ---
 
-### This is development code. Things may not work or are broken. I'm changing the code all the time. Don't expect something production ready
+### This is development code. Things may not work or is broken. I'm changing the code all the time. Don't expect something production ready
 
 ## 🚀 What's New (June 2025)
 

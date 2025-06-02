@@ -15,6 +15,7 @@ import (
 
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/learning"
 	"nix-ai-help/internal/mcp"
 	"nix-ai-help/internal/neovim"
 	"nix-ai-help/internal/nixos"
@@ -271,6 +272,14 @@ func init() {
 
 	// Note: The following command would be registered here but are commented out to focus on the core build functionality first
 	// rootCmd.AddCommand(neovimCmd)
+
+	// --- Learning & Onboarding System Commands ---
+	rootCmd.AddCommand(learnCmd)
+	learnCmd.AddCommand(learnBasicsCmd)
+	learnCmd.AddCommand(learnAdvancedCmd)
+	learnCmd.AddCommand(learnQuizCmd)
+	learnCmd.AddCommand(learnPathCmd)
+	learnCmd.AddCommand(learnProgressCmd)
 }
 
 // Diagnose command to analyze NixOS configuration issues
@@ -3169,43 +3178,209 @@ Use --short for just the version number, or --json for JSON output.`,
 	},
 }
 
-// --- Config command handler stubs ---
-func handleConfigShow(provider ai.AIProvider) {
-	fmt.Println("[STUB] handleConfigShow called")
+// --- Learning & Onboarding System Commands ---
+var learnCmd = &cobra.Command{
+	Use:   "learn",
+	Short: "Interactive learning and onboarding for NixOS",
+	Long: `Interactive learning modules, quizzes, and onboarding for NixOS users at all skill levels.
+
+Examples:
+  nixai learn basics
+  nixai learn advanced
+  nixai learn quiz
+  nixai learn path <topic>
+  nixai learn progress`,
+	Run: func(cmd *cobra.Command, args []string) {
+		_ = cmd.Help()
+	},
 }
 
-func handleConfigSet(args []string, provider ai.AIProvider) {
-	fmt.Println("[STUB] handleConfigSet called with args:", args)
+var learnBasicsCmd = &cobra.Command{
+	Use:   "basics",
+	Short: "Learn basic NixOS concepts",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(utils.FormatHeader("📚 NixOS Basics: Interactive Learning"))
+		module := learning.Module{
+			ID:          "basics",
+			Title:       "NixOS Basics",
+			Description: "Get started with the core concepts of NixOS: what it is, how it works, and how to use declarative configuration.",
+			Steps: []learning.Step{
+				{Title: "What is NixOS?", Instruction: "NixOS is a Linux distribution built on the Nix package manager. It uses declarative configuration for the entire system."},
+				{Title: "Declarative Configuration", Instruction: "All system settings are described in configuration.nix. You edit this file to change your system, then rebuild."},
+				{Title: "Reproducibility", Instruction: "NixOS makes it easy to reproduce your system on any machine. All dependencies are tracked and managed by Nix."},
+				{Title: "Safe Upgrades & Rollbacks", Instruction: "Every change creates a new system generation. You can roll back to any previous state with a single command."},
+				{Title: "Basic Commands", Instruction: "Try these in your terminal:", Example: "sudo nixos-rebuild switch\nnixos-option services.nginx.enable\nnix search wget"},
+			},
+		}
+		learning.RenderModule(module)
+		progress, _ := learning.LoadProgress()
+		if progress.CompletedModules == nil {
+			progress.CompletedModules = map[string]bool{}
+		}
+		progress.CompletedModules[module.ID] = true
+		_ = learning.SaveProgress(progress)
+		fmt.Println(utils.FormatDivider())
+		fmt.Println(utils.FormatTip("Next: Try 'nixai learn quiz' to test your knowledge!"))
+	},
 }
 
-func handleConfigUnset(args []string, provider ai.AIProvider) {
-	fmt.Println("[STUB] handleConfigUnset called with args:", args)
+var learnAdvancedCmd = &cobra.Command{
+	Use:   "advanced",
+	Short: "Learn advanced NixOS topics",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(utils.FormatHeader("📚 NixOS Advanced: Interactive Learning"))
+		module := learning.Module{
+			ID:          "advanced",
+			Title:       "NixOS Advanced Topics",
+			Description: "Deepen your NixOS knowledge: flakes, overlays, custom modules, advanced debugging, and system optimization.",
+			Steps: []learning.Step{
+				{Title: "Nix Flakes", Instruction: "Flakes are a new way to package and distribute Nix-based projects. They provide reproducibility, versioning, and input/output management.", Example: "nix flake show github:NixOS/nixpkgs/nixos-unstable", Exercise: "Try running 'nix flake show' on a public flake."},
+					{Title: "Overlays", Instruction: "Overlays let you extend or override packages in nixpkgs. Useful for patching or customizing packages globally.", Example: "# overlays = [ (self: super: { mypkg = super.hello.override { name = \"myhello\"; }; }) ];", Exercise: "Add a simple overlay to your configuration.nix."},
+				{Title: "Custom Modules", Instruction: "Write your own NixOS modules to encapsulate reusable configuration logic. Modules can define options, defaults, and merge logic.", Example: "# See docs for mkOption, mkIf, and config._module.args", Exercise: "Create a minimal custom module that sets a system option."},
+				{Title: "Debugging & Troubleshooting", Instruction: "Use 'nixos-rebuild build-vm', 'journalctl', and 'nixos-option' for advanced debugging. AI-powered error decoding is available via 'nixai decode-error'.", Example: "journalctl -xe\nnixos-option services.nginx.enable", Exercise: "Trigger and diagnose a service failure, then use 'nixai decode-error' to get help."},
+				{Title: "System Optimization", Instruction: "Profile and optimize your system using 'nix-store --gc', 'nix-store --query', and the nixai GC advisor.", Example: "nixai gc analyze\nnix-store --gc", Exercise: "Analyze your system's store usage and perform a safe cleanup."},
+			},
+		}
+		learning.RenderModule(module)
+		progress, _ := learning.LoadProgress()
+		if progress.CompletedModules == nil {
+			progress.CompletedModules = map[string]bool{}
+		}
+		progress.CompletedModules[module.ID] = true
+		_ = learning.SaveProgress(progress)
+		fmt.Println(utils.FormatDivider())
+		fmt.Println(utils.FormatTip("Next: Try 'nixai learn path <topic>' for a personalized learning journey!"))
+	},
 }
 
-func handleConfigEdit(provider ai.AIProvider) {
-	fmt.Println("[STUB] handleConfigEdit called")
+var learnQuizCmd = &cobra.Command{
+	Use:   "quiz",
+	Short: "Take a NixOS knowledge quiz",
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(utils.FormatHeader("📝 NixOS Skill Assessment Quiz"))
+		quiz := learning.Quiz{
+			Questions: []learning.Question{
+				{
+					Prompt:   "What is the main configuration file for NixOS?",
+					Choices:  []string{"/etc/nixos/configuration.nix", "/etc/nixos/options.nix", "/etc/nixos/packages.nix", "/etc/nixos/system.nix"},
+					Answer:   0,
+					Feedback: "Correct! /etc/nixos/configuration.nix is the main config file.",
+				},
+				{
+					Prompt:   "Which command applies changes after editing configuration.nix?",
+					Choices:  []string{"nixos-apply", "nixos-rebuild switch", "nix run", "nix-update"},
+					Answer:   1,
+					Feedback: "Correct! 'nixos-rebuild switch' applies your changes.",
+				},
+				{
+					Prompt:   "How do you search for a package in NixOS?",
+					Choices:  []string{"nix search <pkg>", "nixos-option <pkg>", "nix find <pkg>", "nix-env <pkg>"},
+					Answer:   0,
+					Feedback: "Correct! 'nix search <pkg>' is the modern search command.",
+				},
+			},
+		}
+		score := 0
+		reader := bufio.NewReader(os.Stdin)
+		for i, q := range quiz.Questions {
+			fmt.Printf("\n%d. %s\n", i+1, q.Prompt)
+			for j, choice := range q.Choices {
+				fmt.Printf("   %d) %s\n", j+1, choice)
+			}
+			fmt.Print("Your answer (1-", len(q.Choices), "): ")
+			input, _ := reader.ReadString('\n')
+			input = strings.TrimSpace(input)
+			ans := -1
+			fmt.Sscanf(input, "%d", &ans)
+			if ans-1 == q.Answer {
+				fmt.Println(utils.FormatSuccess(q.Feedback))
+				score++
+			} else {
+				fmt.Println(utils.FormatError("Incorrect."))
+				fmt.Println(utils.FormatNote(q.Feedback))
+			}
+		}
+		fmt.Println(utils.FormatDivider())
+		fmt.Printf("Final Score: %d/%d\n", score, len(quiz.Questions))
+		progress, _ := learning.LoadProgress()
+		if progress.QuizScores == nil {
+			progress.QuizScores = map[string]int{}
+		}
+		progress.QuizScores["basics-quiz"] = score
+		_ = learning.SaveProgress(progress)
+		if score == len(quiz.Questions) {
+			fmt.Println(utils.FormatSuccess("Excellent! You're ready for more advanced NixOS topics."))
+		} else if score > 0 {
+			fmt.Println(utils.FormatNote("Good job! Review the basics and try again for a perfect score."))
+		} else {
+			fmt.Println(utils.FormatWarning("Keep practicing! Try 'nixai learn basics' for a refresher."))
+		}
+	},
 }
 
-func handleConfigExplain(args []string, provider ai.AIProvider) {
-	fmt.Println("[STUB] handleConfigExplain called with args:", args)
+var learnPathCmd = &cobra.Command{
+	Use:   "path <topic>",
+	Short: "Personalized learning path for a topic",
+	Args:  cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		topic := strings.Join(args, " ")
+		fmt.Println(utils.FormatHeader("🧭 Personalized Learning Path: " + topic))
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to load user config: " + err.Error()))
+			return
+		}
+		provider := InitializeAIProvider(cfg)
+		prompt := "Create a step-by-step NixOS learning path for the topic: '" + topic + "'. Include practical exercises and real-world examples. Format as Markdown."
+		response, err := provider.Query(prompt)
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to generate learning path: " + err.Error()))
+			return
+		}
+		out, _ := glamour.Render(response, "dark")
+		fmt.Println(out)
+		fmt.Println(utils.FormatDivider())
+		fmt.Println(utils.FormatTip("Track your progress with 'nixai learn progress'."))
+	},
 }
 
-func handleConfigAnalyze(provider ai.AIProvider) {
-	fmt.Println("[STUB] handleConfigAnalyze called")
+var learnProgressCmd = &cobra.Command{
+	Use:   "progress",
+	Short: "View your learning progress and achievements",
+	Run: func(cmd *cobra.Command, args []string) {
+		progress, err := learning.LoadProgress()
+		if err != nil {
+			fmt.Println(utils.FormatError("Could not load progress: " + err.Error()))
+			return
+		}
+		fmt.Println(utils.FormatHeader("📈 Your Learning Progress"))
+		if len(progress.CompletedModules) == 0 {
+			fmt.Println("No modules completed yet. Start with 'nixai learn basics' or 'nixai learn advanced'.")
+		} else {
+			fmt.Println("Completed Modules:")
+			for mod := range progress.CompletedModules {
+				fmt.Println("-", mod)
+			}
+		}
+		if len(progress.QuizScores) > 0 {
+			fmt.Println("\nQuiz Scores:")
+			for quiz, score := range progress.QuizScores {
+				fmt.Printf("- %s: %d\n", quiz, score)
+			}
+		}
+		fmt.Println(utils.FormatDivider())
+		fmt.Println(utils.FormatTip("Keep learning! Try 'nixai learn path <topic>' for a new challenge."))
+	},
 }
 
-func handleConfigValidate(provider ai.AIProvider) {
-	fmt.Println("[STUB] handleConfigValidate called")
-}
-
-func handleConfigOptimize(provider ai.AIProvider) {
-	fmt.Println("[STUB] handleConfigOptimize called")
-}
-
-func handleConfigBackup() {
-	fmt.Println("[STUB] handleConfigBackup called")
-}
-
-func handleConfigRestore(args []string) {
-	fmt.Println("[STUB] handleConfigRestore called with args:", args)
-}
+// --- Minimal config handler stubs for build ---
+func handleConfigShow(provider ai.AIProvider)                   {}
+func handleConfigSet(args []string, provider ai.AIProvider)     {}
+func handleConfigUnset(args []string, provider ai.AIProvider)   {}
+func handleConfigEdit(provider ai.AIProvider)                   {}
+func handleConfigExplain(args []string, provider ai.AIProvider) {}
+func handleConfigAnalyze(provider ai.AIProvider)                {}
+func handleConfigValidate(provider ai.AIProvider)               {}
+func handleConfigOptimize(provider ai.AIProvider)               {}
+func handleConfigBackup()                                       {}
+func handleConfigRestore(args []string)                         {}

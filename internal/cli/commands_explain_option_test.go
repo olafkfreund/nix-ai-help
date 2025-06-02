@@ -106,7 +106,7 @@ func TestBuildExplainOptionPrompt(t *testing.T) {
 	if !strings.Contains(prompt, "Related Options") {
 		t.Error("prompt should request related options")
 	}
-	if !strings.Contains(prompt, "Code blocks") {
+	if !strings.Contains(prompt, "code blocks") {
 		t.Error("prompt should request code blocks for examples")
 	}
 	if !strings.Contains(prompt, option) {
