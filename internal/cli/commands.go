@@ -256,6 +256,12 @@ func init() {
 	// The deps command is implemented in deps_commands.go
 	rootCmd.AddCommand(NewDepsCommand())
 
+	// The machines command is implemented in machines_commands.go
+	rootCmd.AddCommand(createMachinesCommand())
+
+	// The migration command is implemented in migration_commands.go
+	rootCmd.AddCommand(migrateCmd)
+
 	diagnoseCmd.Flags().StringVarP(&logFile, "log-file", "l", "", "Path to a log file to analyze")
 	diagnoseCmd.Flags().StringVarP(&configSnippet, "config-snippet", "c", "", "NixOS configuration snippet to analyze")
 	diagnoseCmd.Flags().StringVarP(&nixLogTarget, "nix-log", "g", "", "Run 'nix log' (optionally with a path or derivation) and analyze the output") // New flag
@@ -2533,9 +2539,6 @@ This command performs:
 - Validation and suggestions for the generated derivation
 
 Examples:
-  nixai package-repo https://github.com/user/project
-  nixai package-repo https://github.com/user/rust-app --output ./derivations
-  nixai package-repo /path/to/local/repo --local --name my-package
 
 The generated derivation will follow nixpkgs conventions and include:
 - Appropriate fetcher (fetchFromGitHub, fetchgit, etc.)

@@ -96,6 +96,11 @@ func FormatSubsection(subtitle, content string) string {
 	return fmt.Sprintf("%s\n%s\n", SubtitleStyle.Render("### "+subtitle), content)
 }
 
+// FormatSubheader creates a bold subheader (used for section headers)
+func FormatSubheader(msg string) string {
+	return SubtitleStyle.Render(msg + ":")
+}
+
 // FormatSuccess creates a success message with checkmark
 func FormatSuccess(message string) string {
 	return SuccessStyle.Render("✅ " + message)

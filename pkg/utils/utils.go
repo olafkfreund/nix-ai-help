@@ -65,3 +65,16 @@ func ExpandHome(path string) string {
 	}
 	return path
 }
+
+// GetConfigDir returns the config directory for nixai, respecting XDG_CONFIG_HOME or defaulting to $HOME/.config/nixai
+func GetConfigDir() (string, error) {
+	xdg := os.Getenv("XDG_CONFIG_HOME")
+	if xdg != "" {
+		return filepath.Join(xdg, "nixai"), nil
+	}
+	usr, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(usr.HomeDir, ".config", "nixai"), nil
+}
