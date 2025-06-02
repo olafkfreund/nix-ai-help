@@ -72,10 +72,11 @@ def check_vscode_settings():
     """Check VS Code MCP configuration files"""
     print("⚙️  Checking VS Code MCP configuration...")
     
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
     settings_files = [
-        '/home/olafkfreund/Source/NIX/nix-ai-help/.vscode/settings.json',
-        '/home/olafkfreund/Source/NIX/nix-ai-help/.vscode/mcp-settings.json',
-        '/home/olafkfreund/.config/Code/User/mcp-settings.json'
+        os.path.join(repo_root, '.vscode', 'settings.json'),
+        os.path.join(repo_root, '.vscode', 'mcp-settings.json'),
+        os.path.expanduser('~/.config/Code/User/mcp-settings.json')
     ]
     
     for settings_file in settings_files:

@@ -62,11 +62,12 @@ fi
 
 # Test 6: Create a comprehensive settings file
 echo -e "\n📋 Test 6: Creating Enhanced VS Code Settings"
-cat > .vscode/settings-enhanced.json << 'EOF'
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+cat > .vscode/settings-enhanced.json << EOF
 {
   "mcp.servers": {
     "nixai": {
-      "command": "/home/olafkfreund/Source/NIX/nix-ai-help/scripts/mcp-bridge.sh",
+      "command": "$REPO_ROOT/scripts/mcp-bridge.sh",
       "args": [],
       "env": {},
       "initializationOptions": {}
@@ -74,7 +75,7 @@ cat > .vscode/settings-enhanced.json << 'EOF'
   },
   "copilot.mcp.servers": {
     "nixai": {
-      "command": "/home/olafkfreund/Source/NIX/nix-ai-help/scripts/mcp-bridge.sh",
+      "command": "$REPO_ROOT/scripts/mcp-bridge.sh",
       "args": [],
       "env": {},
       "initializationOptions": {}
@@ -82,7 +83,7 @@ cat > .vscode/settings-enhanced.json << 'EOF'
   },
   "mcpServers": {
     "nixai": {
-      "command": "/home/olafkfreund/Source/NIX/nix-ai-help/scripts/mcp-bridge.sh",
+      "command": "$REPO_ROOT/scripts/mcp-bridge.sh",
       "args": [],
       "env": {},
       "initializationOptions": {}
@@ -90,7 +91,7 @@ cat > .vscode/settings-enhanced.json << 'EOF'
   },
   "claude-dev.mcpServers": {
     "nixai": {
-      "command": "/home/olafkfreund/Source/NIX/nix-ai-help/scripts/mcp-bridge.sh",
+      "command": "$REPO_ROOT/scripts/mcp-bridge.sh",
       "args": [],
       "env": {}
     }

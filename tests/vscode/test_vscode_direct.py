@@ -15,7 +15,8 @@ def test_vscode_mcp_connection():
     
     # Test 1: Direct script test
     print("\n📋 Test 1: Bridge Script Test")
-    script_path = "/home/olafkfreund/Source/NIX/nix-ai-help/scripts/mcp-bridge.sh"
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..'))
+    script_path = os.path.join(repo_root, 'scripts', 'mcp-bridge.sh')
     
     if not os.path.exists(script_path):
         print("❌ Bridge script not found")

@@ -27,14 +27,14 @@ The following VS Code settings are configured in `.vscode/settings.json`:
 {
   "mcp.servers": {
     "nixai": {
-      "command": "/home/olafkfreund/Source/NIX/nix-ai-help/scripts/mcp-bridge.sh",
+      "command": "${workspaceFolder}/scripts/mcp-bridge.sh",
       "args": [],
       "env": {}
     }
   },
   "claude-dev.mcpServers": {
     "nixai": {
-      "command": "/home/olafkfreund/Source/NIX/nix-ai-help/scripts/mcp-bridge.sh", 
+      "command": "${workspaceFolder}/scripts/mcp-bridge.sh",
       "args": [],
       "env": {}
     }
