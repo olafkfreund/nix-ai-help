@@ -92,6 +92,7 @@ func handleCommand(command string) {
 			"set ai <provider> [model]  - Set AI provider (ollama, gemini, openai) and model (optional)",
 			"set-nixos-path <path>      - Set path to NixOS config folder",
 			"flake <subcommand>         - Manage Nix flakes (show, update, check, explain-inputs, explain <input>, ...)",
+			"learn <subcommand>         - Learn Nix concepts (basics, advanced, quiz, path <topic>, progress)",
 			"version                    - Display version information",
 			"exit                       - Exit interactive mode",
 		}
@@ -394,6 +395,38 @@ func handleCommand(command string) {
 			devenvSuggestCmd.Run(devenvSuggestCmd, []string{description})
 		default:
 			fmt.Println("Unknown devenv subcommand. Use: list, create, or suggest")
+		}
+		return
+	case "learn":
+		if len(fields) < 2 {
+			fmt.Println("Usage: learn <basics|advanced|quiz|path <topic>|progress>")
+			fmt.Println("Examples:")
+			fmt.Println("  learn basics")
+			fmt.Println("  learn advanced")
+			fmt.Println("  learn quiz")
+			fmt.Println("  learn path flakes")
+			fmt.Println("  learn progress")
+			return
+		}
+		sub := fields[1]
+		switch sub {
+		case "basics":
+			learnBasicsCmd.Run(learnBasicsCmd, []string{})
+		case "advanced":
+			learnAdvancedCmd.Run(learnAdvancedCmd, []string{})
+		case "quiz":
+			learnQuizCmd.Run(learnQuizCmd, []string{})
+		case "path":
+			if len(fields) < 3 {
+				fmt.Println("Usage: learn path <topic>")
+				return
+			}
+			topic := strings.Join(fields[2:], " ")
+			learnPathCmd.Run(learnPathCmd, []string{topic})
+		case "progress":
+			learnProgressCmd.Run(learnProgressCmd, []string{})
+		default:
+			fmt.Println("Unknown learn subcommand. Try: basics, advanced, quiz, path <topic>, progress")
 		}
 		return
 	case "version":

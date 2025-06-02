@@ -4,13 +4,19 @@
 
 ---
 
+## 🌟 Slogan
+
+**nixai: Your AI-powered, privacy-first NixOS assistant — automate, troubleshoot, and master NixOS from your terminal.**
+
+---
+
 ## 📖 User Manual
 
 See the full [nixai User Manual](docs/MANUAL.md) for comprehensive feature documentation, advanced usage, real-world examples, and troubleshooting tips.
 
 ---
 
-### This is development code. Things may not work or are broken. I'm changing the code all the time. Don't expect something production ready
+### This is development code. Things may not work or is broken. I'm changing the code all the time. Don't expect something production ready
 
 ## 🚀 What's New (June 2025)
 
@@ -62,6 +68,7 @@ All other dependencies are managed by the Nix flake and justfile.
 - [🎨 Terminal Output Formatting](#-terminal-output-formatting)
 - [🖥️ Multi-Machine Configuration Manager](#-multi-machine-configuration-manager)
 - [🛠️ Installation & Usage](#%EF%B8%8F-installation--usage)
+- [📚 Flake Integration Guide](#-flake-integration-guide)
 - [📝 Commands & Usage](#-commands--usage)
 - [🗺️ Project Plan](#%EF%B8%8F-project-plan)
 - [Configuration](#configuration)
@@ -77,7 +84,17 @@ All other dependencies are managed by the Nix flake and justfile.
 
 ## 🚀 Project Overview
 
-**nixai** is a powerful, console-based Linux application designed to help you solve NixOS configuration problems, create and configure NixOS systems, and diagnose issues—all from the command line. Simply ask questions like `nixai "how do I enable SSH?"` for instant AI-powered help. It leverages advanced Large Language Models (LLMs) like Gemini, OpenAI, and Ollama, with a strong preference for local Ollama models to ensure your privacy. nixai integrates an MCP server to query NixOS documentation from multiple official and community sources, and provides interactive and scriptable diagnostics, log parsing, and command execution.
+**nixai** is your all-in-one, AI-powered command-line assistant for NixOS. It helps you automate, troubleshoot, and optimize every aspect of your NixOS experience — from configuration and deployment to diagnostics and learning. Powered by advanced Large Language Models (LLMs) like Ollama, Gemini, and OpenAI (with a privacy-first local default), nixai brings instant, context-aware help, beautiful documentation, and powerful automation to your terminal. 
+
+With nixai, you can:
+- Ask natural language questions and get actionable, AI-driven answers with official documentation context
+- Register, manage, and deploy to fleets of NixOS machines from a single CLI
+- Analyze, explain, and optimize your NixOS configs, flakes, and services
+- Diagnose errors, parse logs, and get step-by-step troubleshooting
+- Search, lint, and generate Nix code for packages, services, and repositories
+- Use interactive or scriptable modes for both beginners and power users
+
+nixai is designed for privacy, productivity, and beautiful terminal output. Whether you're a NixOS newcomer or a seasoned sysadmin, nixai helps you get more done, faster — with confidence.
 
 ---
 
@@ -821,6 +838,14 @@ nixai can be integrated into your NixOS or Home Manager configuration using the 
 }
 ```
 
+**📚 For comprehensive flake integration setup, see our complete [Flake Integration Guide](docs/FLAKE_INTEGRATION_GUIDE.md)** which covers:
+- ✅ Adding nixai as a flake input
+- ✅ NixOS and Home Manager module configuration
+- ✅ All available options and features
+- ✅ AI provider setup (Ollama, OpenAI, Gemini)
+- ✅ Editor integrations (VS Code, Neovim)
+- ✅ Troubleshooting and examples
+
 See the [MCP Server Configuration & Autostart](#-mcp-server-configuration--autostart) section for more details.
 
 **For Direct Nix Build:**
@@ -854,6 +879,87 @@ just fmt     # Format the code
 
 just all     # Clean, build, test, and run
 ```
+
+---
+
+## 🔗 Flake Integration
+
+Want to add nixai to your flake.nix and install it system-wide or per-user? We've got you covered with comprehensive guides:
+
+### Quick Start
+- **📋 [Flake Quick Reference](docs/FLAKE_QUICK_REFERENCE.md)** - Essential copy-paste snippets for immediate use
+- **📚 [Complete Flake Integration Guide](docs/FLAKE_INTEGRATION_GUIDE.md)** - Detailed setup with all options and features
+
+### What You Can Do
+- Add nixai as a flake input to your NixOS or Home Manager configuration
+- Enable system-wide or per-user installation with modules
+- Configure AI providers (Ollama, OpenAI, Gemini) declaratively
+- Auto-configure editor integrations (VS Code, Neovim)
+- Set up MCP server for advanced documentation features
+- Use in combination with other flake inputs seamlessly
+
+Both guides include complete working examples, troubleshooting, and best practices for integrating nixai into your Nix-based system.
+
+---
+
+## 📚 Flake Integration Guide
+
+For users who want to integrate **nixai** into their NixOS or Home Manager configurations using flakes, we've created a comprehensive guide that covers everything you need to know.
+
+### 🚀 Quick Start Options
+
+You have several ways to use nixai with flakes:
+
+1. **Direct Usage** (no configuration needed):
+   ```bash
+   # Run nixai directly from the flake
+   nix run github:olafkfreund/nix-ai-help -- "how do I enable SSH?"
+   
+   # Install to user profile
+   nix profile install github:olafkfreund/nix-ai-help
+   ```
+
+2. **NixOS System Integration**:
+   ```nix
+   # In your flake.nix
+   inputs.nixai.url = "github:olafkfreund/nix-ai-help";
+   
+   # In your configuration
+   nixosConfigurations.hostname = nixpkgs.lib.nixosSystem {
+     modules = [
+       nixai.nixosModules.default
+       { services.nixai.enable = true; }
+     ];
+   };
+   ```
+
+3. **Home Manager Integration**:
+   ```nix
+   # In your flake.nix
+   inputs.nixai.url = "github:olafkfreund/nix-ai-help";
+   
+   # In your home configuration
+   homeConfigurations.username = home-manager.lib.homeManagerConfiguration {
+     modules = [
+       nixai.homeManagerModules.default
+       { services.nixai.enable = true; }
+     ];
+   };
+   ```
+
+### 📖 Complete Guide
+
+**➡️ For detailed setup instructions, configuration options, AI provider setup, editor integrations, troubleshooting, and real-world examples, see our comprehensive [Flake Integration Guide](docs/FLAKE_INTEGRATION_GUIDE.md).**
+
+This guide covers:
+
+- ✅ **Complete flake setup** - Step-by-step integration into your configurations
+- ✅ **All configuration options** - AI providers, MCP server, documentation sources
+- ✅ **Editor integrations** - VS Code and Neovim automatic configuration
+- ✅ **AI provider setup** - Ollama (local/private), OpenAI, and Gemini configuration
+- ✅ **Advanced features** - Security hardening, multi-provider setups, custom sources
+- ✅ **Troubleshooting** - Common issues and solutions
+- ✅ **Real examples** - Complete working configurations for different use cases
 
 ---
 

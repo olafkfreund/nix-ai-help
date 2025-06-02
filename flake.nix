@@ -15,7 +15,7 @@
         pname = "nixai";
         version = "0.1.0";
         src = ./.;
-        vendorHash = null; # TODO: Update when dependencies change
+        vendorHash = null; # Using vendored dependencies
         doCheck = false; # Disable tests in Nix build due to network/sandbox restrictions
 
         # Specify the main package to build

@@ -2,10 +2,14 @@ package utils
 
 import (
 	"errors"
+	"fmt"
+	"math/rand"
 	"os"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // IsFile checks if the given path is a file.
@@ -77,4 +81,80 @@ func GetConfigDir() (string, error) {
 		return "", err
 	}
 	return filepath.Join(usr.HomeDir, ".config", "nixai"), nil
+}
+
+// GenerateID generates a unique ID for community resources
+func GenerateID() string {
+	return fmt.Sprintf("nixai_%d_%s", time.Now().Unix(), randomString(8))
+}
+
+// ParseTags parses a comma-separated tag string into a slice
+func ParseTags(tagStr string) []string {
+	if tagStr == "" {
+		return []string{}
+	}
+
+	tags := strings.Split(tagStr, ",")
+	var result []string
+	for _, tag := range tags {
+		trimmed := strings.TrimSpace(tag)
+		if trimmed != "" {
+			result = append(result, trimmed)
+		}
+	}
+	return result
+}
+
+// ParseFloat safely parses a string to float64, returning 0 on error
+func ParseFloat(s string) float64 {
+	f, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0
+	}
+	return f
+}
+
+// ParseInt safely parses a string to int, returning 0 on error
+func ParseInt(s string) int {
+	i, err := strconv.Atoi(s)
+	if err != nil {
+		return 0
+	}
+	return i
+}
+
+// FindJSONStart finds the starting position of JSON content in a string
+func FindJSONStart(s string) int {
+	return strings.Index(s, "{")
+}
+
+// FindJSONEnd finds the ending position of JSON content starting from a given position
+func FindJSONEnd(s string, start int) int {
+	if start < 0 || start >= len(s) {
+		return -1
+	}
+
+	depth := 0
+	for i := start; i < len(s); i++ {
+		switch s[i] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return i + 1
+			}
+		}
+	}
+	return -1
+}
+
+// randomString generates a random string of specified length
+func randomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[rand.Intn(len(charset))]
+	}
+	return string(b)
 }
