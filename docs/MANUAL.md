@@ -38,6 +38,7 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 - [Searching for Packages and Services](#searching-for-packages-and-services)
 - [AI-Powered Package Repository Analysis](#ai-powered-package-repository-analysis)
 - [System Health Checks](#system-health-checks)
+- [🖥️ Multi-Machine Configuration Manager](#multi-machine-configuration-manager)
 - [Configuration Templates & Snippets](#configuration-templates--snippets)
 - [Interactive Mode](#interactive-mode)
 - [Editor Integration](#editor-integration)
@@ -503,6 +504,95 @@ nixai health
    2. Review open ports and close unnecessary ones
    3. Enable automatic security updates
 ```
+
+---
+
+## 🖥️ Multi-Machine Configuration Manager
+
+The Multi-Machine Configuration Manager lets you centrally manage, synchronize, and deploy NixOS configurations across multiple machines—all from the command line.
+
+### What It Does
+
+- Register and manage multiple NixOS machines in a central registry
+- Group machines for fleet operations (e.g., deploy to all web servers)
+- Sync configurations between local and remote machines
+- Deploy configuration changes with rollback support
+- Compare configurations across machines (diff)
+- Check connectivity and status of all registered machines
+- All features available via the `nixai machines` command and subcommands
+
+### Real Life Examples
+
+#### Registering and Managing Machines
+
+```sh
+# Register machines
+nixai machines add web1 192.168.1.10 --description "Web server 1"
+nixai machines add db1 192.168.1.20 --description "Database server"
+
+# List all machines
+nixai machines list
+
+# Show details for a machine
+nixai machines show web1
+
+# Remove a machine
+nixai machines remove db1 --force
+```
+
+#### Group Management and Fleet Operations
+
+```sh
+# Create a group and add machines
+nixai machines groups add production web1 db1
+
+# List all groups
+nixai machines groups list
+
+# Deploy config to all machines in a group
+nixai machines deploy --group production
+```
+
+#### Sync, Diff, and Status
+
+```sh
+# Sync configuration to a machine
+nixai machines sync web1
+
+# Compare configurations across machines
+nixai machines diff
+
+# Check status of all machines
+nixai machines status
+```
+
+### Best Practices
+
+- Use descriptive names and descriptions for machines
+- Organize machines into logical groups for easier fleet management
+- Always check status before deploying changes
+- Use `--force` when removing machines to skip confirmation
+- Review diffs before deploying to multiple machines
+
+### Troubleshooting
+
+- If a machine is unreachable, check SSH connectivity and credentials
+- Ensure the correct NixOS config path is set for each machine
+- Use `nixai machines show <name>` for detailed info and troubleshooting tips
+
+### Command Reference
+
+- `nixai machines list` — List all registered machines
+- `nixai machines add <name> <host> [--description ...]` — Register a new machine
+- `nixai machines show <name>` — Show details for a machine
+- `nixai machines remove <name> --force` — Remove a machine
+- `nixai machines groups ...` — Manage machine groups
+- `nixai machines sync <machine>` — Sync configs to a machine
+- `nixai machines deploy [--group <group>]` — Deploy to one or more machines
+- `nixai machines diff` — Compare configurations
+- `nixai machines status` — Check machine status
+
+See the [Project Plan](../PROJECT_PLAN.md#17-multi-machine-configuration-manager-) for implementation details and roadmap.
 
 ---
 
