@@ -735,8 +735,15 @@ var buildCmd = &cobra.Command{
 var flakeCmd = &cobra.Command{
 	Use:   "flake [args]",
 	Short: "AI-assisted nix flake commands and troubleshooting",
-	Long:  `Run nix flake commands (show, update, check, etc.) with AI-powered help for troubleshooting and configuration.\nExamples:\n  nixai flake show\n  nixai flake update\n  nixai flake check\n  nixai flake explain-inputs\n  nixai flake explain <input>`,
-	Args:  cobra.ArbitraryArgs,
+	Long: `Run nix flake commands (show, update, check, etc.) with AI-powered help for troubleshooting and configuration.
+
+Examples:
+  nixai flake show
+  nixai flake update
+  nixai flake check
+  nixai flake explain-inputs
+  nixai flake explain <input>`,
+	Args: cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) > 0 && (args[0] == "explain-inputs" || args[0] == "explain") {
 			ExplainFlakeInputs(args[1:])
@@ -780,6 +787,142 @@ var flakeCmd = &cobra.Command{
 			os.Exit(1)
 		}
 	},
+}
+
+// Flake create command: create or fix a flake.nix for the current or given directory
+var flakeCreateCmd = &cobra.Command{
+	Use:   "create [path]",
+	Short: "Create or fix a flake.nix for a project (with AI assistance)",
+	Long:  `Create a new flake.nix from scratch or generate one for a local project folder. Detects build system, fills in metadata, and uses AI to suggest best practices. Can also validate and fix an existing flake.nix.`,
+	Args:  cobra.MaximumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		path := "."
+		if len(args) > 0 && args[0] != "" {
+			path = args[0]
+		}
+		fromScratch, _ := cmd.Flags().GetBool("from-scratch")
+		analyze, _ := cmd.Flags().GetBool("analyze")
+		fix, _ := cmd.Flags().GetBool("fix")
+		force, _ := cmd.Flags().GetBool("force")
+		system, _ := cmd.Flags().GetString("system")
+		desc, _ := cmd.Flags().GetString("desc")
+
+		flakePath := filepath.Join(path, "flake.nix")
+		fileExists := utils.IsFile(flakePath)
+
+		if fileExists && !force && !fix {
+			fmt.Println(utils.FormatWarning("flake.nix already exists. Use --fix to correct or --force to overwrite."))
+			return
+		}
+
+		// 1. If --fix, validate and correct existing flake.nix
+		if fix && fileExists {
+			content, err := os.ReadFile(flakePath)
+			if err != nil {
+				fmt.Println(utils.FormatError("Failed to read flake.nix: " + err.Error()))
+				return
+			}
+			// Use AI to suggest corrections
+			cfg, _ := config.LoadUserConfig()
+			var provider ai.AIProvider
+			provider = ai.NewOllamaProvider("llama3")
+			if cfg.AIProvider == "openai" {
+				provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			} else if cfg.AIProvider == "gemini" {
+				provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
+			}
+			prompt := "Review and correct this Nix flake.nix file. Fix any errors, fill in missing fields, and suggest best practices.\n\n" + string(content)
+			aiResp, aiErr := provider.Query(prompt)
+			if aiErr != nil || aiResp == "" {
+				fmt.Println(utils.FormatError("AI could not suggest corrections."))
+				return
+			}
+			fmt.Println(utils.RenderMarkdown("\n---\n**AI-corrected flake.nix:**\n"))
+			fmt.Println(utils.RenderMarkdown("```nix\n" + aiResp + "\n```"))
+			if force {
+				os.WriteFile(flakePath, []byte(aiResp), 0644)
+				fmt.Println(utils.FormatSuccess("flake.nix updated."))
+			}
+			return
+		}
+
+		// 2. If --from-scratch or empty folder, create minimal flake
+		if fromScratch || (!fileExists && !analyze) {
+			if system == "" {
+				system = "x86_64-linux"
+			}
+			if desc == "" {
+				desc = "A new Nix flake project"
+			}
+			flake := fmt.Sprintf(`{
+  description = "%s";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  outputs = { self, nixpkgs }: {
+    packages.%s.default = nixpkgs.legacyPackages.%s.hello;
+  };
+}
+`, desc, system, system)
+			os.WriteFile(flakePath, []byte(flake), 0644)
+			fmt.Println(utils.RenderMarkdown("\n---\n**Generated minimal flake.nix:**\n"))
+			fmt.Println(utils.RenderMarkdown("```nix\n" + flake + "\n```"))
+			return
+		}
+
+		// 3. If --analyze or folder with code, detect build system and generate flake
+		if analyze || utils.IsDirectory(path) {
+			// Detect build system (Go, Python, Node, Rust, etc.)
+			var buildType, buildInstr string
+			if utils.IsFile(filepath.Join(path, "go.mod")) {
+				buildType = "go"
+				buildInstr = "buildGoModule"
+			} else if utils.IsFile(filepath.Join(path, "package.json")) {
+				buildType = "node"
+				buildInstr = "buildNpmPackage"
+			} else if utils.IsFile(filepath.Join(path, "Cargo.toml")) {
+				buildType = "rust"
+				buildInstr = "buildRustPackage"
+			} else if utils.IsFile(filepath.Join(path, "setup.py")) || utils.IsFile(filepath.Join(path, "pyproject.toml")) {
+				buildType = "python"
+				buildInstr = "buildPythonPackage"
+			} else {
+				buildType = "generic"
+				buildInstr = "stdenv.mkDerivation"
+			}
+			if system == "" {
+				system = "x86_64-linux"
+			}
+			if desc == "" {
+				desc = "A Nix flake for this project"
+			}
+			flake := fmt.Sprintf(`{
+  description = "%s";
+  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  outputs = { self, nixpkgs }: {
+    packages.%s.default = nixpkgs.legacyPackages.%s.%s {
+      pname = "%s";
+      version = "0.1.0";
+      src = ./.;
+    };
+  };
+}
+`, desc, system, system, buildInstr, filepath.Base(path))
+			os.WriteFile(flakePath, []byte(flake), 0644)
+			fmt.Println(utils.RenderMarkdown("\n---\n**Generated flake.nix for " + buildType + " project:**\n"))
+			fmt.Println(utils.RenderMarkdown("```nix\n" + flake + "\n```"))
+			return
+		}
+		fmt.Println(utils.FormatError("Could not determine how to create flake.nix. Use --from-scratch or --analyze."))
+	},
+}
+
+func init() {
+	flakeCmd.AddCommand(flakeCreateCmd)
+	flakeCreateCmd.Flags().Bool("from-scratch", false, "Create a minimal flake.nix from scratch")
+	flakeCreateCmd.Flags().Bool("analyze", false, "Analyze the folder and auto-generate a flake.nix")
+	flakeCreateCmd.Flags().Bool("fix", false, "Validate and correct an existing flake.nix")
+	flakeCreateCmd.Flags().Bool("force", false, "Overwrite existing flake.nix if present")
+	flakeCreateCmd.Flags().String("system", "", "Target system (e.g. x86_64-linux)")
+	flakeCreateCmd.Flags().String("desc", "", "Description for the flake")
 }
 
 // Using utils.RenderMarkdown for markdown rendering

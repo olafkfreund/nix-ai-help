@@ -902,6 +902,37 @@ Both guides include complete working examples, troubleshooting, and best practic
 
 ---
 
+## 🆕 Flake Creation & Correction
+
+The `nixai flake create` command allows you to quickly create, correct, or upgrade a `flake.nix` for any project folder, with AI-powered build system detection and best-practice suggestions.
+
+### Features
+- Create a minimal flake from scratch (`--from-scratch`)
+- Analyze a project folder and generate a flake for Go, Node, Rust, Python, or generic projects (`--analyze`)
+- Correct and upgrade an existing `flake.nix` with AI assistance (`--fix`)
+- Overwrite with `--force`
+- Customize system and description
+
+### Usage Examples
+
+```sh
+# Create a minimal flake.nix in the current directory
+nixai flake create --from-scratch
+
+# Analyze a project folder and generate a flake.nix
+nixai flake create . --analyze
+
+# Fix and update an existing flake.nix using AI
+nixai flake create . --fix --force
+
+# Specify system and description
+nixai flake create myproject --from-scratch --system x86_64-linux --desc "My Project Flake"
+```
+
+The command will detect the build system (Go, Node, Rust, Python, or generic), generate a valid flake, and provide AI-powered explanations and best practices.
+
+---
+
 ## 📚 Flake Integration Guide
 
 For users who want to integrate **nixai** into their NixOS or Home Manager configurations using flakes, we've created a comprehensive guide that covers everything you need to know.
