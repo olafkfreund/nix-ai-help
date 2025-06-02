@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -30,6 +31,14 @@ func NewLogger() *Logger {
 	}
 }
 
+// NewLoggerWithWriter creates a new Logger with a custom writer and default info level.
+func NewLoggerWithWriter(w io.Writer) *Logger {
+	return &Logger{
+		Logger: log.New(w, "", log.LstdFlags),
+		level:  InfoLevel,
+	}
+}
+
 // NewLoggerWithLevel creates a new instance of Logger with specified level.
 func NewLoggerWithLevel(levelStr string) *Logger {
 	level := InfoLevel
@@ -46,6 +55,25 @@ func NewLoggerWithLevel(levelStr string) *Logger {
 
 	return &Logger{
 		Logger: log.New(os.Stderr, "", log.LstdFlags),
+		level:  level,
+	}
+}
+
+// NewLoggerWithLevelAndWriter creates a new Logger with a custom writer and specified level.
+func NewLoggerWithLevelAndWriter(levelStr string, w io.Writer) *Logger {
+	level := InfoLevel
+	switch strings.ToLower(levelStr) {
+	case "debug":
+		level = DebugLevel
+	case "info":
+		level = InfoLevel
+	case "warn", "warning":
+		level = WarnLevel
+	case "error":
+		level = ErrorLevel
+	}
+	return &Logger{
+		Logger: log.New(w, "", log.LstdFlags),
 		level:  level,
 	}
 }

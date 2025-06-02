@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -19,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/hashicorp/go-retryablehttp"
 	"github.com/sourcegraph/jsonrpc2"
 )
@@ -83,9 +83,12 @@ type Tool struct {
 	Description string `json:"description"`
 }
 
+// Add a package-level variable to track uptime for metrics and health endpoints
+var startTime time.Time
+
 // Handle processes MCP protocol requests
 func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) {
-	log.Printf("[DEBUG] Handle called with method: %s, ID: %v", req.Method, req.ID)
+	m.logger.Debug(fmt.Sprintf("Handle called | method=%s id=%v", req.Method, req.ID))
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -235,6 +238,7 @@ func (m *MCPServer) Start(socketPath string) error {
 
 	listener, err := net.Listen("unix", socketPath)
 	if err != nil {
+		m.logger.Error(fmt.Sprintf("Failed to listen on Unix socket | socketPath=%s error=%v", socketPath, err))
 		return fmt.Errorf("failed to listen on Unix socket %s: %v", socketPath, err)
 	}
 
@@ -243,32 +247,32 @@ func (m *MCPServer) Start(socketPath string) error {
 	m.listener = listener
 	m.mu.Unlock()
 
-	m.logger.Info(fmt.Sprintf("MCP server listening on Unix socket: %s", socketPath))
+	m.logger.Info(fmt.Sprintf("MCP server listening on Unix socket | socketPath=%s", socketPath))
 
 	// Accept connections in a blocking loop
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			m.logger.Error(fmt.Sprintf("Failed to accept connection: %v", err))
+			m.logger.Error(fmt.Sprintf("Failed to accept connection | error=%v", err))
 			continue
 		}
 
 		go func(conn net.Conn) {
 			defer conn.Close()
-			log.Printf("[DEBUG] New MCP client connected from %v", conn.RemoteAddr())
+			m.logger.Debug(fmt.Sprintf("New MCP client connected | remoteAddr=%v", conn.RemoteAddr()))
 
 			// Handle connection with JSON-RPC2
 			stream := jsonrpc2.NewPlainObjectStream(conn)
-			log.Printf("[DEBUG] Created buffered stream")
+			m.logger.Debug("Created buffered stream")
 
 			jsonConn := jsonrpc2.NewConn(context.Background(), stream, m)
-			log.Printf("[DEBUG] Created JSON-RPC2 connection")
+			m.logger.Debug("Created JSON-RPC2 connection")
 			defer jsonConn.Close()
 
 			// Keep connection alive
-			log.Printf("[DEBUG] Waiting for disconnect notification...")
+			m.logger.Debug("Waiting for disconnect notification")
 			<-jsonConn.DisconnectNotify()
-			log.Printf("[DEBUG] MCP client disconnected")
+			m.logger.Debug("MCP client disconnected")
 		}(conn)
 	}
 }
@@ -329,6 +333,8 @@ type Server struct {
 	logger               *logger.Logger
 	debugLogging         bool
 	mcpServer            *MCPServer
+	configPath           string
+	watcher              *fsnotify.Watcher
 }
 
 // Add a simple in-memory cache for query results
@@ -392,14 +398,56 @@ func NewServerFromConfig(configPath string) (*Server, error) {
 	if cfg.MCPServer.SocketPath != "" {
 		socketPath = cfg.MCPServer.SocketPath
 	}
-	return &Server{
+
+	srv := &Server{
 		addr:                 addr,
 		socketPath:           socketPath,
 		documentationSources: cfg.MCPServer.DocumentationSources,
 		logger:               logger.NewLoggerWithLevel(cfg.LogLevel),
 		debugLogging:         strings.ToLower(cfg.LogLevel) == "debug",
 		mcpServer:            &MCPServer{logger: *logger.NewLoggerWithLevel(cfg.LogLevel)},
-	}, nil
+		configPath:           configPath,
+	}
+
+	// Set up config watcher for hot-reload
+	watcher, err := fsnotify.NewWatcher()
+	if err == nil {
+		srv.watcher = watcher
+		go srv.watchConfig()
+		watcher.Add(configPath)
+	} else {
+		srv.logger.Error(fmt.Sprintf("Failed to initialize config watcher: %v", err))
+	}
+
+	return srv, nil
+}
+
+// watchConfig watches the config file for changes and reloads it
+func (s *Server) watchConfig() {
+	for {
+		select {
+		case event, ok := <-s.watcher.Events:
+			if !ok {
+				return
+			}
+			if event.Op&fsnotify.Write == fsnotify.Write {
+				s.logger.Info("Config file changed, reloading...")
+				cfg, err := config.LoadYAMLConfig(s.configPath)
+				if err == nil {
+					s.documentationSources = cfg.MCPServer.DocumentationSources
+					s.logger.Info("Reloaded documentation sources from config.")
+					// Optionally reload log level, etc.
+				} else {
+					s.logger.Error(fmt.Sprintf("Failed to reload config: %v", err))
+				}
+			}
+		case err, ok := <-s.watcher.Errors:
+			if !ok {
+				return
+			}
+			s.logger.Error(fmt.Sprintf("Config watcher error: %v", err))
+		}
+	}
 }
 
 // SetSocketPath sets a custom socket path for the MCP server
@@ -409,19 +457,32 @@ func (s *Server) SetSocketPath(path string) {
 
 // Start initializes and starts the MCP server with graceful shutdown support.
 func (s *Server) Start() error {
-	// Redirect log output to stderr to avoid polluting HTTP responses
-	log.SetOutput(os.Stderr)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/query", s.handleQuery)
 
+	// Improved /healthz endpoint
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "uptime": time.Now().Format(time.RFC3339)})
+	})
+
+	// /metrics endpoint (simple Prometheus format)
+	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
+		// Example metrics (replace with real metrics as needed)
+		fmt.Fprintln(w, "# HELP nixai_mcp_requests_total Total number of /query requests")
+		fmt.Fprintln(w, "# TYPE nixai_mcp_requests_total counter")
+		fmt.Fprintln(w, "nixai_mcp_requests_total 0")
+		fmt.Fprintln(w, "# HELP nixai_mcp_uptime_seconds Uptime in seconds")
+		uptime := int(time.Since(startTime).Seconds())
+		fmt.Fprintf(w, "nixai_mcp_uptime_seconds %d\n", uptime)
 	})
 
 	shutdownCh := make(chan struct{})
 	mux.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Shutting down MCP server...\n"))
+		s.logger.Info("Shutdown endpoint called, shutting down MCP server")
 		go func() {
 			shutdownCh <- struct{}{}
 		}()
@@ -432,7 +493,10 @@ func (s *Server) Start() error {
 		Handler: mux,
 	}
 
-	log.Printf("Starting MCP server on %s\n", s.addr)
+	s.logger.Info(fmt.Sprintf("Starting MCP server | addr=%s", s.addr))
+
+	// Track start time for metrics
+	startTime = time.Now()
 
 	// Run HTTP server in goroutine
 	errCh := make(chan error, 1)
@@ -456,7 +520,7 @@ func (s *Server) Start() error {
 
 		// Start the MCP server (this blocks and shouldn't return unless there's an error)
 		if err := s.mcpServer.Start(socketPath); err != nil {
-			log.Printf("ERROR: MCP server encountered an error: %v", err)
+			s.logger.Error(fmt.Sprintf("MCP server encountered an error | error=%v", err))
 			// Don't exit the main server if the MCP server exits - just log the error
 		}
 	}()
@@ -466,12 +530,12 @@ func (s *Server) Start() error {
 	case <-shutdownCh:
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		log.Println("Shutting down MCP server...")
+		s.logger.Info("Shutting down MCP server")
 		s.mcpServer.Stop()
 		return server.Shutdown(ctx)
 	case err := <-errCh:
 		if strings.Contains(err.Error(), "address already in use") {
-			log.Printf("ERROR: The MCP server could not start because the address is already in use. If another instance is running, stop it with 'nixai mcp-server stop'.")
+			s.logger.Error(fmt.Sprintf("The MCP server could not start because the address is already in use. | error=%v", err))
 		}
 		s.mcpServer.Stop() // Make sure to stop the MCP server if HTTP server fails
 		return err
@@ -557,7 +621,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.debugLogging {
-		log.Printf("[DEBUG] handleQuery: received query: %s", query)
+		s.logger.Debug(fmt.Sprintf("handleQuery: received query | query=%s", query))
 	}
 
 	// Helper to write JSON response
@@ -584,7 +648,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	var structuredNoDoc bool
 	for _, src := range s.documentationSources {
 		if s.debugLogging {
-			log.Printf("[DEBUG] Querying documentation source: %s for option: %s", src, query)
+			s.logger.Debug(fmt.Sprintf("Querying documentation source | source=%s option=%s", src, query))
 		}
 		var body string
 		var err error
@@ -603,7 +667,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		}
 		if err != nil {
 			if s.debugLogging {
-				log.Printf("[DEBUG] Error querying source %s: %v", src, err)
+				s.logger.Debug(fmt.Sprintf("Error querying source | source=%s error=%v", src, err))
 			}
 			continue
 		}
@@ -611,7 +675,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 			clean := strings.TrimSpace(body)
 			if clean != "" && !strings.HasPrefix(clean, "No documentation found") {
 				if s.debugLogging {
-					log.Printf("[DEBUG] Structured doc found from %s: %s", src, clean)
+					s.logger.Debug(fmt.Sprintf("Structured doc found | source=%s doc=%s", src, clean))
 				}
 				// Return immediately if a structured doc is found
 				cacheMutex.Lock()
@@ -621,7 +685,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 				return
 			} else if strings.HasPrefix(clean, "No documentation found") {
 				if s.debugLogging {
-					log.Printf("[DEBUG] No documentation found for %s in %s", query, src)
+					s.logger.Debug(fmt.Sprintf("No documentation found | query=%s source=%s", query, src))
 				}
 				structuredNoDoc = true
 			}
@@ -777,9 +841,6 @@ func fetchNixOSOptionsAPI(_ string, option string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	// Debug logging for the response size
-	log.Printf("[DEBUG] Received %d bytes from NixOS ES", len(data))
 
 	// Parse response
 	var esResp ESResponse

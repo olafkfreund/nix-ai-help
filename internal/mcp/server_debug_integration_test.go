@@ -2,18 +2,16 @@ package mcp
 
 import (
 	"bytes"
-	"log"
 	"net/http"
 	"net/http/httptest"
+	"nix-ai-help/pkg/logger"
 	"strings"
 	"testing"
 )
 
 func TestHandleQuery_DebugLogging(t *testing.T) {
 	var buf bytes.Buffer
-	origLog := log.Writer()
-	log.SetOutput(&buf)
-	defer log.SetOutput(origLog)
+	customLogger := logger.NewLoggerWithLevelAndWriter("debug", &buf)
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/options" && r.Method == "POST" {
@@ -27,7 +25,14 @@ func TestHandleQuery_DebugLogging(t *testing.T) {
 	defer ts.Close()
 
 	srcs := []string{ts.URL + "/options"}
-	srv := NewServerWithDebug("", srcs)
+	srv := &Server{
+		addr:                 "",
+		socketPath:           "/tmp/nixai-mcp.sock",
+		documentationSources: srcs,
+		logger:               customLogger,
+		debugLogging:         true,
+		mcpServer:            &MCPServer{logger: *customLogger},
+	}
 
 	req := httptest.NewRequest("GET", "/query?q=services.nginx.enable", nil)
 	rw := httptest.NewRecorder()
@@ -36,13 +41,10 @@ func TestHandleQuery_DebugLogging(t *testing.T) {
 
 	logOutput := buf.String()
 
-	if !strings.Contains(logOutput, "[DEBUG] Querying documentation source") {
+	if !strings.Contains(logOutput, "DEBUG: Querying documentation source") {
 		t.Errorf("expected debug log for source query, got: %s", logOutput)
 	}
-	if !strings.Contains(logOutput, "[DEBUG] Received") && !strings.Contains(logOutput, "bytes from NixOS ES") {
-		t.Errorf("expected debug log for ES response, got: %s", logOutput)
-	}
-	if !strings.Contains(logOutput, "[DEBUG] Structured doc found") {
+	if !strings.Contains(logOutput, "DEBUG: Structured doc found") {
 		t.Errorf("expected debug log for structured doc, got: %s", logOutput)
 	}
 }

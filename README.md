@@ -395,6 +395,43 @@ See [Autostart Options Documentation](docs/autostart-options.md) for more detail
 
 ---
 
+## MCP Server Features
+
+The MCP (Model Context Protocol) server provides advanced documentation and option explanation services for NixOS and Home Manager. Recent features include:
+
+- **Hot-reload of configuration**: The MCP server watches its YAML config file and reloads documentation sources and settings at runtime. No restart required for config changes.
+- **Structured logging**: All server logs use the `pkg/logger` structured logger and respect the configured log level (set in config YAML). Debug/info/error logs are consistent and testable.
+- **/healthz endpoint**: Returns server health and uptime in JSON format.
+- **/metrics endpoint**: Prometheus-compatible endpoint for metrics (uptime, request counters, etc.).
+- **Graceful shutdown**: `/shutdown` endpoint and signal handling for clean server exit, with clear log output.
+- **Testable logger**: Logger can be injected with a custom writer for integration tests.
+
+### Example: Hot-reload Config
+
+1. Edit your MCP config YAML (e.g. `~/.config/nixai/config.yaml`).
+2. The server will detect changes and reload documentation sources automatically. Logs will show reload events.
+
+### Example: Structured Logging
+
+```text
+INFO[2025-06-02T12:34:56Z] Starting MCP server | addr=127.0.0.1:8081
+INFO[2025-06-02T12:35:01Z] Config file changed, reloading...
+INFO[2025-06-02T12:35:01Z] Reloaded documentation sources from config.
+```
+
+### Endpoints
+
+- `GET/POST /query` — Query NixOS/Home Manager docs (see below)
+- `GET /healthz` — Health and uptime
+- `GET /metrics` — Prometheus metrics
+- `POST /shutdown` — Graceful shutdown
+
+### Testing
+
+All features are covered by integration tests, including logger output capture.
+
+---
+
 ## 🔄 Migration Assistant (Channels ↔ Flakes)
 
 nixai includes a comprehensive migration assistant to help you convert your NixOS configuration between legacy channels and modern flakes, with safety checks, backup/rollback, and AI-powered guidance.
@@ -1111,12 +1148,6 @@ This project uses **Nix flakes** for reproducible development environments. Here
    ```
 
 2. **Enter the development environment:**
-
-   ```sh
-   nix develop
-   ```
-
-   This automatically provides:
    - Go 1.24.3
    - just (task runner)
    - golangci-lint

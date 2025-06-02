@@ -48,6 +48,10 @@ github.com/davecgh/go-spew/spew
 ## explicit; go 1.13
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
+# github.com/fsnotify/fsnotify v1.9.0
+## explicit; go 1.17
+github.com/fsnotify/fsnotify
+github.com/fsnotify/fsnotify/internal
 # github.com/gorilla/css v1.0.1
 ## explicit; go 1.20
 github.com/gorilla/css/scanner
