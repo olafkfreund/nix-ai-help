@@ -4,6 +4,12 @@
 
 ---
 
+## 🌟 Slogan
+
+**nixai: Your AI-powered, privacy-first NixOS assistant — automate, troubleshoot, and master NixOS from your terminal.**
+
+---
+
 ## 📖 User Manual
 
 See the full [nixai User Manual](docs/MANUAL.md) for comprehensive feature documentation, advanced usage, real-world examples, and troubleshooting tips.
@@ -77,7 +83,17 @@ All other dependencies are managed by the Nix flake and justfile.
 
 ## 🚀 Project Overview
 
-**nixai** is a powerful, console-based Linux application designed to help you solve NixOS configuration problems, create and configure NixOS systems, and diagnose issues—all from the command line. Simply ask questions like `nixai "how do I enable SSH?"` for instant AI-powered help. It leverages advanced Large Language Models (LLMs) like Gemini, OpenAI, and Ollama, with a strong preference for local Ollama models to ensure your privacy. nixai integrates an MCP server to query NixOS documentation from multiple official and community sources, and provides interactive and scriptable diagnostics, log parsing, and command execution.
+**nixai** is your all-in-one, AI-powered command-line assistant for NixOS. It helps you automate, troubleshoot, and optimize every aspect of your NixOS experience — from configuration and deployment to diagnostics and learning. Powered by advanced Large Language Models (LLMs) like Ollama, Gemini, and OpenAI (with a privacy-first local default), nixai brings instant, context-aware help, beautiful documentation, and powerful automation to your terminal. 
+
+With nixai, you can:
+- Ask natural language questions and get actionable, AI-driven answers with official documentation context
+- Register, manage, and deploy to fleets of NixOS machines from a single CLI
+- Analyze, explain, and optimize your NixOS configs, flakes, and services
+- Diagnose errors, parse logs, and get step-by-step troubleshooting
+- Search, lint, and generate Nix code for packages, services, and repositories
+- Use interactive or scriptable modes for both beginners and power users
+
+nixai is designed for privacy, productivity, and beautiful terminal output. Whether you're a NixOS newcomer or a seasoned sysadmin, nixai helps you get more done, faster — with confidence.
 
 ---
 
