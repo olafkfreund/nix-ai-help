@@ -10,6 +10,7 @@ This comprehensive guide shows you how to integrate **nixai** into your NixOS an
 - [Combined NixOS + Home Manager Setup](#combined-nixos--home-manager-setup)
 - [Configuration Options](#configuration-options)
 - [Advanced Features](#advanced-features)
+- [Example: Nixvim + Home Manager + nixai Neovim Integration](#example-nixvim--home-manager--nixai-neovim-integration)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -488,37 +489,56 @@ services.nixai = {
 
 ---
 
-## Usage Examples
+## Example: Nixvim + Home Manager + nixai Neovim Integration
 
-After installation, you can use nixai in various ways:
+This example shows how to use `nixvim` with Home Manager to install `nixai` and enable the Neovim integration, including keybindings and MCP server autostart.
 
-### Command Line Usage
-```bash
-# Direct questions
-nixai "how do I enable SSH?"
-nixai --ask "configure NVIDIA drivers"
+Add this to your `home.nix`:
 
-# Interactive mode
-nixai
+```nix
+{ config, pkgs, ... }:
+let
+  nixai-flake = builtins.getFlake "github:olafkfreund/nix-ai-help";
+in {
+  imports = [ nixai-flake.homeManagerModules.default ];
 
-# Specific commands
-nixai health                    # System health check
-nixai lint-config /etc/nixos/configuration.nix
-nixai service-examples nginx
-nixai find-option "enable firewall"
-nixai hardware detect
-nixai gc analyze
+  # Enable nixai and Neovim integration
+  services.nixai = {
+    enable = true;
+    mcp.enable = true;
+    neovimIntegration = {
+      enable = true;
+      useNixVim = true;
+      keybindings = {
+        askNixai = "<leader>na";
+        askNixaiVisual = "<leader>na";
+        startMcpServer = "<leader>ns";
+      };
+      autoStartMcp = true;
+    };
+  };
+
+  # Nixvim configuration (minimal example)
+  programs.nixvim = {
+    enable = true;
+    extraConfigVim = ''
+      set number
+      set relativenumber
+      set expandtab
+      set shiftwidth=2
+      set tabstop=2
+    '';
+    # Optionally add plugins, LSP, etc.
+  };
+}
 ```
 
-### In Neovim (with integration enabled)
-- `<leader>na` - Ask nixai about current context
-- Select text in visual mode, then `<leader>na` - Ask about selection
-- `<leader>ns` - Start MCP server
+**Notes:**
 
-### In VS Code (with integration enabled)
-- MCP features automatically available through extensions
-- Access nixai through command palette
-- Integrated documentation lookup
+- This will install `nixai`, enable the MCP server, and set up Neovim keybindings for asking questions and starting the server.
+- You can customize the keybindings and other options as needed.
+- Make sure you are using a recent version of Home Manager and Nixvim.
+- If you encounter issues, check the logs with `journalctl --user -u nixai-mcp` and ensure the MCP server is running.
 
 ---
 
