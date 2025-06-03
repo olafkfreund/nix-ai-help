@@ -188,3 +188,34 @@ The Home Manager module includes VS Code integration that can be enabled with `v
 3. Enable MCP protocol handlers for AI assistants
 
 Note: This requires Home Manager's VS Code module to be enabled with `programs.vscode.enable = true`.
+
+## Multi-Endpoint MCP Server Support
+
+You can define multiple MCP endpoints for advanced workflows (e.g., dev/prod/test, remote/local):
+
+```nix
+services.nixai = {
+  enable = true;
+  mcp.enable = true;
+  mcp.endpoints = [
+    {
+      name = "default";
+      socketPath = "/run/nixai/mcp.sock";
+      host = "localhost";
+      port = 8080;
+    }
+    {
+      name = "test";
+      socketPath = "/tmp/nixai-test.sock";
+      host = "localhost";
+      port = 8082;
+    }
+  ];
+};
+```
+
+- These endpoints are written to `config.yaml` and available to the CLI and Neovim integration.
+- In Neovim, you get per-endpoint keymaps (e.g., `<leader>nd` for default, `<leader>nt` for test).
+- The CLI and integrations will use the correct socket/host/port for each endpoint.
+
+See also: [docs/neovim-integration.md](../docs/neovim-integration.md) for Neovim multi-endpoint usage.
