@@ -617,6 +617,44 @@ nixai package-repo https://github.com/user/project
 
 ---
 
+## 🔍 Enhanced Search Command: Discover, Configure, and Master NixOS Packages & Services
+
+The `nixai search` command now provides a powerful, interactive experience for exploring NixOS packages and services:
+
+- **Comprehensive Option Listing:**
+  - See *all* available NixOS options for a package/service, including type, default, description, and real-world examples.
+- **Config Snippets for Every Setup:**
+  - Instantly copy-paste configuration snippets for classic `/etc/nixos/configuration.nix`, Home Manager, and flake-based setups.
+- **AI-Powered Best Practices & Pitfalls:**
+  - Get advanced usage tips, best practices, and common pitfalls—sourced from both official docs and AI analysis.
+- **Interactive Exploration:**
+  - Use interactive prompts to view option details, copy config snippets, or ask for further explanation.
+- **Beautiful Output:**
+  - All results are formatted with headers, key-value tables, and Markdown rendering for easy reading and direct use in your configs.
+
+### Example Usage
+
+```sh
+nixai search nginx
+```
+
+*What you'll see:*
+- A list of all NixOS options for `nginx` (e.g., `services.nginx.enable`, `services.nginx.virtualHosts`, ...)
+- For each option: type, default, description, and example usage
+- Config snippets for classic, Home Manager, and flake setups (ready to copy)
+- AI-powered best practices and advanced tips for configuring `nginx`
+- Interactive prompt to view more details or copy a snippet
+
+### Why Use This?
+- Quickly discover all configuration options for any package or service
+- Avoid common mistakes and follow best practices
+- Easily adapt examples to your preferred NixOS setup style
+- Learn advanced usage patterns and troubleshooting tips
+
+See the [User Manual](docs/MANUAL.md#searching-for-packages-and-services) for full details and advanced examples.
+
+---
+
 ## 🖥️ Multi-Machine Configuration Manager
 
 The Multi-Machine Configuration Manager lets you centrally manage and synchronize NixOS configurations across many machines. You can register machines, organize them into groups, sync and deploy configurations, compare differences, and monitor status—all from the command line.

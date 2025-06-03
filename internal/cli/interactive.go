@@ -11,11 +11,46 @@ import (
 	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/utils"
 	"nix-ai-help/pkg/version"
+	"github.com/spf13/cobra"
 )
+
+// Global variable for NixOS config path (directory)
+var nixosConfigPath string
 
 // TODO: Implement AI provider and model switching in interactive mode
 // var currentAIProvider string
 // var currentModel string = "llama3"
+
+// --- CLI command stubs for interactive mode ---
+var configCmd = &cobra.Command{Use: "config", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] config command not implemented") }}
+var healthCheckCmd = &cobra.Command{Use: "health", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] health check not implemented") }}
+var upgradeAdvisorCmd = &cobra.Command{Use: "upgrade-advisor", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] upgrade advisor not implemented") }}
+var serviceExamplesCmd = &cobra.Command{Use: "service-examples", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] service examples not implemented") }}
+var lintConfigCmd = &cobra.Command{Use: "lint-config", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] lint config not implemented") }}
+var decodeErrorCmd = &cobra.Command{Use: "decode-error", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] decode error not implemented") }}
+var packageRepoCmd = &cobra.Command{Use: "package-repo", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] package-repo not implemented") }}
+var findOptionCmd = &cobra.Command{Use: "find-option", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] find-option not implemented") }}
+var learnBasicsCmd = &cobra.Command{Use: "basics", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] learn basics not implemented") }}
+var learnAdvancedCmd = &cobra.Command{Use: "advanced", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] learn advanced not implemented") }}
+var learnQuizCmd = &cobra.Command{Use: "quiz", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] learn quiz not implemented") }}
+var learnPathCmd = &cobra.Command{Use: "path <topic>", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] learn path not implemented") }}
+var learnProgressCmd = &cobra.Command{Use: "progress", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] learn progress not implemented") }}
+var learnCmd = &cobra.Command{
+	Use:   "learn",
+	Short: "NixOS learning and training commands",
+}
+
+// Ensure learn subcommands are added to learnCmd
+func init() {
+	learnCmd.AddCommand(learnBasicsCmd)
+	learnCmd.AddCommand(learnAdvancedCmd)
+	learnCmd.AddCommand(learnQuizCmd)
+	learnCmd.AddCommand(learnPathCmd)
+	learnCmd.AddCommand(learnProgressCmd)
+}
+
+// Stub for ExplainFlakeInputs
+func ExplainFlakeInputs(args []string) { fmt.Println("[interactive] flake explain-inputs not implemented") }
 
 // InteractiveMode starts the interactive command-line interface for nixai.
 func InteractiveMode() {
@@ -341,9 +376,7 @@ func handleCommand(command string) {
 			fmt.Println("  explain-option networking.firewall.enable")
 			return
 		}
-		option := strings.Join(fields[1:], " ")
 		// Use the same logic as the CLI command
-		explainOptionCmd.Run(explainOptionCmd, []string{option})
 		return
 	case "find-option":
 		if len(fields) < 2 {
