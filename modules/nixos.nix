@@ -24,18 +24,21 @@ in {
         type = types.str;
         default = "/run/nixai/mcp.sock";
         description = "Path to the MCP server Unix socket";
+        example = "/run/nixai/mcp.sock";
       };
 
       host = mkOption {
         type = types.str;
         default = "localhost";
         description = "Host for the MCP HTTP server to listen on";
+        example = "localhost";
       };
 
       port = mkOption {
         type = types.port;
         default = 8080;
         description = "Port for the MCP HTTP server to listen on";
+        example = 8080;
       };
 
       documentationSources = mkOption {
@@ -48,18 +51,35 @@ in {
           "https://nix-community.github.io/home-manager/"
         ];
         description = "Documentation sources for the MCP server to query";
+        example = ["https://wiki.nixos.org/wiki/NixOS_Wiki"];
       };
 
       aiProvider = mkOption {
         type = types.str;
         default = "ollama";
         description = "Default AI provider to use (ollama, gemini, openai)";
+        example = "ollama";
       };
 
       aiModel = mkOption {
         type = types.str;
         default = "llama3";
         description = "Default AI model to use for the specified provider";
+        example = "llama3";
+      };
+
+      extraFlags = mkOption {
+        type = types.listOf types.str;
+        default = [];
+        description = "Extra flags to pass to the MCP server";
+        example = ["--log-level=debug"];
+      };
+
+      environment = mkOption {
+        type = types.attrsOf types.str;
+        default = {};
+        description = "Extra environment variables for the MCP server";
+        example = {NIXAI_LOG_LEVEL = "debug";};
       };
     };
 
@@ -80,7 +100,7 @@ in {
       wantedBy = ["multi-user.target"];
       after = ["network.target"];
       serviceConfig = {
-        ExecStart = "${cfg.mcp.package}/bin/nixai mcp-server start --socket-path=${cfg.mcp.socketPath}";
+        ExecStart = ''${cfg.mcp.package}/bin/nixai mcp-server start --socket-path=${cfg.mcp.socketPath} ${lib.concatStringsSep " " cfg.mcp.extraFlags}'';
         Restart = "on-failure";
         RestartSec = "5s";
 
@@ -92,16 +112,21 @@ in {
         ProtectSystem = "strict";
         ProtectHome = true;
         NoNewPrivileges = true;
+
+        # Allow user/group override for advanced use
+        User = mkIf (cfg.mcp.environment ? user) cfg.mcp.environment.user;
+        Group = mkIf (cfg.mcp.environment ? group) cfg.mcp.environment.group;
       };
-      environment = {
-        NIXAI_SOCKET_PATH = cfg.mcp.socketPath;
-      };
+      environment =
+        cfg.mcp.environment
+        // {
+          NIXAI_SOCKET_PATH = cfg.mcp.socketPath;
+        };
     };
 
     # Create default configuration file
     environment.etc."nixai/config.yaml" = {
-      text =
-        builtins.toJSON {
+      text = builtins.toJSON ({
           ai_provider = cfg.mcp.aiProvider;
           ai_model = cfg.mcp.aiModel;
           log_level = "info";
@@ -113,7 +138,26 @@ in {
             documentation_sources = cfg.mcp.documentationSources;
           };
         }
-        // cfg.config;
+        // cfg.config);
     };
+  };
+
+  meta = {
+    maintainers = [lib.maintainers.olf];
+    description = lib.mdDoc ''
+      NixAI NixOS module. Provides options to enable the NixAI MCP server, configure AI provider/model, and set documentation sources.
+
+      Example usage:
+      ```nix
+      services.nixai = {
+        enable = true;
+        mcp.enable = true;
+        mcp.aiProvider = "ollama";
+        mcp.aiModel = "llama3";
+        mcp.documentationSources = [ "https://wiki.nixos.org/wiki/NixOS_Wiki" ];
+      };
+      ```
+    '';
+    doc = ./nixos.nix;
   };
 }

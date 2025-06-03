@@ -52,18 +52,21 @@ in {
         type = types.str;
         default = "$HOME/.local/share/nixai/mcp.sock";
         description = "Path to the MCP server Unix socket";
+        example = "$HOME/.local/share/nixai/mcp.sock";
       };
 
       host = mkOption {
         type = types.str;
         default = "localhost";
         description = "Host for the MCP HTTP server to listen on";
+        example = "localhost";
       };
 
       port = mkOption {
         type = types.port;
         default = 8081;
         description = "Port for the MCP HTTP server to listen on";
+        example = 8081;
       };
 
       documentationSources = mkOption {
@@ -76,18 +79,35 @@ in {
           "https://nix-community.github.io/home-manager/"
         ];
         description = "Documentation sources for the MCP server to query";
+        example = ["https://wiki.nixos.org/wiki/NixOS_Wiki"];
       };
 
       aiProvider = mkOption {
         type = types.str;
         default = "ollama";
         description = "Default AI provider to use (ollama, gemini, openai)";
+        example = "ollama";
       };
 
       aiModel = mkOption {
         type = types.str;
         default = "llama3";
         description = "Default AI model to use for the specified provider";
+        example = "llama3";
+      };
+
+      extraFlags = mkOption {
+        type = types.listOf types.str;
+        default = [];
+        description = "Extra flags to pass to the MCP server";
+        example = ["--log-level=debug"];
+      };
+
+      environment = mkOption {
+        type = types.attrsOf types.str;
+        default = {};
+        description = "Extra environment variables for the MCP server";
+        example = {NIXAI_LOG_LEVEL = "debug";};
       };
     };
 
@@ -134,6 +154,8 @@ in {
           socket_path = cfg.mcp.socketPath;
           auto_start = cfg.mcp.enable;
           documentation_sources = cfg.mcp.documentationSources;
+          extra_flags = cfg.mcp.extraFlags;
+          environment = cfg.mcp.environment;
         };
       };
     })
@@ -147,7 +169,8 @@ in {
         };
 
         Service = {
-          ExecStart = "${cfg.mcp.package}/bin/nixai mcp-server start --socket-path=${cfg.mcp.socketPath}";
+          ExecStart = "${cfg.mcp.package}/bin/nixai mcp-server start --socket-path=${cfg.mcp.socketPath} ${concatStringsSep " " cfg.mcp.extraFlags}";
+          Environment = cfg.mcp.environment;
           Restart = "on-failure";
           RestartSec = "5s";
         };
@@ -240,4 +263,23 @@ in {
       };
     })
   ];
+
+  meta = {
+    maintainers = [lib.maintainers.olf];
+    description = lib.mdDoc ''
+      NixAI Home Manager module. Provides options to enable the NixAI MCP server, configure AI provider/model, and set documentation sources.
+
+      Example usage:
+      ```nix
+      services.nixai = {
+        enable = true;
+        mcp.enable = true;
+        mcp.aiProvider = "ollama";
+        mcp.aiModel = "llama3";
+        mcp.documentationSources = [ "https://wiki.nixos.org/wiki/NixOS_Wiki" ];
+      };
+      ```
+    '';
+    doc = ./home-manager.nix;
+  };
 }
