@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/mcp"
 	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/utils"
 	"nix-ai-help/pkg/version"
@@ -39,23 +40,17 @@ var tipsOfTheDay = []string{
 // var currentModel string = "llama3"
 
 // --- CLI command stubs for interactive mode ---
-var configCmd = &cobra.Command{Use: "config", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] config command not implemented") }}
 var healthCheckCmd = &cobra.Command{Use: "health", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] health check not implemented") }}
 var upgradeAdvisorCmd = &cobra.Command{Use: "upgrade-advisor", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] upgrade advisor not implemented") }}
 var serviceExamplesCmd = &cobra.Command{Use: "service-examples", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] service examples not implemented") }}
 var lintConfigCmd = &cobra.Command{Use: "lint-config", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] lint config not implemented") }}
 var decodeErrorCmd = &cobra.Command{Use: "decode-error", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] decode error not implemented") }}
-var packageRepoCmd = &cobra.Command{Use: "package-repo", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] package-repo not implemented") }}
 var findOptionCmd = &cobra.Command{Use: "find-option", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] find-option not implemented") }}
 var learnBasicsCmd = &cobra.Command{Use: "basics", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] learn basics not implemented") }}
 var learnAdvancedCmd = &cobra.Command{Use: "advanced", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] learn advanced not implemented") }}
 var learnQuizCmd = &cobra.Command{Use: "quiz", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] learn quiz not implemented") }}
 var learnPathCmd = &cobra.Command{Use: "path <topic>", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] learn path not implemented") }}
 var learnProgressCmd = &cobra.Command{Use: "progress", Run: func(cmd *cobra.Command, args []string) { fmt.Println("[interactive] learn progress not implemented") }}
-var learnCmd = &cobra.Command{
-	Use:   "learn",
-	Short: "NixOS learning and training commands",
-}
 
 // Ensure learn subcommands are added to learnCmd
 func init() {
@@ -187,7 +182,29 @@ var (
 		query   string
 		results []string
 	}{query: "", results: nil}
+
+	optionAutocompleteCache = struct {
+		sync.Mutex
+		prefix  string
+		results []string
+	}{prefix: "", results: nil}
 )
+
+// Animated snowflake spinner for progress indication
+var snowflakeFrames = []string{"❄️  ", "  ❄️", " ❄️ ", "❄️  ", "  ❄️"}
+
+func showSnowflakeSpinner(stop <-chan struct{}) {
+	for i := 0; ; i++ {
+		select {
+		case <-stop:
+			fmt.Print("\r   \r")
+			return
+		default:
+			fmt.Printf("\r%s", snowflakeFrames[i%len(snowflakeFrames)])
+			time.Sleep(120 * time.Millisecond)
+		}
+	}
+}
 
 // commandCompleter implements readline.AutoCompleter for command palette/autocomplete
 // Enhanced: supports fuzzy search for commands, package name completion for 'search', and option completion for 'explain-option' and 'explain-home-option'.
@@ -242,13 +259,31 @@ func (c commandCompleter) Do(line []rune, pos int) ([][]rune, int) {
 
 	// Option completion for 'explain-option <option>' and 'explain-home-option <option>'
 	if (fields[0] == "explain-option" || fields[0] == "explain-home-option") && len(fields) >= 2 {
-		// For demo: suggest common options, in real use, query MCP or a static list
-		commonOptions := []string{
-			"services.nginx.enable", "networking.firewall.enable", "programs.zsh.enable", "users.users", "environment.systemPackages", "fonts.fonts", "hardware.opengl.enable", "services.openssh.enable",
+		prefix := fields[len(fields)-1]
+		optionAutocompleteCache.Lock()
+		if optionAutocompleteCache.prefix != prefix {
+			optionAutocompleteCache.prefix = prefix
+			optionAutocompleteCache.results = nil
+			optionAutocompleteCache.Unlock()
+			// Show snowflake spinner while querying MCP
+			stop := make(chan struct{})
+			go showSnowflakeSpinner(stop)
+			cfg, _ := config.LoadUserConfig()
+			mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
+			client := mcp.NewMCPClient(mcpURL)
+			results, err := client.OptionCompletion(prefix)
+			close(stop)
+			fmt.Print("\r   \r") // Clear spinner
+			optionAutocompleteCache.Lock()
+			if err == nil {
+				optionAutocompleteCache.results = results
+			}
+			optionAutocompleteCache.Unlock()
 		}
-		last := fields[len(fields)-1]
-		for _, opt := range commonOptions {
-			if strings.HasPrefix(opt, last) {
+		results := optionAutocompleteCache.results
+		optionAutocompleteCache.Unlock()
+		for _, opt := range results {
+			if strings.HasPrefix(opt, prefix) {
 				suggestions = append(suggestions, []rune(opt))
 			}
 		}

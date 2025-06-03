@@ -125,6 +125,10 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 				Name:        "search_nixos_packages",
 				Description: "Search for NixOS packages",
 			},
+			{
+				Name:        "complete_nixos_option",
+				Description: "Autocomplete NixOS option names for a given prefix",
+			},
 		}
 		conn.Reply(ctx, req.ID, map[string]interface{}{"tools": tools})
 
@@ -212,6 +216,19 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 				conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInvalidParams,
 					Message: "Missing query parameter",
+				})
+			}
+
+		case "complete_nixos_option":
+			if prefix, ok := params.Arguments["prefix"].(string); ok {
+				results := m.handleOptionCompletion(prefix)
+				conn.Reply(ctx, req.ID, map[string]interface{}{
+					"options": results,
+				})
+			} else {
+				conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInvalidParams,
+					Message: "Missing prefix parameter",
 				})
 			}
 
@@ -322,6 +339,22 @@ func (m *MCPServer) handleHomeManagerOptionExplain(option string) string {
 // handlePackageSearch processes package search queries
 func (m *MCPServer) handlePackageSearch(query string) string {
 	return fmt.Sprintf("Package search for '%s' is not yet implemented in MCP protocol. Use the CLI interface: nixai search pkg %s", query, query)
+}
+
+// handleOptionCompletion processes option name completions for a given prefix
+func (m *MCPServer) handleOptionCompletion(prefix string) []string {
+	// For demo: use a static list, but in real use, query ElasticSearch or in-memory index
+	allOptions := []string{
+		"services.nginx.enable", "networking.firewall.enable", "programs.zsh.enable", "users.users", "environment.systemPackages", "fonts.fonts", "hardware.opengl.enable", "services.openssh.enable",
+		// ... more options ...
+	}
+	var results []string
+	for _, opt := range allOptions {
+		if strings.HasPrefix(opt, prefix) {
+			results = append(results, opt)
+		}
+	}
+	return results
 }
 
 // Server represents the combined HTTP and MCP server

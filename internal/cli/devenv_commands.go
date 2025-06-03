@@ -401,8 +401,6 @@ func collectFlagOptions(cmd *cobra.Command, template devenv.Template, cfg *confi
 }
 
 func init() {
-	// Add devenv command and subcommands
-	rootCmd.AddCommand(devenvCmd)
 	devenvCmd.AddCommand(devenvListCmd)
 	devenvCmd.AddCommand(devenvCreateCmd)
 	devenvCmd.AddCommand(devenvSuggestCmd)

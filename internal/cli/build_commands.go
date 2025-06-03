@@ -694,9 +694,6 @@ func summarizeBuildOutput(output string) string {
 
 // Initialize commands
 func init() {
-	// Add enhanced build command
-	rootCmd.AddCommand(enhancedBuildCmd)
-
 	// Add build subcommands
 	enhancedBuildCmd.AddCommand(buildDebugCmd)
 	enhancedBuildCmd.AddCommand(buildRetryCmd)
