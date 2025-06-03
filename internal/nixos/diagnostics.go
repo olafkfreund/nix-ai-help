@@ -376,6 +376,7 @@ func getRelevantDocsLinks(errorType string) []string {
 		return []string{
 			"https://nixos.org/manual/nixos/stable/#sec-configuration",
 			"https://nix.dev/manual/nix/2.28/language/",
+			"https://nix.dev/",
 		}
 	case "package":
 		return []string{
@@ -396,6 +397,7 @@ func getRelevantDocsLinks(errorType string) []string {
 		return []string{
 			"https://nixos.org/manual/nixpkgs/stable/#chap-quick-start",
 			"https://wiki.nixos.org/wiki/Packaging",
+			"https://nix.dev",
 		}
 	default:
 		return []string{

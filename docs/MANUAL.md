@@ -203,7 +203,19 @@ nixai mcp-server status
 nixai mcp-server stop
 ```
 
-- **Tip:** MCP server provides documentation context for all AI queries.
+### MCP Server Background/Daemon Mode
+
+You can start the MCP server in the background (daemon mode) so it continues running independently of your terminal session:
+
+```sh
+nixai mcp-server start --background
+nixai mcp-server start -d
+nixai mcp-server start --daemon  # alias for --background
+```
+
+- Use `nixai mcp-server status` to check if the server is running.
+- Use `nixai mcp-server stop` to stop the background server.
+- All background/daemon flags are equivalent.
 
 ### Development Environment (devenv)
 

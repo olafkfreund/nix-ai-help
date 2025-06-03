@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 
@@ -510,6 +511,127 @@ Examples:
 		fmt.Println(utils.FormatTip("Use 'nixai logs <file>' or pipe logs to 'nixai logs' for analysis (feature coming soon)."))
 	},
 }
+
+var mcpServerBackground bool
+
+var mcpServerStartCmd = &cobra.Command{
+	Use:   "start",
+	Short: "Start the MCP server",
+	Long: `Start the Model Context Protocol (MCP) server for advanced NixOS documentation queries and AI integration.
+
+Examples:
+  nixai mcp-server start
+  nixai mcp-server start --background
+  nixai mcp-server start -d
+  nixai mcp-server start --daemon
+`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if mcpServerBackground {
+			// Relaunch self in background (daemonize)
+			execPath, err := os.Executable()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to determine executable path: "+err.Error()))
+				os.Exit(1)
+			}
+			args := []string{"mcp-server", "start"}
+			cmd := os.Args[0]
+			for _, a := range os.Args[1:] {
+				if a != "--background" && a != "-d" && a != "--daemon" {
+					args = append(args, a)
+				}
+			}
+			procAttr := &os.ProcAttr{
+				Files: []*os.File{nil, nil, nil},
+				Env:   os.Environ(),
+			}
+			process, err := os.StartProcess(execPath, append([]string{cmd}, args...), procAttr)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to start MCP server in background: "+err.Error()))
+				os.Exit(1)
+			}
+			fmt.Println(utils.FormatSuccess("✅ MCP server started in background (PID: " + fmt.Sprint(process.Pid) + ")"))
+			fmt.Println(utils.FormatTip("Use 'nixai mcp-server status' to check status, 'nixai mcp-server stop' to stop."))
+			os.Exit(0)
+		}
+		// Foreground mode: start server in-process
+		fmt.Println(utils.FormatHeader("🛰️  Starting MCP Server (foreground mode)"))
+		server, err := mcp.NewServerFromConfig("")
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize MCP server: "+err.Error()))
+			os.Exit(1)
+		}
+		if err := server.Start(); err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("MCP server error: "+err.Error()))
+			os.Exit(1)
+		}
+	},
+}
+
+var mcpServerStopCmd = &cobra.Command{
+	Use:   "stop",
+	Short: "Stop the MCP server",
+	Run: func(cmd *cobra.Command, args []string) {
+		// Try to stop via /shutdown endpoint
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
+			os.Exit(1)
+		}
+		url := fmt.Sprintf("http://%s:%d/shutdown", cfg.MCPServer.Host, cfg.MCPServer.Port)
+		resp, err := http.Post(url, "application/json", nil)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to stop MCP server: "+err.Error()))
+			os.Exit(1)
+		}
+		defer resp.Body.Close()
+		fmt.Println(utils.FormatSuccess("✅ MCP server stop requested."))
+	},
+}
+
+var mcpServerStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Show MCP server status",
+	Run: func(cmd *cobra.Command, args []string) {
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
+			os.Exit(1)
+		}
+		url := fmt.Sprintf("http://%s:%d/healthz", cfg.MCPServer.Host, cfg.MCPServer.Port)
+		resp, err := http.Get(url)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("MCP server is not running or unreachable."))
+			return
+		}
+		defer resp.Body.Close()
+		fmt.Println(utils.FormatSuccess("✅ MCP server is running."))
+	},
+}
+
+var mcpServerLogsCmd = &cobra.Command{
+	Use:   "logs",
+	Short: "Show recent MCP server logs",
+	Run: func(cmd *cobra.Command, args []string) {
+		logPath := "mcp.log"
+		if _, err := os.Stat(logPath); err == nil {
+			data, _ := os.ReadFile(logPath)
+			fmt.Println(utils.FormatHeader("📝 Recent MCP Server Logs"))
+			fmt.Println(string(data))
+		} else {
+			fmt.Println(utils.FormatWarning("No log file found at mcp.log"))
+		}
+	},
+}
+
+func init() {
+	mcpServerStartCmd.Flags().BoolVarP(&mcpServerBackground, "background", "d", false, "Run MCP server in background (daemon mode)")
+	mcpServerStartCmd.Flags().BoolVar(&mcpServerBackground, "daemon", false, "Alias for --background")
+	mcpServerCmd.AddCommand(mcpServerStartCmd)
+	mcpServerCmd.AddCommand(mcpServerStopCmd)
+	mcpServerCmd.AddCommand(mcpServerStatusCmd)
+	mcpServerCmd.AddCommand(mcpServerLogsCmd)
+}
+
 var mcpServerCmd = &cobra.Command{
 	Use:   "mcp-server",
 	Short: "Start or manage the MCP server",
@@ -524,14 +646,15 @@ Examples:
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(utils.FormatHeader("🛰️  MCP Server Management"))
 		fmt.Println()
-		fmt.Println(utils.FormatKeyValue("start", "Start the MCP server (coming soon)"))
-		fmt.Println(utils.FormatKeyValue("stop", "Stop the MCP server (coming soon)"))
-		fmt.Println(utils.FormatKeyValue("status", "Show MCP server status (coming soon)"))
-		fmt.Println(utils.FormatKeyValue("logs", "Show recent MCP server logs (coming soon)"))
+		fmt.Println(utils.FormatKeyValue("start", "Start the MCP server"))
+		fmt.Println(utils.FormatKeyValue("stop", "Stop the MCP server"))
+		fmt.Println(utils.FormatKeyValue("status", "Show MCP server status"))
+		fmt.Println(utils.FormatKeyValue("logs", "Show recent MCP server logs"))
 		fmt.Println()
-		fmt.Println(utils.FormatTip("Use 'nixai mcp-server <subcommand>' to manage the MCP server (feature coming soon)."))
+		fmt.Println(utils.FormatTip("Use 'nixai mcp-server <subcommand>' to manage the MCP server."))
 	},
 }
+
 var neovimSetupCmd = &cobra.Command{
 	Use:   "neovim-setup",
 	Short: "Neovim integration setup",
