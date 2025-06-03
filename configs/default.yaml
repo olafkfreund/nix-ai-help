@@ -25,6 +25,18 @@ default:
     diagnostics:
         enabled: true
         threshold: 5
+        error_patterns:
+            # Example user-defined error patterns
+            - name: custom_permission_error
+              pattern: '(?i)custom permission denied|access refused by policy'
+              error_type: permission
+              severity: medium
+              description: Custom permission or access error
+            - name: custom_network_issue
+              pattern: '(?i)custom network unreachable|host not found'
+              error_type: network
+              severity: high
+              description: Custom network connectivity issue
     commands:
         timeout: 30
         retries: 3

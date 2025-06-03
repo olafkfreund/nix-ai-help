@@ -38,6 +38,12 @@ const EmbeddedDefaultConfig = `default:
     diagnostics:
         enabled: true
         threshold: 5
+        error_patterns:
+            - name: example_error
+              pattern: '(?i)example error regex'
+              error_type: custom
+              severity: high
+              description: Example error description
     commands:
         timeout: 30
         retries: 3
@@ -86,9 +92,27 @@ type NixosConfig struct {
 	LogPath    string `yaml:"log_path" json:"log_path"`
 }
 
+// ErrorPatternConfig allows user-defined error patterns for diagnostics
+// Pattern is a regex string
+// Example YAML:
+//   - name: my_error
+//     pattern: '(?i)my error regex'
+//     error_type: custom
+//     severity: high
+//     description: My custom error
+
+type ErrorPatternConfig struct {
+	Name        string `yaml:"name" json:"name"`
+	Pattern     string `yaml:"pattern" json:"pattern"`
+	ErrorType   string `yaml:"error_type" json:"error_type"`
+	Severity    string `yaml:"severity" json:"severity"`
+	Description string `yaml:"description" json:"description"`
+}
+
 type DiagnosticsConfig struct {
-	Enabled   bool `yaml:"enabled" json:"enabled"`
-	Threshold int  `yaml:"threshold" json:"threshold"`
+	Enabled       bool                 `yaml:"enabled" json:"enabled"`
+	Threshold     int                  `yaml:"threshold" json:"threshold"`
+	ErrorPatterns []ErrorPatternConfig `yaml:"error_patterns" json:"error_patterns"`
 }
 
 type CommandsConfig struct {
@@ -171,8 +195,20 @@ func DefaultUserConfig() *UserConfig {
 			ConfigPath: "~/nixos-config/configuration.nix",
 			LogPath:    "/var/log/nixos/nixos-rebuild.log",
 		},
-		Diagnostics: DiagnosticsConfig{Enabled: true, Threshold: 1},
-		Commands:    CommandsConfig{Timeout: 30, Retries: 2},
+		Diagnostics: DiagnosticsConfig{
+			Enabled:   true,
+			Threshold: 1,
+			ErrorPatterns: []ErrorPatternConfig{
+				{
+					Name:        "example_error",
+					Pattern:     "(?i)example error regex",
+					ErrorType:   "custom",
+					Severity:    "high",
+					Description: "Example error description",
+				},
+			},
+		},
+		Commands: CommandsConfig{Timeout: 30, Retries: 2},
 		Devenv: DevenvConfig{
 			DefaultDirectory: ".",
 			AutoInitGit:      true,
