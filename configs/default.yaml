@@ -16,6 +16,7 @@ default:
             - nixos-options-es://options  # Special endpoint for NixOS options via ElasticSearch
             - https://wiki.nixos.org/wiki/NixOS_Wiki
             - https://nix.dev/manual/nix
+            - https://nix.dev/  # Added main nix.dev site as a documentation source
             - https://nixos.org/manual/nixpkgs/stable/
             - https://nix.dev/manual/nix/2.28/language/
             - https://nix-community.github.io/home-manager/

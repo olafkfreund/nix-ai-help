@@ -29,6 +29,7 @@ const EmbeddedDefaultConfig = `default:
         documentation_sources:
             - https://wiki.nixos.org/wiki/NixOS_Wiki
             - https://nix.dev/manual/nix
+			- https://nix.dev/ 
             - https://nixos.org/manual/nixpkgs/stable/
             - https://nix.dev/manual/nix/2.28/language/
             - https://nix-community.github.io/home-manager/
@@ -186,6 +187,7 @@ func DefaultUserConfig() *UserConfig {
 			DocumentationSources: []string{
 				"https://wiki.nixos.org/wiki/NixOS_Wiki",
 				"https://nix.dev/manual/nix",
+				"https://nix.dev/",
 				"https://nixos.org/manual/nixpkgs/stable/",
 				"https://nix.dev/manual/nix/2.28/language/",
 				"https://nix-community.github.io/home-manager/",

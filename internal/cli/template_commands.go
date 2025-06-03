@@ -1611,11 +1611,7 @@ func getDevelopmentTemplate() string {
 
 // Add commands to CLI in init function
 func init() {
-	// Add main commands
-	rootCmd.AddCommand(templatesCmd)
-	rootCmd.AddCommand(snippetsCmd)
-
-	// Add template subcommands
+	// Add template and snippet subcommands
 	templatesCmd.AddCommand(templatesListCmd)
 	templatesCmd.AddCommand(templatesSearchCmd)
 	templatesCmd.AddCommand(templatesGithubCmd)
@@ -1624,7 +1620,6 @@ func init() {
 	templatesCmd.AddCommand(templatesSaveCmd)
 	templatesCmd.AddCommand(templatesCategoriesCmd)
 
-	// Add snippet subcommands
 	snippetsCmd.AddCommand(snippetsListCmd)
 	snippetsCmd.AddCommand(snippetsSearchCmd)
 	snippetsCmd.AddCommand(snippetsAddCmd)

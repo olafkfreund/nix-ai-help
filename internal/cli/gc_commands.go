@@ -926,9 +926,6 @@ func formatDuration(d time.Duration) string {
 
 // Add commands to CLI in init function
 func init() {
-	// Add main gc command
-	rootCmd.AddCommand(gcCmd)
-
 	// Add gc subcommands
 	gcCmd.AddCommand(gcAnalyzeCmd)
 	gcCmd.AddCommand(gcSafeCleanCmd)
@@ -938,6 +935,5 @@ func init() {
 	// Add flags
 	gcSafeCleanCmd.Flags().Bool("dry-run", false, "Show what would be done without making changes")
 	gcSafeCleanCmd.Flags().IntP("keep-generations", "k", 5, "Number of recent generations to keep")
-
 	gcCompareGenerationsCmd.Flags().IntP("keep", "k", 5, "Number of generations to recommend keeping")
 }

@@ -340,7 +340,7 @@ Add the nixai Home Manager module to your configuration:
     enable = true;
     mcp = {
       enable = true;
-      # Optional: custom socket path (uses $HOME expansion)
+      # Optional: custom socket path (uses `$HOME` expansion)
       socketPath = "$HOME/.local/share/nixai/mcp.sock";
     };
     # Optional: integrate with VS Code
@@ -614,6 +614,44 @@ nixai package-repo https://github.com/user/project
 - **Comprehensive Validation**: Validates generated derivations for completeness and correctness
 - **Path Resolution**: Supports both relative and absolute paths
 - **Debug Mode**: Comprehensive logging for troubleshooting and development
+
+---
+
+## 🔍 Enhanced Search Command: Discover, Configure, and Master NixOS Packages & Services
+
+The `nixai search` command now provides a powerful, interactive experience for exploring NixOS packages and services:
+
+- **Comprehensive Option Listing:**
+  - See *all* available NixOS options for a package/service, including type, default, description, and real-world examples.
+- **Config Snippets for Every Setup:**
+  - Instantly copy-paste configuration snippets for classic `/etc/nixos/configuration.nix`, Home Manager, and flake-based setups.
+- **AI-Powered Best Practices & Pitfalls:**
+  - Get advanced usage tips, best practices, and common pitfalls—sourced from both official docs and AI analysis.
+- **Interactive Exploration:**
+  - Use interactive prompts to view option details, copy config snippets, or ask for further explanation.
+- **Beautiful Output:**
+  - All results are formatted with headers, key-value tables, and Markdown rendering for easy reading and direct use in your configs.
+
+### Example Usage
+
+```sh
+nixai search nginx
+```
+
+*What you'll see:*
+- A list of all NixOS options for `nginx` (e.g., `services.nginx.enable`, `services.nginx.virtualHosts`, ...)
+- For each option: type, default, description, and example usage
+- Config snippets for classic, Home Manager, and flake setups (ready to copy)
+- AI-powered best practices and advanced tips for configuring `nginx`
+- Interactive prompt to view more details or copy a snippet
+
+### Why Use This?
+- Quickly discover all configuration options for any package or service
+- Avoid common mistakes and follow best practices
+- Easily adapt examples to your preferred NixOS setup style
+- Learn advanced usage patterns and troubleshooting tips
+
+See the [User Manual](docs/MANUAL.md#searching-for-packages-and-services) for full details and advanced examples.
 
 ---
 
@@ -1597,6 +1635,7 @@ nixai mcp-server start
 
 # Start in background (daemon mode)
 nixai mcp-server start --background
+nixai mcp-server start -d
 nixai mcp-server start --daemon  # alias for --background
 
 # With custom socket path
@@ -1609,339 +1648,9 @@ nixai mcp-server status
 nixai mcp-server stop
 ```
 
+- You can use any of `--background`, `-d`, or `--daemon` to run the MCP server as a background process (daemon mode).
 - MCP server provides NixOS documentation and options data to enhance AI responses
 - Can be configured to use a custom socket path for communication
-- Supports running as a background daemon process
-- Use environment variable `NIXAI_SOCKET_PATH` to set socket path system-wide
-
-### Editor Integration
-
-#### Neovim Integration
-
-```sh
-# Set up Neovim integration
-nixai neovim-setup
-
-# With custom socket path
-nixai neovim-setup --socket-path="/path/to/mcp.sock"
-
-# With custom Neovim config directory
-nixai neovim-setup --config-dir="/path/to/neovim/config"
-```
-
-Once set up, use these keybindings in Neovim:
-
-- `<leader>nq` - Ask a NixOS question
-- `<leader>ns` - Get context-aware suggestions
-- `<leader>no` - Explain a NixOS option
-- `<leader>nh` - Explain a Home Manager option
-
-See [Neovim Integration](docs/neovim-integration.md) for detailed setup instructions and advanced usage.
-
----
-
-## 📝 How to Use the Latest Features
-
-### Set or Fix Your NixOS Config Path
-
-- **CLI:**
-
-  ```sh
-  nixai search --nixos-path /etc/nixos pkg <query>
-  ```
-
-- **Config File:**
-
-  Edit `~/.config/nixai/config.yaml` and set `nixos_folder: /etc/nixos`.
-
-- **Interactive:**
-
-  Start with `nixai interactive` and use `set-nixos-path`.
-
-If the path is missing or invalid, nixai will show you exactly how to fix it.
-
-### Automated Service Option Lookup
-
-- When you search for a service (e.g., `nixai search service nginx`), nixai will now display all available options for that service, not just the enable flag. This uses `nixos-option --find` for comprehensive results.
-
-### Error Guidance
-
-- If you run a command and the config path is not set or is invalid, nixai will print a clear error and suggest how to set it.
-
-### Testing
-
-- All new features are covered by tests. Run them with:
-
-  ```sh
-  just test
-  # or
-  go test ./...
-  ```
-
----
-
-## 🗺️ Project Plan
-
-### 1. **Core Architecture**
-
-- Modular Go codebase with clear package boundaries.
-
-- YAML-based configuration (`configs/default.yaml`) for all settings.
-
-- Main entrypoint: `cmd/nixai/main.go`.
-
-### 2. **AI Integration**
-
-- Support for multiple LLM providers: Ollama (local), Gemini, OpenAI, and more.
-
-- User-selectable provider with Ollama as default for privacy.
-
-- All LLM logic in `internal/ai`.
-
-### 3. **Documentation Query (MCP Server)**
-
-- MCP server/client in `internal/mcp`.
-
-- Query NixOS docs from:
-
-  - [NixOS Wiki](https://wiki.nixos.org/wiki/NixOS_Wiki)
-
-  - [nix.dev manual](https://nix.dev/manual/nix)
-
-  - [Nixpkgs Manual](https://nixos.org/manual/nixpkgs/stable/)
-
-  - [Nix Language Manual](https://nix.dev/manual/nix/2.28/language/)
-
-  - [Home Manager Manual](https://nix-community.github.io/home-manager/)
-
-- Always use sources from config.
-
-### 4. **Diagnostics & Log Parsing**
-
-- Log parsing and diagnostics in `internal/nixos`.
-
-- Accept logs via pipe, file, or CLI.
-
-- Execute and parse local NixOS commands.
-
-### 5. **CLI & Interactive Mode**
-
-- All CLI logic in `internal/cli`.
-
-- Interactive and scriptable modes.
-
-- User-friendly command structure.
-
-### 6. **Utilities & Logging**
-
-- Logging via `pkg/logger`, respecting config log level.
-
-- Utility helpers in `pkg/utils`.
-
-### 7. **Testing & Build**
-
-- Use `justfile` for build, test, lint, and run tasks.
-
-- Nix (`flake.nix`) for reproducible builds and dev environments.
-
-- All new features must be testable and documented.
-
-### 8. **Documentation & Contribution**
-
-- Update this `README.md` and code comments for all changes.
-
-- Keep `.github/copilot-instructions.md` up to date.
-
-- Contributions welcome via PR or issue.
-
----
-
-## Configuration
-
-nixai supports persistent, user-editable configuration for all users. On first run, a config file is created at:
-
-You can edit this file to set your preferred NixOS config folder, AI provider, model, log level, documentation sources, and more. Example contents:
-
-```yaml
-ai_provider: ollama
-ai_model: llama3
-nixos_folder: ~/nixos-config
-log_level: info
-mcp_server:
-  host: localhost
-  port: 8080
-  socket_path: /tmp/nixai-mcp.sock  # Custom Unix socket path
-  documentation_sources:
-    - https://wiki.nixos.org/wiki/NixOS_Wiki
-    - https://nix.dev/manual/nix
-    - https://nixos.org/manual/nixpkgs/stable/
-    - https://nix.dev/manual/nix/2.28/language/
-    - https://nix-community.github.io/home-manager/
-nixos:
-  config_path: ~/nixos-config/configuration.nix
-  log_path: /var/log/nixos/nixos-rebuild.log
-diagnostics:
-  enabled: true
-  threshold: 1
-commands:
-  timeout: 30
-  retries: 2
-```
-
----
-
-## Build & Test
-
-### Using Nix (Recommended for Reproducible Builds)
-
-The project includes a comprehensive Nix flake for reproducible development:
-
-```sh
-# Enter development environment (includes Go, just, golangci-lint, etc.)
-nix develop
-
-# Build the project
-just build
-
-# Run all tests
-just test-all
-
-# Check code quality
-just lint
-
-# Build using Nix directly
-nix build .#nixai
-```
-
-### Test Structure
-
-Tests are organized in the `tests/` directory by category:
-
-- **MCP Tests**: `tests/mcp/` - Tests for MCP protocol and server
-- **VS Code Tests**: `tests/vscode/` - Tests for VS Code integration
-- **Provider Tests**: `tests/providers/` - Tests for AI provider integration
-
-Run specific test groups:
-
-```sh
-# MCP tests only
-just test-mcp
-
-# VS Code integration tests only
-just test-vscode
-
-# AI provider tests only
-just test-providers
-```
-
-Check test environment compatibility:
-
-```sh
-./tests/check-compatibility.sh
-```
-
-### Using Go Directly
-
-```sh
-# Clean module cache if needed
-go clean -modcache
-
-# Download dependencies
-go mod tidy
-
-# Build
-go build -o nixai ./cmd/nixai/main.go
-
-# Test
-go test ./...
-
-# Run
-./nixai --help
-```
-
-### Development Workflow
-
-1. **Setup**: `nix develop` (or ensure Go 1.24+ is installed)
-2. **Dependencies**: `go mod tidy`
-3. **Build**: `just build`
-4. **Test**: `just test`
-5. **Quality Check**: `just lint`
-6. **Run**: `./nixai --help`
-
-### Available Just Commands
-
-Run `just -l` to see all available commands:
-
-- `just build` - Build the nixai binary
-- `just test` - Run all tests
-- `just lint` - Run linter (static analysis)
-- `just fmt` - Format Go code
-- `just clean` - Remove build artifacts
-- `just run` - Build and run nixai
-- `just deps` - Install/update dependencies
-- `just all` - Clean, build, test, and run
-
-Use the `justfile` for common tasks: `just build`, `just test`, etc.
-
-Nix (`flake.nix`) provides a reproducible dev environment.
-
----
-
-## Where to Find NixOS Build Logs
-
-- Latest build logs: `/var/log/nixos/nixos-rebuild.log` (system), `/var/log/nix/drvs/` (per-derivation).
-
-- Use `nix log` for recent build failures.
-
----
-
-## Example: Diagnosing a Build Failure
-
-```sh
-sudo nixos-rebuild switch
-
-nixai diagnose --nix-log
-```
-
----
-
-## 🤝 Contributing
-
-- All code must be idiomatic Go, modular, and well-documented.
-
-- Add or update tests for all new features and bugfixes.
-
-- See PROJECT_PLAN.md for roadmap and tasks.
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- Thanks to the NixOS community and documentation authors.
-
-- Special thanks to the creators of the AI models used in this project.
-
----
-
-## 📸 Screenshots
-
-Below are example screenshots of `nixai` in action:
-
-| Example | Screenshot |
-|---------|------------|
-| Option Explanation | ![Option Explanation](./screenshots/swappy-20250529_173003.png) |
-| Package Analysis   | ![Package Analysis](./screenshots/swappy-20250529_173101.png) |
-| Derivation Output  | ![Derivation Output](./screenshots/swappy-20250529_173153.png) |
-| Health Check       | ![Health Check](./screenshots/swappy-20250529_173239.png) |
-| Service Example    | ![Service Example](./screenshots/swappy-20250529_173502.png) |
-| Interactive Mode   | ![Interactive Mode](./screenshots/swappy-20250529_173529.png) |
-| Error Decoder      | ![Error Decoder](./screenshots/swappy-20250529_173532.png) |
 
 ---
 

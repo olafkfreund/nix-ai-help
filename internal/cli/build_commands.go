@@ -15,6 +15,9 @@ import (
 	"nix-ai-help/pkg/utils"
 )
 
+// Global variable for NixOS config path (directory)
+var nixosConfigPathGlobal string
+
 // Enhanced build command with subcommands
 var enhancedBuildCmd = &cobra.Command{
 	Use:   "build [args]",
@@ -691,9 +694,6 @@ func summarizeBuildOutput(output string) string {
 
 // Initialize commands
 func init() {
-	// Add enhanced build command
-	rootCmd.AddCommand(enhancedBuildCmd)
-
 	// Add build subcommands
 	enhancedBuildCmd.AddCommand(buildDebugCmd)
 	enhancedBuildCmd.AddCommand(buildRetryCmd)

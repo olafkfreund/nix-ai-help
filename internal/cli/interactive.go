@@ -4,478 +4,181 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"nix-ai-help/internal/config"
-	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/utils"
-	"nix-ai-help/pkg/version"
-)
 
-// TODO: Implement AI provider and model switching in interactive mode
-// var currentAIProvider string
-// var currentModel string = "llama3"
+	"github.com/charmbracelet/glamour"
+	"github.com/spf13/cobra"
+)
 
 // InteractiveMode starts the interactive command-line interface for nixai.
 func InteractiveMode() {
-	reader := bufio.NewReader(os.Stdin)
-
-	// Enhanced welcome message
-	fmt.Println(utils.FormatHeader("🚀 Welcome to nixai Interactive Mode"))
-	fmt.Println(utils.FormatKeyValue("Version", version.Get().Short()))
-	fmt.Println(utils.FormatInfo("Type 'help' for commands, 'exit' to quit."))
-
-	if nixosConfigPath != "" {
-		fmt.Println(utils.FormatKeyValue("NixOS Config Path", nixosConfigPath))
-	}
-	fmt.Println(utils.FormatDivider())
-
+	printInteractiveWelcome()
+	scanner := bufio.NewScanner(os.Stdin)
 	for {
-		fmt.Print(utils.AccentStyle.Render("> "))
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			if err.Error() == "EOF" {
-				fmt.Println("\nExiting nixai. Goodbye!")
-				break
-			}
-			fmt.Println("Error reading input:", err)
-			break
+		fmt.Print("nixai> ")
+		if !scanner.Scan() {
+			fmt.Println("\nExiting nixai. Goodbye!")
+			return
+		}
+		input := strings.TrimSpace(scanner.Text())
+		if input == "" {
+			continue
+		}
+		if input == "exit" || input == "quit" {
+			fmt.Println(utils.FormatDivider() + "\nGoodbye! 👋")
+			os.Exit(0)
+		}
+		if input == "help" || input == "?" {
+			printInteractiveWelcome()
+			continue
+		}
+		fields := strings.Fields(input)
+		if len(fields) == 0 {
+			continue
+		}
+		// Support: 'nixai interactive <command> ...' (e.g., 'nixai interactive store')
+		if fields[0] == "interactive" && len(fields) > 1 {
+			fields = fields[1:]
 		}
 
-		input = strings.TrimSpace(input)
-		if input == "exit" {
-			fmt.Println("Exiting nixai. Goodbye!")
-			break
+		// Build command map dynamically from root command - this gets all registered commands
+		knownCommands := make(map[string]*cobra.Command)
+		for _, cmd := range rootCmd.Commands() {
+			knownCommands[cmd.Name()] = cmd
 		}
 
-		handleCommand(input)
-	}
-}
-
-// handleCommand processes user commands entered in interactive mode.
-func handleCommand(command string) {
-	fields := strings.Fields(command)
-	if len(fields) == 0 {
-		return
-	}
-	switch fields[0] {
-	case "help":
-		fmt.Println(utils.FormatHeader("📚 Available Commands"))
-
-		commands := []string{
-			"diagnose <log/config>      - Diagnose NixOS issues",
-			"decode-error <error>       - AI-powered error decoder and fix generator",
-			"search <package>           - Search for and install Nix packages",
-			"explain-option <option>    - Get AI-powered explanations for NixOS options",
-			"find-option <description>  - Find NixOS options from natural language description",
-			"service-examples <service> - Get AI-powered service configuration examples",
-			"lint-config <file>         - AI-powered configuration file analysis and linting",
-			"package-repo <path>        - Analyze repositories and generate Nix derivations",
-			"devenv <subcommand>        - Create and manage development environments",
-			"  devenv list               - List available devenv templates",
-			"  devenv create <template>  - Create development environment",
-			"  devenv suggest <desc>     - Get AI template suggestions",
-			"config <subcommand>        - AI-assisted Nix configuration management",
-			"  config show               - Show current configuration with AI analysis",
-			"  config set <key> <value>  - Set configuration option with AI guidance",
-			"  config unset <key>        - Unset configuration option with safety checks",
-			"  config explain <key>      - AI-powered explanation of config options",
-			"  config analyze            - Comprehensive configuration analysis",
-			"  config validate           - Validate configuration and suggest improvements",
-			"  config optimize           - AI recommendations for performance optimization",
-			"  config backup             - Create backup of current configuration",
-			"  config restore <backup>   - Restore configuration from backup",
-			"health                     - Run comprehensive system health check",
-			"upgrade-advisor            - Get AI-powered upgrade guidance and safety checks",
-			"show config                - Show current configuration and MCP sources",
-			"set ai <provider> [model]  - Set AI provider (ollama, gemini, openai) and model (optional)",
-			"set-nixos-path <path>      - Set path to NixOS config folder",
-			"flake <subcommand>         - Manage Nix flakes (show, update, check, explain-inputs, explain <input>, ...)",
-			"learn <subcommand>         - Learn Nix concepts (basics, advanced, quiz, path <topic>, progress)",
-			"version                    - Display version information",
-			"exit                       - Exit interactive mode",
-		}
-
-		fmt.Println(utils.FormatList(commands))
-	case "config":
-		if len(fields) < 2 {
-			fmt.Println("Usage: config <show|set|unset|edit|explain|analyze|validate|optimize|backup|restore> [args...]")
-			fmt.Println("Examples:")
-			fmt.Println("  config show                              # Show current config with analysis")
-			fmt.Println("  config set experimental-features \"nix-command flakes\"")
-			fmt.Println("  config explain substituters             # Get AI explanation")
-			fmt.Println("  config analyze                          # Full analysis")
-			fmt.Println("  config validate                         # Validate config")
-			fmt.Println("  config optimize                         # Performance tips")
-			return
-		}
-		// Use the same logic as the CLI command by calling it directly
-		configCmd.Run(configCmd, fields[1:])
-		return
-	case "health":
-		fmt.Println("Running comprehensive system health check...")
-		healthCheckCmd.Run(healthCheckCmd, []string{})
-		return
-	case "upgrade-advisor":
-		fmt.Println("Starting upgrade advisor analysis...")
-		upgradeAdvisorCmd.Run(upgradeAdvisorCmd, []string{})
-		return
-	case "service-examples":
-		if len(fields) < 2 {
-			fmt.Println("Usage: service-examples <service>")
-			fmt.Println("Examples:")
-			fmt.Println("  service-examples nginx")
-			fmt.Println("  service-examples postgresql")
-			fmt.Println("  service-examples docker")
-			fmt.Println("  service-examples prometheus")
-			return
-		}
-		service := strings.Join(fields[1:], " ")
-		// Use the same logic as the CLI command by calling it directly
-		serviceExamplesCmd.Run(serviceExamplesCmd, []string{service})
-		return
-	case "lint-config":
-		if len(fields) < 2 {
-			fmt.Println("Usage: lint-config <file>")
-			fmt.Println("Examples:")
-			fmt.Println("  lint-config /etc/nixos/configuration.nix")
-			fmt.Println("  lint-config ~/.config/nixpkgs/home.nix")
-			fmt.Println("  lint-config ./flake.nix")
-			return
-		}
-		file := strings.Join(fields[1:], " ")
-		// Use the same logic as the CLI command by calling it directly
-		lintConfigCmd.Run(lintConfigCmd, []string{file})
-		return
-	case "decode-error":
-		if len(fields) < 2 {
-			fmt.Println("Usage: decode-error <error_message>")
-			fmt.Println("Examples:")
-			fmt.Println("  decode-error \"syntax error at line 42\"")
-			fmt.Println("  decode-error \"error: function 'buildNodePackage' called without required argument\"")
-			return
-		}
-		errorMessage := strings.Join(fields[1:], " ")
-		// Use the same logic as the CLI command by calling it directly
-		decodeErrorCmd.Run(decodeErrorCmd, []string{errorMessage})
-		return
-	case "search":
-		if len(fields) < 2 {
-			fmt.Println("Usage: search <package>")
-			return
-		}
-		query := strings.Join(fields[1:], " ")
-		cfg, _ := config.LoadUserConfig()
-		configPath := ""
-		if nixosConfigPath != "" {
-			fmt.Printf("Using NixOS config folder: %s\n", nixosConfigPath)
-			configPath = nixosConfigPath
-		} else if cfg != nil && cfg.NixosFolder != "" {
-			configPath = cfg.NixosFolder
-		}
-		executor := nixos.NewExecutor(configPath)
-		fmt.Printf("Searching for Nix packages matching: %s\n", query)
-		output, err := executor.SearchNixPackages(query)
-		if err != nil {
-			fmt.Printf("Error searching for packages: %v\n", err)
-			return
-		}
-		lines := strings.Split(output, "\n")
-		var pkgs []struct{ Attr, Name, Desc string }
-		var lastAttr string
-		for i := 0; i < len(lines); i++ {
-			line := strings.TrimSpace(lines[i])
-			if line == "" {
-				continue
-			}
-			if strings.HasPrefix(line, "evaluating ") {
-				continue
-			}
-			fields := strings.Fields(line)
-			if len(fields) > 1 && (strings.Contains(fields[0], ".") || strings.Contains(fields[0], ":")) {
-				attr := fields[0]
-				attr = strings.TrimPrefix(attr, "legacyPackages.x86_64-linux.")
-				attr = strings.TrimPrefix(attr, "nixpkgs.")
-				name := attr
-				desc := strings.Join(fields[1:], " ")
-				pkgs = append(pkgs, struct{ Attr, Name, Desc string }{fields[0], name, desc})
-				lastAttr = fields[0]
-				continue
-			}
-			if (strings.HasPrefix(line, " ") || strings.HasPrefix(line, "\t")) && lastAttr != "" {
-				if len(pkgs) > 0 {
-					pkgs[len(pkgs)-1].Desc += " " + strings.TrimSpace(line)
+		// Handle special interactive-only commands first
+		switch fields[0] {
+		case "help", "?":
+			printInteractiveWelcome()
+			continue
+		case "exit", "quit":
+			fmt.Println(utils.FormatDivider() + "\nGoodbye! 👋")
+			os.Exit(0)
+		case "interactive":
+			fmt.Println(utils.FormatTip("You are already in interactive mode!"))
+			continue
+		default:
+			// Try to run any registered command
+			if cmd, ok := knownCommands[fields[0]]; ok {
+				output, err := runCommandAndCaptureOutput(cmd, fields[1:])
+				if err != nil {
+					fmt.Println(utils.FormatTip("Error: " + err.Error()))
+				} else if strings.TrimSpace(output) == "" {
+					fmt.Println(utils.FormatTip("No output from command. Try a subcommand like 'list', 'show', or 'add'."))
+				} else {
+					fmt.Println(output)
 				}
-				continue
-			}
-			if idx := strings.Index(line, " - "); idx > 0 {
-				name := line[:idx]
-				desc := line[idx+3:]
-				pkgs = append(pkgs, struct{ Attr, Name, Desc string }{name, name, desc})
-				lastAttr = name
-			}
-		}
-		if len(pkgs) == 0 {
-			fmt.Println("No packages found.")
-			return
-		}
-		fmt.Println()
-		for i, pkg := range pkgs {
-			fmt.Printf("%2d. %s\n    %s\n", i+1, pkg.Name, pkg.Desc)
-		}
-		fmt.Print("\nEnter the number of the package to see configuration and test options (or leave blank to exit): ")
-		reader := bufio.NewReader(os.Stdin)
-		sel, _ := reader.ReadString('\n')
-		sel = strings.TrimSpace(sel)
-		if sel == "" {
-			return
-		}
-		idx := -1
-		fmt.Sscanf(sel, "%d", &idx)
-		if idx < 1 || idx > len(pkgs) {
-			fmt.Println("Invalid selection.")
-			return
-		}
-		pkg := pkgs[idx-1]
-		fmt.Printf("\nSelected: %s\n\n", pkg.Name)
-		fmt.Println("NixOS (configuration.nix):")
-		fmt.Printf("  environment.systemPackages = with pkgs; [ %s ];\n", pkg.Name)
-		fmt.Println("Home Manager (home.nix):")
-		fmt.Printf("  home.packages = with pkgs; [ %s ];\n", pkg.Name)
-		fmt.Println("\nFetching available options with nixos-option --find...")
-		optOut, err := executor.ListServiceOptions(pkg.Name)
-		if err == nil && strings.TrimSpace(optOut) != "" {
-			fmt.Println(optOut)
-		} else {
-			fmt.Println("No additional options found or nixos-option --find failed.")
-		}
-		fmt.Print("\nTest this package in a temporary shell? [y/N]: ")
-		yn, _ := reader.ReadString('\n')
-		yn = strings.TrimSpace(yn)
-		if strings.ToLower(yn) == "y" {
-			fmt.Printf("\nLaunching 'nix-shell -p %s'...\n", pkg.Name)
-			cmdShell := exec.Command("nix-shell", "-p", pkg.Name)
-			cmdShell.Stdin = os.Stdin
-			cmdShell.Stdout = os.Stdout
-			cmdShell.Stderr = os.Stderr
-			err := cmdShell.Run()
-			if err != nil {
-				fmt.Printf("Error running nix-shell: %v\n", err)
-			}
-			return
-		}
-	case "package-repo":
-		if len(fields) < 2 {
-			fmt.Println("Usage: package-repo <path>")
-			fmt.Println("Examples:")
-			fmt.Println("  package-repo . --local")
-			fmt.Println("  package-repo /path/to/project")
-			fmt.Println("  package-repo . --analyze-only")
-			fmt.Println("  package-repo https://github.com/user/project")
-			return
-		}
-		// Pass all arguments after 'package-repo' to the CLI command
-		packageRepoCmd.Run(packageRepoCmd, fields[1:])
-		return
-	case "show":
-		if len(fields) > 1 && fields[1] == "config" {
-			showConfig()
-		} else {
-			fmt.Println("Unknown show command. Try 'show config'.")
-		}
-	case "set":
-		if len(fields) >= 3 && fields[1] == "ai" {
-			provider := fields[2]
-			model := ""
-			if len(fields) > 3 {
-				model = fields[3]
-			}
-			setAIProvider(provider, model)
-		} else {
-			fmt.Println("Usage: set ai <provider> [model]")
-		}
-	case "set-nixos-path":
-		if len(fields) < 2 {
-			fmt.Println("Usage: set-nixos-path <path-to-nixos-config-folder>")
-			return
-		}
-		nixosConfigPath = fields[1]
-		fmt.Printf("NixOS config folder set to: %s\n", nixosConfigPath)
-		return
-	case "flake":
-		if len(fields) < 2 {
-			fmt.Println("Usage: flake <show|update|check|explain-inputs|explain <input>|...>")
-			return
-		}
-		if fields[1] == "explain-inputs" {
-			ExplainFlakeInputs(nil)
-			return
-		}
-		if fields[1] == "explain" {
-			if len(fields) >= 3 {
-				ExplainFlakeInputs(fields[2:3])
 			} else {
-				fmt.Println("Usage: flake explain <input>")
+				// Handle questions directly without a command
+				if len(fields) > 0 {
+					question := strings.Join(fields, " ")
+					answer, err := handleAsk(question)
+					if err != nil {
+						fmt.Println(utils.FormatTip("Error: " + err.Error()))
+					} else {
+						if strings.TrimSpace(answer) == "" {
+							fmt.Println(utils.FormatTip("Unknown command: " + fields[0] + ". Type 'help' to see available commands."))
+						} else {
+							fmt.Println(answer)
+						}
+					}
+				} else {
+					fmt.Println(utils.FormatTip("Unknown command. Type 'help' to see available commands."))
+				}
 			}
-			return
 		}
-		// fallback: pass to nix flake
-		cmdArgs := append([]string{"flake"}, fields[1:]...)
-		out, err := exec.Command("nix", cmdArgs...).CombinedOutput()
-		fmt.Println(string(out))
-		if err != nil {
-			fmt.Printf("nix flake failed: %v\n", err)
-			problemSummary := summarizeBuildOutput(string(out))
-			if problemSummary != "" {
-				fmt.Println("\nProblem summary:")
-				fmt.Println(problemSummary)
-			}
-		}
-		return
-	case "explain-option":
-		if len(fields) < 2 {
-			fmt.Println("Usage: explain-option <option>")
-			fmt.Println("Examples:")
-			fmt.Println("  explain-option services.nginx.enable")
-			fmt.Println("  explain-option networking.firewall.enable")
-			return
-		}
-		option := strings.Join(fields[1:], " ")
-		// Use the same logic as the CLI command
-		explainOptionCmd.Run(explainOptionCmd, []string{option})
-		return
-	case "find-option":
-		if len(fields) < 2 {
-			fmt.Println("Usage: find-option <description>")
-			fmt.Println("Examples:")
-			fmt.Println("  find-option \"enable SSH access\"")
-			fmt.Println("  find-option \"configure firewall\"")
-			fmt.Println("  find-option \"set up automatic updates\"")
-			fmt.Println("  find-option \"enable docker\"")
-			return
-		}
-		description := strings.Join(fields[1:], " ")
-		// Use the same logic as the CLI command
-		findOptionCmd.Run(findOptionCmd, []string{description})
-		return
-	case "devenv":
-		if len(fields) < 2 {
-			fmt.Println("Usage: devenv <list|create|suggest>")
-			fmt.Println("Examples:")
-			fmt.Println("  devenv list                              # List available templates")
-			fmt.Println("  devenv create python myproject           # Create Python environment")
-			fmt.Println("  devenv create rust --with-wasm          # Create Rust with WebAssembly")
-			fmt.Println("  devenv suggest \"web app with database\"   # Get AI recommendations")
-			return
-		}
-
-		switch fields[1] {
-		case "list":
-			devenvListCmd.Run(devenvListCmd, []string{})
-		case "create":
-			if len(fields) < 3 {
-				fmt.Println("Usage: devenv create <template> [project-name]")
-				fmt.Println("Examples:")
-				fmt.Println("  devenv create python myapp")
-				fmt.Println("  devenv create rust --with-wasm")
-				fmt.Println("  devenv create nodejs --framework nextjs")
-				return
-			}
-			devenvCreateCmd.Run(devenvCreateCmd, fields[2:])
-		case "suggest":
-			if len(fields) < 3 {
-				fmt.Println("Usage: devenv suggest <description>")
-				fmt.Println("Examples:")
-				fmt.Println("  devenv suggest \"web application with database\"")
-				fmt.Println("  devenv suggest \"machine learning project\"")
-				return
-			}
-			description := strings.Join(fields[2:], " ")
-			devenvSuggestCmd.Run(devenvSuggestCmd, []string{description})
-		default:
-			fmt.Println("Unknown devenv subcommand. Use: list, create, or suggest")
-		}
-		return
-	case "learn":
-		if len(fields) < 2 {
-			fmt.Println("Usage: learn <basics|advanced|quiz|path <topic>|progress>")
-			fmt.Println("Examples:")
-			fmt.Println("  learn basics")
-			fmt.Println("  learn advanced")
-			fmt.Println("  learn quiz")
-			fmt.Println("  learn path flakes")
-			fmt.Println("  learn progress")
-			return
-		}
-		sub := fields[1]
-		switch sub {
-		case "basics":
-			learnBasicsCmd.Run(learnBasicsCmd, []string{})
-		case "advanced":
-			learnAdvancedCmd.Run(learnAdvancedCmd, []string{})
-		case "quiz":
-			learnQuizCmd.Run(learnQuizCmd, []string{})
-		case "path":
-			if len(fields) < 3 {
-				fmt.Println("Usage: learn path <topic>")
-				return
-			}
-			topic := strings.Join(fields[2:], " ")
-			learnPathCmd.Run(learnPathCmd, []string{topic})
-		case "progress":
-			learnProgressCmd.Run(learnProgressCmd, []string{})
-		default:
-			fmt.Println("Unknown learn subcommand. Try: basics, advanced, quiz, path <topic>, progress")
-		}
-		return
-	case "version":
-		versionInfo := version.Get()
-		fmt.Println(utils.FormatHeader("📦 Version Information"))
-		fmt.Println(versionInfo.String())
-		fmt.Println(utils.FormatKeyValue("Platform", versionInfo.Platform))
-		fmt.Println(utils.FormatKeyValue("Go Version", versionInfo.GoVersion))
-	case "exit":
-		fmt.Println("Exiting nixai. Goodbye!")
-		os.Exit(0)
-	default:
-		fmt.Println("You entered:", command)
-		fmt.Println("Type 'help' to see available commands.")
 	}
 }
 
-func showConfig() {
-	cfg, err := config.LoadUserConfig()
+func printInteractiveWelcome() {
+	header := utils.FormatHeader("❄️ nixai: NixOS AI Assistant")
+	intro := "Welcome to the interactive shell! Type a command or question, or type 'help' for a list of commands."
+	divider := utils.FormatDivider()
+
+	// Build a visually appealing, non-Markdown menu using utils formatting
+	menu := strings.Join([]string{
+		utils.FormatKeyValue("🤖 ask <question>", "Ask any NixOS question"),
+		utils.FormatKeyValue("🛠️ build", "Enhanced build troubleshooting and optimization"),
+		utils.FormatKeyValue("🌐 community", "Community resources and support (not yet implemented)"),
+		utils.FormatKeyValue("🔄 completion", "Generate the autocompletion script for the specified shell"),
+		utils.FormatKeyValue("⚙️ config", "Manage nixai configuration"),
+		utils.FormatKeyValue("🧑‍💻 configure", "Configure NixOS interactively (not yet implemented)"),
+		utils.FormatKeyValue("🔗 deps", "Analyze NixOS configuration dependencies and imports"),
+		utils.FormatKeyValue("🧪 devenv", "Create and manage development environments with devenv"),
+		utils.FormatKeyValue("🩺 diagnose", "Diagnose NixOS issues (not yet implemented)"),
+		utils.FormatKeyValue("🩻 doctor", "Run NixOS health checks (not yet implemented)"),
+		utils.FormatKeyValue("🖥️ explain-option <option>", "Explain a NixOS option"),
+		utils.FormatKeyValue("🧊 flake", "Nix flake utilities (not yet implemented)"),
+		utils.FormatKeyValue("🧹 gc", "AI-powered garbage collection analysis and cleanup"),
+		utils.FormatKeyValue("💻 hardware", "AI-powered hardware configuration optimizer"),
+		utils.FormatKeyValue("❓ help", "Help about any command"),
+		utils.FormatKeyValue("💬 interactive", "Launch interactive AI-powered NixOS assistant shell"),
+		utils.FormatKeyValue("📚 learn", "NixOS learning and training commands (not yet implemented)"),
+		utils.FormatKeyValue("📝 logs", "Analyze and parse NixOS logs (not yet implemented)"),
+		utils.FormatKeyValue("🖧 machines", "Manage and synchronize NixOS configurations across multiple machines"),
+		utils.FormatKeyValue("🛰️ mcp-server", "Start or manage the MCP server (not yet implemented)"),
+		utils.FormatKeyValue("🔀 migrate", "AI-powered migration assistant for channels and flakes"),
+		utils.FormatKeyValue("📝 neovim-setup", "Neovim integration setup (not yet implemented)"),
+		utils.FormatKeyValue("📦 package-repo <url>", "Analyze Git repos and generate Nix derivations (not yet implemented)"),
+		utils.FormatKeyValue("🔍 search <package>", "Search for NixOS packages/services and get config/AI tips"),
+		utils.FormatKeyValue("🔖 snippets", "Manage NixOS configuration snippets"),
+		utils.FormatKeyValue("💾 store", "Manage, backup, and analyze the Nix store"),
+		utils.FormatKeyValue("📄 templates", "Manage NixOS configuration templates and snippets"),
+		utils.FormatKeyValue("❌ exit", "Exit interactive mode"),
+	}, "\n")
+
+	// Use glamour for header/intro, but print menu as styled plain text
+	customStyle := `{
+	  "header": {"color": "#8be9fd", "bold": true},
+	  "hr": {"color": "#44475a"},
+	  "blockquote": {"color": "#6272a4"}
+	}`
+	r, err := glamour.NewTermRenderer(
+		glamour.WithStylesFromJSONBytes([]byte(customStyle)),
+		glamour.WithWordWrap(80),
+	)
 	if err != nil {
-		fmt.Println("Could not load config:", err)
+		fmt.Println(header + "\n" + intro + "\n" + divider + "\n" + menu)
 		return
 	}
-	fmt.Println("Current nixai configuration:")
-	fmt.Printf("  AI Provider: %s\n", cfg.AIProvider)
-	fmt.Printf("  Log Level:   %s\n", cfg.LogLevel)
-	fmt.Printf("  MCP Sources:\n")
-	for _, src := range cfg.MCPServer.DocumentationSources {
-		fmt.Printf("    - %s\n", src)
+	out, err := r.Render(header + "\n" + intro + "\n" + divider)
+	if err != nil {
+		fmt.Println(header + "\n" + intro + "\n" + divider + "\n" + menu)
+		return
 	}
+	fmt.Print(out)
+	fmt.Println(menu)
+	fmt.Println(divider)
 }
 
-func setAIProvider(provider, model string) {
+// Handler for 'ask' command - handles direct questions in interactive mode
+func handleAsk(question string) (string, error) {
 	cfg, err := config.LoadUserConfig()
 	if err != nil {
-		fmt.Println("Could not load config:", err)
-		return
+		return "", err
 	}
-	cfg.AIProvider = provider
-	if provider == "ollama" && model != "" {
-		fmt.Printf("Set AI provider to '%s' with model '%s'.\n", provider, model)
-	} else if provider != "ollama" {
-		fmt.Printf("Set AI provider to '%s'.\n", provider)
-	}
-	cfg.AIModel = model // set model if provided
-	err = config.SaveUserConfig(cfg)
+	provider := InitializeAIProvider(cfg)
+	resp, err := provider.Query(question)
 	if err != nil {
-		fmt.Println("Failed to write user config:", err)
-		return
+		return "", err
 	}
-	fmt.Println("AI provider updated in user config. It will be used for future diagnoses.")
+	return utils.RenderMarkdown(resp), nil
+}
+
+// Helper to run a cobra.Command and capture its output as string
+func runCommandAndCaptureOutput(cmd *cobra.Command, args []string) (string, error) {
+	origOut := cmd.OutOrStdout()
+	origErr := cmd.OutOrStderr()
+	var sb strings.Builder
+	cmd.SetOut(&sb)
+	cmd.SetErr(&sb)
+	cmd.SetArgs(args)
+	err := cmd.Execute()
+	cmd.SetOut(origOut)
+	cmd.SetErr(origErr)
+	return sb.String(), err
 }

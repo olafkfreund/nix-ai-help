@@ -448,9 +448,6 @@ Provide actual NixOS configuration snippets optimized for %s mode.`, mode, mode,
 
 // Add commands to CLI in init function
 func init() {
-	// Add main hardware command
-	rootCmd.AddCommand(hardwareCmd)
-
 	// Add hardware subcommands
 	hardwareCmd.AddCommand(hardwareDetectCmd)
 	hardwareCmd.AddCommand(hardwareOptimizeCmd)
