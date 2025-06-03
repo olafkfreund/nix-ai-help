@@ -109,6 +109,48 @@ in {
         description = "Extra environment variables for the MCP server";
         example = {NIXAI_LOG_LEVEL = "debug";};
       };
+
+      endpoints = mkOption {
+        type = types.listOf (types.submodule ({...}: {
+          options = {
+            name = mkOption {
+              type = types.str;
+              description = "Name for this MCP server endpoint (e.g. 'default', 'prod', 'test')";
+            };
+            socketPath = mkOption {
+              type = types.str;
+              description = "Path to the MCP server Unix socket for this endpoint";
+              example = "$HOME/.local/share/nixai/mcp.sock";
+            };
+            host = mkOption {
+              type = types.str;
+              default = "localhost";
+              description = "Host for the MCP HTTP server to listen on for this endpoint";
+            };
+            port = mkOption {
+              type = types.port;
+              default = 8081;
+              description = "Port for the MCP HTTP server to listen on for this endpoint";
+            };
+          };
+        }));
+        default = [];
+        description = "List of additional/custom MCP server endpoints (for multi-server or custom setups).";
+        example = [
+          {
+            name = "default";
+            socketPath = "$HOME/.local/share/nixai/mcp.sock";
+            host = "localhost";
+            port = 8081;
+          }
+          {
+            name = "test";
+            socketPath = "/tmp/nixai-test.sock";
+            host = "localhost";
+            port = 8082;
+          }
+        ];
+      };
     };
 
     vscodeIntegration = mkEnableOption "Enable VS Code MCP integration";
@@ -156,6 +198,7 @@ in {
           documentation_sources = cfg.mcp.documentationSources;
           extra_flags = cfg.mcp.extraFlags;
           environment = cfg.mcp.environment;
+          endpoints = cfg.mcp.endpoints;
         };
       };
     })
@@ -219,46 +262,14 @@ in {
         '';
 
         extraLuaConfig = ''
-          -- nixai integration for regular Neovim
-          local function nixai_query(question)
-            if not question or question == "" then
-              question = vim.fn.input("Ask nixai: ")
-            end
-
-            if question == "" then
-              return
-            end
-
-            local cmd = string.format("${cfg.mcp.package}/bin/nixai --ask \"%s\"", question:gsub('"', '\\"'))
-            local output = vim.fn.system(cmd)
-
-            -- Create response buffer
-            local buf = vim.api.nvim_create_buf(false, true)
-            local lines = vim.split(output, "\n")
-            vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-            vim.api.nvim_buf_set_option(buf, "filetype", "markdown")
-            vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
-            vim.api.nvim_buf_set_name(buf, "nixai-response")
-
-            -- Open in split
-            vim.cmd("split")
-            vim.api.nvim_set_current_buf(buf)
-
-            -- Add quit mapping
-            vim.keymap.set("n", "q", ":close<CR>", { buffer = buf, silent = true })
-          end
-
-          -- Set up keymaps
-          vim.keymap.set("n", "${cfg.neovimIntegration.keybindings.askNixai}", nixai_query, { desc = "Ask nixai" })
-          vim.keymap.set("v", "${cfg.neovimIntegration.keybindings.askNixaiVisual}", function()
-            local start_pos = vim.fn.getpos("'<")
-            local end_pos = vim.fn.getpos("'>")
-            local lines = vim.fn.getline(start_pos[2], end_pos[2])
-            local text = table.concat(lines, "\n")
-            nixai_query("Explain this code: " .. text)
-          end, { desc = "Ask nixai about selection" })
-
-          print("nixai integration loaded! Use ${cfg.neovimIntegration.keybindings.askNixai} to ask questions")
+          -- Load nixai-nvim.lua integration module
+          vim.g.nixai_endpoints = vim.fn.json_decode([[${builtins.toJSON cfg.mcp.endpoints}]])
+          vim.g.nixai_socket_path = "${cfg.mcp.socketPath}"
+          dofile("${pkgs.writeTextFile {
+            name = "nixai-nvim.lua";
+            text = builtins.readFile ../../modules/nixai-nvim.lua;
+          }}")
+          require("nixai-nvim").setup_keymaps()
         '';
       };
     })

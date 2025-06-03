@@ -12,6 +12,7 @@ This comprehensive guide shows you how to integrate **nixai** into your NixOS an
 - [Advanced Features](#advanced-features)
 - [Example: Nixvim + Home Manager + nixai Neovim Integration](#example-nixvim--home-manager--nixai-neovim-integration)
 - [Troubleshooting](#troubleshooting)
+- [Multi-Endpoint MCP Server Support](#multi-endpoint-mcp-server-support)
 
 ---
 
@@ -718,6 +719,39 @@ This configuration provides:
 - ✅ Custom documentation sources
 - ✅ Comprehensive logging and debugging
 - ✅ MCP server on both system and user level
+
+---
+
+## 🧩 Multi-Endpoint MCP Server Support
+
+You can define multiple MCP endpoints for advanced workflows (e.g., dev/prod/test, remote/local):
+
+```nix
+services.nixai = {
+  enable = true;
+  mcp.enable = true;
+  mcp.endpoints = [
+    {
+      name = "default";
+      socketPath = "/run/nixai/mcp.sock";
+      host = "localhost";
+      port = 8080;
+    }
+    {
+      name = "test";
+      socketPath = "/tmp/nixai-test.sock";
+      host = "localhost";
+      port = 8082;
+    }
+  ];
+};
+```
+
+- These endpoints are written to `config.yaml` and available to the CLI and Neovim integration.
+- In Neovim, you get per-endpoint keymaps (e.g., `<leader>nd` for default, `<leader>nt` for test).
+- The CLI and integrations will use the correct socket/host/port for each endpoint.
+
+See also: [docs/neovim-integration.md](docs/neovim-integration.md) for Neovim multi-endpoint usage.
 
 ---
 

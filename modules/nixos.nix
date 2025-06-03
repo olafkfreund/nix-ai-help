@@ -81,6 +81,48 @@ in {
         description = "Extra environment variables for the MCP server";
         example = {NIXAI_LOG_LEVEL = "debug";};
       };
+
+      endpoints = mkOption {
+        type = types.listOf (types.submodule ({...}: {
+          options = {
+            name = mkOption {
+              type = types.str;
+              description = "Name for this MCP server endpoint (e.g. 'default', 'prod', 'test')";
+            };
+            socketPath = mkOption {
+              type = types.str;
+              description = "Path to the MCP server Unix socket for this endpoint";
+              example = "/run/nixai/mcp.sock";
+            };
+            host = mkOption {
+              type = types.str;
+              default = "localhost";
+              description = "Host for the MCP HTTP server to listen on for this endpoint";
+            };
+            port = mkOption {
+              type = types.port;
+              default = 8081;
+              description = "Port for the MCP HTTP server to listen on for this endpoint";
+            };
+          };
+        }));
+        default = [];
+        description = "List of additional/custom MCP server endpoints (for multi-server or custom setups).";
+        example = [
+          {
+            name = "default";
+            socketPath = "/run/nixai/mcp.sock";
+            host = "localhost";
+            port = 8081;
+          }
+          {
+            name = "test";
+            socketPath = "/tmp/nixai-test.sock";
+            host = "localhost";
+            port = 8082;
+          }
+        ];
+      };
     };
 
     config = mkOption {
@@ -136,6 +178,14 @@ in {
             socket_path = cfg.mcp.socketPath;
             auto_start = cfg.mcp.enable;
             documentation_sources = cfg.mcp.documentationSources;
+            endpoints =
+              map (ep: {
+                name = ep.name;
+                socket_path = ep.socketPath;
+                host = ep.host;
+                port = ep.port;
+              })
+              cfg.mcp.endpoints;
           };
         }
         // cfg.config);
