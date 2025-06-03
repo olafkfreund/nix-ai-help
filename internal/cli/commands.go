@@ -28,16 +28,30 @@ Usage:
   nixai [question] [flags]
   nixai [command]`,
 	SilenceUsage: true,
+	Version:      version.Get().Version,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if askQuestion != "" {
+			fmt.Println(utils.FormatHeader("🤖 AI Answer to your question:"))
+			aiProvider := ai.NewOllamaProvider("llama3") // Default, or use config
+			answer, err := aiProvider.Query(askQuestion)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
+				os.Exit(1)
+			}
+			fmt.Println(utils.RenderMarkdown(answer))
+			return nil
+		}
+		// If no --ask, show help
+		return cmd.Help()
+	},
 }
 
 var askQuestion string
 var nixosPath string
-var showVersion bool
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&askQuestion, "ask", "a", "", "Ask a question about NixOS configuration")
 	rootCmd.PersistentFlags().StringVarP(&nixosPath, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
-	rootCmd.PersistentFlags().BoolVarP(&showVersion, "version", "v", false, "version for nixai")
 }
 
 // Configuration management functions
@@ -47,7 +61,9 @@ func showConfig() {
 		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 		os.Exit(1)
 	}
-
+	if nixosPath != "" {
+		cfg.NixosFolder = nixosPath
+	}
 	fmt.Println(utils.FormatHeader("🔧 Current nixai Configuration"))
 	fmt.Println()
 	fmt.Println(utils.FormatKeyValue("AI Provider", cfg.AIProvider))
@@ -66,6 +82,9 @@ func setConfig(key, value string) {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 		os.Exit(1)
+	}
+	if nixosPath != "" {
+		cfg.NixosFolder = nixosPath
 	}
 
 	switch key {
@@ -114,6 +133,9 @@ func getConfig(key string) {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 		os.Exit(1)
+	}
+	if nixosPath != "" {
+		cfg.NixosFolder = nixosPath
 	}
 
 	var value string
@@ -195,6 +217,9 @@ var searchCmd = &cobra.Command{
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 			os.Exit(1)
+		}
+		if nixosPath != "" {
+			cfg.NixosFolder = nixosPath
 		}
 		exec := nixos.NewExecutor(cfg.NixosFolder)
 		fmt.Println(utils.FormatHeader("🔍 NixOS Search Results for: " + query))
@@ -490,27 +515,6 @@ func Execute() {
 			os.Setenv("NIXAI_NIXOS_PATH", nixosPath)
 		}
 	})
-	if showVersion {
-		v := version.Get()
-		fmt.Println(utils.FormatHeader("nixai version:"))
-		fmt.Println(utils.FormatKeyValue("Version", v.Version))
-		fmt.Println(utils.FormatKeyValue("Git Commit", v.GitCommit))
-		fmt.Println(utils.FormatKeyValue("Build Date", v.BuildDate))
-		fmt.Println(utils.FormatKeyValue("Go Version", v.GoVersion))
-		fmt.Println(utils.FormatKeyValue("Platform", v.Platform))
-		os.Exit(0)
-	}
-	if askQuestion != "" {
-		fmt.Println(utils.FormatHeader("🤖 AI Answer to your question:"))
-		aiProvider := ai.NewOllamaProvider("llama3") // Default, or use config
-		answer, err := aiProvider.Query(askQuestion)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
-			os.Exit(1)
-		}
-		fmt.Println(utils.RenderMarkdown(answer))
-		os.Exit(0)
-	}
 	initializeCommands()
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
