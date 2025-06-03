@@ -3,6 +3,7 @@ package nixos
 import (
 	"fmt"
 	"nix-ai-help/internal/ai"
+	"nix-ai-help/internal/config"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 	"regexp"
@@ -25,6 +26,34 @@ type ErrorPattern struct {
 	ErrorType   string
 	Severity    string
 	Description string
+}
+
+// UserErrorPattern represents a user-defined error pattern from YAML config.
+type UserErrorPattern struct {
+	Name        string `yaml:"name"`
+	Pattern     string `yaml:"pattern"`
+	ErrorType   string `yaml:"error_type"`
+	Severity    string `yaml:"severity"`
+	Description string `yaml:"description"`
+}
+
+// getUserErrorPatterns loads user-defined error patterns from config.
+func getUserErrorPatterns() ([]UserErrorPattern, error) {
+	cfg, err := config.LoadUserConfig()
+	if err != nil {
+		return nil, err
+	}
+	var patterns []UserErrorPattern
+	for _, ep := range cfg.Diagnostics.ErrorPatterns {
+		patterns = append(patterns, UserErrorPattern{
+			Name:        ep.Name,
+			Pattern:     ep.Pattern,
+			ErrorType:   ep.ErrorType,
+			Severity:    ep.Severity,
+			Description: ep.Description,
+		})
+	}
+	return patterns, nil
 }
 
 // Diagnose analyzes the provided log output and user input to identify potential NixOS configuration issues.
@@ -94,6 +123,27 @@ func Diagnose(logOutput string, userInput string, aiProvider ai.AIProvider) []Di
 			Severity:    "high",
 			Description: "Nix derivation build error",
 		},
+	}
+
+	// Merge user-defined patterns from config
+	userPatterns, err := getUserErrorPatterns()
+	if err == nil {
+		for _, up := range userPatterns {
+			if up.Pattern == "" || up.Name == "" {
+				continue
+			}
+			compiled, err := regexp.Compile(up.Pattern)
+			if err != nil {
+				log.Warn("Invalid user error pattern: " + up.Name + ", skipping: " + err.Error())
+				continue
+			}
+			errorPatterns[up.Name] = ErrorPattern{
+				Pattern:     compiled,
+				ErrorType:   up.ErrorType,
+				Severity:    up.Severity,
+				Description: up.Description,
+			}
+		}
 	}
 
 	// Check for each error pattern
@@ -542,6 +592,14 @@ func FormatDiagnostics(diags []Diagnostic) string {
 			content.WriteString(utils.FormatKeyValue("Type", d.ErrorType))
 			content.WriteString(utils.FormatKeyValue("Severity", strings.ToUpper(d.Severity)))
 			content.WriteString(utils.FormatKeyValue("Details", d.Details))
+
+			// For AI-enhanced diagnostics, only show the AI's Markdown block (Details), skip extracted steps/docs
+			if d.ErrorType == "ai_analysis" {
+				sb.WriteString(utils.FormatBox(title, content.String()))
+				sb.WriteString("\n")
+				issueCount++
+				continue
+			}
 
 			// Add fix steps if available
 			if len(d.Steps) > 0 {
