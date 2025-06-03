@@ -3,19 +3,36 @@ package cli
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/utils"
 	"nix-ai-help/pkg/version"
+
+	"math/rand"
+	"time"
+
+	"github.com/charmbracelet/glamour"
+	"github.com/chzyer/readline"
 	"github.com/spf13/cobra"
 )
 
 // Global variable for NixOS config path (directory)
 var nixosConfigPath string
+
+var tipsOfTheDay = []string{
+	"Use 'package-repo <url>' to generate a Nix derivation from a Git repo!",
+	"Try 'explain-option <option>' to get a detailed explanation of any NixOS option.",
+	"You can use up/down arrows to navigate your command history.",
+	"Press Tab to autocomplete commands and options.",
+	"Pipe logs into nixai for instant diagnostics!",
+	"Use 'help' or '?' at any time for contextual help.",
+}
 
 // TODO: Implement AI provider and model switching in interactive mode
 // var currentAIProvider string
@@ -50,42 +67,195 @@ func init() {
 }
 
 // Stub for ExplainFlakeInputs
-func ExplainFlakeInputs(args []string) { fmt.Println("[interactive] flake explain-inputs not implemented") }
+func ExplainFlakeInputs(args []string) {
+	fmt.Println("[interactive] flake explain-inputs not implemented")
+}
+
+func printWelcomeScreen() {
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	tip := tipsOfTheDay[rnd.Intn(len(tipsOfTheDay))]
+	welcome := utils.FormatHeader("Welcome to nixai - Your NixOS AI Assistant 🐧") +
+		"\n" +
+		"Type a command or question, or type 'help' for a list of commands.\n" +
+		utils.FormatDivider() +
+		"\n" +
+		"Tip of the day: " + tip + "\n" +
+		utils.FormatDivider() +
+		"\nPopular commands:\n" +
+		utils.FormatKeyValue("ask <question>", "Ask any NixOS question") +
+		utils.FormatKeyValue("package-repo <url>", "Generate Nix derivation from repo") +
+		utils.FormatKeyValue("explain-option <option>", "Explain a NixOS option") +
+		utils.FormatKeyValue("explain-home-option <option>", "Explain a Home Manager option") +
+		utils.FormatKeyValue("search <package>", "Search for a Nix package") +
+		utils.FormatKeyValue("exit", "Quit interactive mode")
+	out, _ := glamour.Render(welcome, "dark")
+	fmt.Println(out)
+}
 
 // InteractiveMode starts the interactive command-line interface for nixai.
 func InteractiveMode() {
-	reader := bufio.NewReader(os.Stdin)
-
-	// Enhanced welcome message
-	fmt.Println(utils.FormatHeader("🚀 Welcome to nixai Interactive Mode"))
-	fmt.Println(utils.FormatKeyValue("Version", version.Get().Short()))
-	fmt.Println(utils.FormatInfo("Type 'help' for commands, 'exit' to quit."))
-
-	if nixosConfigPath != "" {
-		fmt.Println(utils.FormatKeyValue("NixOS Config Path", nixosConfigPath))
+	printWelcomeScreen()
+	// Setup readline for input with history, autocomplete, and multi-line support (manual workaround)
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt:            utils.FormatHeader("nixai> "),
+		HistoryFile:       "/tmp/nixai_history.tmp",
+		AutoComplete:      commandCompleter{},
+		InterruptPrompt:   "^C",
+		EOFPrompt:         "exit",
+		HistorySearchFold: true,
+		FuncFilterInputRune: func(r rune) (rune, bool) {
+			if r == readline.CharCtrlZ {
+				return r, false // disable Ctrl+Z
+			}
+			return r, true
+		},
+	})
+	if err != nil {
+		fmt.Println("Error initializing interactive mode:", err)
+		return
 	}
-	fmt.Println(utils.FormatDivider())
+	defer rl.Close()
 
+	var multilineBuf []string
 	for {
-		fmt.Print(utils.AccentStyle.Render("> "))
-		input, err := reader.ReadString('\n')
-		if err != nil {
-			if err.Error() == "EOF" {
-				fmt.Println("\nExiting nixai. Goodbye!")
+		line, err := rl.Readline()
+		if err == readline.ErrInterrupt {
+			if len(line) == 0 {
 				break
 			}
-			fmt.Println("Error reading input:", err)
+			continue
+		} else if err == io.EOF {
 			break
 		}
 
-		input = strings.TrimSpace(input)
-		if input == "exit" {
-			fmt.Println("Exiting nixai. Goodbye!")
-			break
+		// Multi-line input: Shift+Enter (\n) appends, Enter submits
+		if strings.HasSuffix(line, "\\") {
+			multilineBuf = append(multilineBuf, strings.TrimSuffix(line, "\\"))
+			rl.SetPrompt(utils.FormatHeader("... "))
+			continue
 		}
-
-		handleCommand(input)
+		if len(multilineBuf) > 0 {
+			multilineBuf = append(multilineBuf, line)
+			input := strings.Join(multilineBuf, "\n")
+			multilineBuf = nil
+			rl.SetPrompt(utils.FormatHeader("nixai> "))
+			processInteractiveInput(input)
+			continue
+		}
+		input := strings.TrimSpace(line)
+		if input == "" {
+			continue
+		}
+		processInteractiveInput(input)
 	}
+}
+
+// processInteractiveInput handles a single or multi-line input in interactive mode.
+func processInteractiveInput(input string) {
+	if input == "exit" || input == "quit" {
+		fmt.Println(utils.FormatDivider() + "\nGoodbye! 👋")
+		os.Exit(0)
+	}
+	if input == "help" || input == "?" {
+		printWelcomeScreen()
+		return
+	}
+	if strings.HasPrefix(input, "explain-option") && len(strings.Fields(input)) == 1 {
+		fmt.Println(utils.FormatTip("Usage: explain-option <option>\nExample: explain-option services.nginx.enable"))
+		return
+	}
+	if strings.HasPrefix(input, "search") && len(strings.Fields(input)) == 1 {
+		fmt.Println(utils.FormatTip("Usage: search <package>\nExample: search libreoffice"))
+		return
+	}
+	if strings.HasPrefix(input, "package-repo") && len(strings.Fields(input)) == 1 {
+		fmt.Println(utils.FormatTip("Usage: package-repo <url>\nExample: package-repo https://github.com/NixOS/nixpkgs"))
+		return
+	}
+	if strings.HasPrefix(input, "explain-home-option") && len(strings.Fields(input)) == 1 {
+		fmt.Println(utils.FormatTip("Usage: explain-home-option <option>\nExample: explain-home-option programs.zsh.enable"))
+		return
+	}
+	fmt.Println(utils.FormatDivider())
+	fmt.Println("You entered:", input)
+	fmt.Println(utils.FormatDivider())
+}
+
+var (
+	packageAutocompleteCache = struct {
+		sync.Mutex
+		query   string
+		results []string
+	}{query: "", results: nil}
+)
+
+// commandCompleter implements readline.AutoCompleter for command palette/autocomplete
+// Enhanced: supports fuzzy search for commands, package name completion for 'search', and option completion for 'explain-option' and 'explain-home-option'.
+type commandCompleter struct{}
+
+func (c commandCompleter) Do(line []rune, pos int) ([][]rune, int) {
+	input := string(line)
+	fields := strings.Fields(input)
+	cmds := []string{"ask", "package-repo", "explain-option", "explain-home-option", "search", "exit", "help", "?", "quit"}
+	var suggestions [][]rune
+
+	if len(fields) == 0 {
+		for _, cmd := range cmds {
+			suggestions = append(suggestions, []rune(cmd))
+		}
+		return suggestions, 0
+	}
+
+	// Fuzzy match for command name
+	if len(fields) == 1 && pos <= len(fields[0]) {
+		word := fields[0]
+		for _, cmd := range cmds {
+			if strings.Contains(cmd, word) {
+				suggestions = append(suggestions, []rune(cmd))
+			}
+		}
+		return suggestions, 0
+	}
+
+	// Autocomplete for 'search <package>'
+	if fields[0] == "search" && len(fields) >= 2 {
+		query := strings.Join(fields[1:], " ")
+		maxResults := 10
+		packageAutocompleteCache.Lock()
+		if packageAutocompleteCache.query != query {
+			executor := nixos.NewExecutor("")
+			results, err := executor.SearchNixPackagesForAutocomplete(query, maxResults)
+			if err == nil {
+				packageAutocompleteCache.query = query
+				packageAutocompleteCache.results = results
+			}
+		}
+		pkgs := packageAutocompleteCache.results
+		packageAutocompleteCache.Unlock()
+		for _, pkg := range pkgs {
+			if strings.HasPrefix(pkg, fields[len(fields)-1]) {
+				suggestions = append(suggestions, []rune(pkg))
+			}
+		}
+		return suggestions, len(fields[0]) + 1 // after 'search '
+	}
+
+	// Option completion for 'explain-option <option>' and 'explain-home-option <option>'
+	if (fields[0] == "explain-option" || fields[0] == "explain-home-option") && len(fields) >= 2 {
+		// For demo: suggest common options, in real use, query MCP or a static list
+		commonOptions := []string{
+			"services.nginx.enable", "networking.firewall.enable", "programs.zsh.enable", "users.users", "environment.systemPackages", "fonts.fonts", "hardware.opengl.enable", "services.openssh.enable",
+		}
+		last := fields[len(fields)-1]
+		for _, opt := range commonOptions {
+			if strings.HasPrefix(opt, last) {
+				suggestions = append(suggestions, []rune(opt))
+			}
+		}
+		return suggestions, len(fields[0]) + 1 // after command
+	}
+
+	return suggestions, 0
 }
 
 // handleCommand processes user commands entered in interactive mode.

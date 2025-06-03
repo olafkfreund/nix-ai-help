@@ -7,8 +7,8 @@ import (
 
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/config"
-	"nix-ai-help/internal/nixos"
 	"nix-ai-help/internal/mcp"
+	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/utils"
 
 	"github.com/charmbracelet/glamour"
