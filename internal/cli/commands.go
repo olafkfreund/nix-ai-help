@@ -307,6 +307,34 @@ Examples:
 }
 
 // Stub commands for missing top-level commands
+var askCmd = &cobra.Command{
+	Use:   "ask [question]",
+	Short: "Ask a question about NixOS configuration",
+	Long: `Ask a direct question about NixOS configuration and get an AI-powered answer.
+
+Examples:
+  nixai ask "How do I configure nginx?"
+  nixai ask "What is the difference between services.openssh.enable and programs.ssh.enable?"`,
+	Args: cobra.MinimumNArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		question := strings.Join(args, " ")
+		fmt.Println(utils.FormatHeader("🤖 AI Answer to your question:"))
+
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
+			os.Exit(1)
+		}
+
+		provider := InitializeAIProvider(cfg)
+		answer, err := provider.Query(question)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
+			os.Exit(1)
+		}
+		fmt.Println(utils.RenderMarkdown(answer))
+	},
+}
 var communityCmd = &cobra.Command{
 	Use:   "community",
 	Short: "Community resources and support (not yet implemented)",
@@ -424,6 +452,37 @@ var packageRepoCmd = &cobra.Command{
 	},
 }
 
+// initializeCommands adds all commands to the root command
+func initializeCommands() {
+	rootCmd.AddCommand(askCmd)
+	rootCmd.AddCommand(searchCmd)
+	rootCmd.AddCommand(explainOptionCmd)
+	rootCmd.AddCommand(explainHomeOptionCmd)
+	rootCmd.AddCommand(interactiveCmd)
+	rootCmd.AddCommand(enhancedBuildCmd)
+	rootCmd.AddCommand(NewDepsCommand())
+	rootCmd.AddCommand(devenvCmd)
+	rootCmd.AddCommand(gcCmd)
+	rootCmd.AddCommand(hardwareCmd)
+	rootCmd.AddCommand(createMachinesCommand())
+	rootCmd.AddCommand(migrateCmd)
+	rootCmd.AddCommand(storeCmd)
+	rootCmd.AddCommand(templatesCmd)
+	rootCmd.AddCommand(snippetsCmd)
+	// Register stub commands for missing features
+	rootCmd.AddCommand(communityCmd)
+	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(configureCmd)
+	rootCmd.AddCommand(diagnoseCmd)
+	rootCmd.AddCommand(doctorCmd)
+	rootCmd.AddCommand(flakeCmd)
+	rootCmd.AddCommand(learnCmd)
+	rootCmd.AddCommand(logsCmd)
+	rootCmd.AddCommand(mcpServerCmd)
+	rootCmd.AddCommand(neovimSetupCmd)
+	rootCmd.AddCommand(packageRepoCmd)
+}
+
 // Execute runs the root command
 func Execute() {
 	cobra.OnInitialize(func() {
@@ -452,32 +511,7 @@ func Execute() {
 		fmt.Println(utils.RenderMarkdown(answer))
 		os.Exit(0)
 	}
-	rootCmd.AddCommand(searchCmd)
-	rootCmd.AddCommand(explainOptionCmd)
-	rootCmd.AddCommand(explainHomeOptionCmd)
-	rootCmd.AddCommand(interactiveCmd)
-	rootCmd.AddCommand(enhancedBuildCmd)
-	rootCmd.AddCommand(NewDepsCommand())
-	rootCmd.AddCommand(devenvCmd)
-	rootCmd.AddCommand(gcCmd)
-	rootCmd.AddCommand(hardwareCmd)
-	rootCmd.AddCommand(createMachinesCommand())
-	rootCmd.AddCommand(migrateCmd)
-	rootCmd.AddCommand(storeCmd)
-	rootCmd.AddCommand(templatesCmd)
-	rootCmd.AddCommand(snippetsCmd)
-	// Register stub commands for missing features
-	rootCmd.AddCommand(communityCmd)
-	rootCmd.AddCommand(configCmd)
-	rootCmd.AddCommand(configureCmd)
-	rootCmd.AddCommand(diagnoseCmd)
-	rootCmd.AddCommand(doctorCmd)
-	rootCmd.AddCommand(flakeCmd)
-	rootCmd.AddCommand(learnCmd)
-	rootCmd.AddCommand(logsCmd)
-	rootCmd.AddCommand(mcpServerCmd)
-	rootCmd.AddCommand(neovimSetupCmd)
-	rootCmd.AddCommand(packageRepoCmd)
+	initializeCommands()
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

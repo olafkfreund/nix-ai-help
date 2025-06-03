@@ -26,6 +26,9 @@ func NewCommandCompleter() *CommandCompleter {
 		subcommands: make(map[string][]string),
 	}
 
+	// Ensure commands are initialized before building the command map
+	initializeCommands()
+
 	// Build command map from root command
 	for _, cmd := range rootCmd.Commands() {
 		cc.commands[cmd.Name()] = cmd
@@ -265,6 +268,64 @@ func processInteractiveCommand(input string, debug bool) {
 			}
 		}
 	}
+}
+
+// parseCommandArgs parses a command line string into individual arguments
+// Handles quoted strings and escaping properly
+func parseCommandArgs(input string) []string {
+	var args []string
+	var current strings.Builder
+	var inQuotes bool
+	var quoteChar rune
+
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return nil
+	}
+
+	for i, r := range input {
+		switch r {
+		case '"', '\'':
+			if !inQuotes {
+				inQuotes = true
+				quoteChar = r
+			} else if r == quoteChar {
+				inQuotes = false
+				quoteChar = 0
+			} else {
+				current.WriteRune(r)
+			}
+		case '\\':
+			// Handle escape sequences
+			if i+1 < len(input) {
+				next := rune(input[i+1])
+				if next == quoteChar || next == '\\' {
+					// Skip the backslash and write the escaped character
+					continue
+				}
+			}
+			current.WriteRune(r)
+		case ' ', '\t':
+			if inQuotes {
+				current.WriteRune(r)
+			} else {
+				// End of current argument
+				if current.Len() > 0 {
+					args = append(args, current.String())
+					current.Reset()
+				}
+			}
+		default:
+			current.WriteRune(r)
+		}
+	}
+
+	// Add the last argument if there is one
+	if current.Len() > 0 {
+		args = append(args, current.String())
+	}
+
+	return args
 }
 
 // SetOutput allows setting a custom output for the completer (useful for testing)
