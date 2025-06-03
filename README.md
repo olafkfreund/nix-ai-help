@@ -351,9 +351,10 @@ Add the nixai Home Manager module to your configuration:
 
 #### Using Flakes
 
-If you're using flakes, you can import the modules directly:
+> **Note:** When using flakes, nixai modules are exported per system architecture. Reference them as `nixai.nixosModules.x86_64-linux.default` (or your system, e.g. `aarch64-linux`) instead of just `nixai.nixosModules.default`.
 
 ```nix
+
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -365,7 +366,7 @@ If you're using flakes, you can import the modules directly:
     nixosConfigurations.yourhostname = nixpkgs.lib.nixosSystem {
       # ...
       modules = [
-        nixai.nixosModules.default
+        nixai.nixosModules.x86_64-linux.default # <-- Use your system here
         {
           services.nixai = {
             enable = true;
@@ -374,11 +375,11 @@ If you're using flakes, you can import the modules directly:
         }
       ];
     };
-    
+
     homeConfigurations.yourusername = home-manager.lib.homeManagerConfiguration {
       # ...
       modules = [
-        nixai.homeManagerModules.default
+        nixai.homeManagerModules.x86_64-linux.default # <-- Use your system here
         {
           services.nixai = {
             enable = true;
@@ -390,6 +391,12 @@ If you're using flakes, you can import the modules directly:
   };
 }
 ```
+
+**Troubleshooting:**
+
+- If you see `error: attribute 'default' missing`, reference the module as `nixai.nixosModules.<system>.default` (e.g., `nixai.nixosModules.x86_64-linux.default`).
+
+- If you see `error: attribute 'mdDoc' missing`, update nixai to the latest version. The module now uses a plain string for the description and is compatible with all recent Nixpkgs.
 
 See [Autostart Options Documentation](docs/autostart-options.md) for more detailed examples and troubleshooting.
 
@@ -1190,7 +1197,7 @@ You have several ways to use nixai with flakes:
    # In your configuration
    nixosConfigurations.hostname = nixpkgs.lib.nixosSystem {
      modules = [
-       nixai.nixosModules.default
+       nixai.nixosModules.x86_64-linux.default # <-- Use your system here
        { services.nixai.enable = true; }
      ];
    };
@@ -1204,7 +1211,7 @@ You have several ways to use nixai with flakes:
    # In your home configuration
    homeConfigurations.username = home-manager.lib.homeManagerConfiguration {
      modules = [
-       nixai.homeManagerModules.default
+       nixai.homeManagerModules.x86_64-linux.default # <-- Use your system here
        { services.nixai.enable = true; }
      ];
    };
