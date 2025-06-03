@@ -18,7 +18,7 @@
         pname = "nixai";
         version = "0.1.0";
         src = ./.;
-        vendorHash = "sha256-KZ2U8ErZIvuSwPL7hD3roDI+v1xIX/zssf0lHueTZV4=";
+        vendorHash = null;
         modVendor = true;
         proxyVendor = true;
         doCheck = false;
