@@ -18,7 +18,8 @@
         pname = "nixai";
         version = "0.1.0";
         src = ./.;
-        vendorHash = "sha256-jYVCwL0MhJXfit+LIPKoyf9MHuYXPgMfasxwBqOFntE=";
+        vendorHash = "sha256-KZ2U8ErZIvuSwPL7hD3roDI+v1xIX/zssf0lHueTZV4=";
+        modVendor = true;
         proxyVendor = true;
         doCheck = false;
         subPackages = ["cmd/nixai"];
