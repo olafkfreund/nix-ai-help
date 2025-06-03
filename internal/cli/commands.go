@@ -12,7 +12,6 @@ import (
 	"nix-ai-help/pkg/utils"
 	"nix-ai-help/pkg/version"
 
-	"github.com/charmbracelet/glamour"
 	"github.com/spf13/cobra"
 )
 
@@ -235,14 +234,8 @@ var searchCmd = &cobra.Command{
 		aiPrompt := "Provide best practices, advanced usage, and pitfalls for NixOS package or service: " + query
 		aiAnswer, aiErr := aiProvider.Query(aiPrompt)
 		if aiErr == nil && aiAnswer != "" {
-			aiBox := utils.FormatBox("🤖 AI Best Practices & Tips", aiAnswer)
-			renderer, _ := glamour.NewTermRenderer(glamour.WithAutoStyle(), glamour.WithWordWrap(120))
-			rendered, err := renderer.Render(aiBox)
-			if err != nil {
-				fmt.Println(aiBox)
-			} else {
-				fmt.Print(rendered)
-			}
+			fmt.Println(utils.FormatHeader("🤖 AI Best Practices & Tips"))
+			fmt.Println(utils.RenderMarkdown(aiAnswer))
 		}
 	},
 }
@@ -362,9 +355,24 @@ Examples:
 }
 var communityCmd = &cobra.Command{
 	Use:   "community",
-	Short: "Community resources and support (not yet implemented)",
+	Short: "Show NixOS community resources and support links",
+	Long: `Access NixOS community forums, documentation, chat channels, and GitHub resources.
+
+Examples:
+  nixai community
+`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("[nixai] The 'community' command is not yet implemented.")
+		fmt.Println(utils.FormatHeader("🌐 NixOS Community Resources"))
+		fmt.Println()
+		showCommunityOverview(os.Stdout)
+		fmt.Println()
+		showCommunityForums(os.Stdout)
+		fmt.Println()
+		showCommunityDocs(os.Stdout)
+		fmt.Println()
+		showMatrixChannels(os.Stdout)
+		fmt.Println()
+		showGitHubResources(os.Stdout)
 	},
 }
 var configCmd = &cobra.Command{
@@ -436,44 +444,132 @@ var doctorCmd = &cobra.Command{
 }
 var flakeCmd = &cobra.Command{
 	Use:   "flake",
-	Short: "Nix flake utilities (not yet implemented)",
+	Short: "Nix flake utilities and helpers",
+	Long: `Nix flake utilities for initializing, updating, and inspecting Nix flakes.
+
+Examples:
+  nixai flake init <dir>         # Initialize a new flake
+  nixai flake update             # Update flake inputs
+  nixai flake check              # Check flake integrity
+  nixai flake show               # Show flake information
+  nixai flake lock               # Update flake.lock
+  nixai flake metadata           # Show flake metadata
+`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("[nixai] The 'flake' command is not yet implemented.")
+		fmt.Println(utils.FormatHeader("❄️  Nix Flake Utilities"))
+		fmt.Println()
+		fmt.Println(utils.FormatKeyValue("init <dir>", "Initialize a new flake in the specified directory"))
+		fmt.Println(utils.FormatKeyValue("update", "Update flake inputs"))
+		fmt.Println(utils.FormatKeyValue("check", "Check flake integrity"))
+		fmt.Println(utils.FormatKeyValue("show", "Show flake information"))
+		fmt.Println(utils.FormatKeyValue("lock", "Update flake.lock file"))
+		fmt.Println(utils.FormatKeyValue("metadata", "Show flake metadata"))
+		fmt.Println()
+		fmt.Println(utils.FormatTip("Use 'nixai flake <subcommand>' to run a specific flake operation."))
 	},
 }
 var learnCmd = &cobra.Command{
 	Use:   "learn",
-	Short: "NixOS learning and training commands (not yet implemented)",
+	Short: "NixOS learning and training commands",
+	Long: `NixOS learning and training features: tutorials, guided exercises, and best practices.
+
+Examples:
+  nixai learn basics           # NixOS basics tutorial
+  nixai learn advanced         # Advanced NixOS usage
+  nixai learn troubleshooting  # Troubleshooting exercises
+  nixai learn quiz             # Take a NixOS quiz
+`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("[nixai] The 'learn' command is not yet implemented.")
+		fmt.Println(utils.FormatHeader("📚 NixOS Learning & Training"))
+		fmt.Println()
+		fmt.Println(utils.FormatKeyValue("basics", "NixOS basics tutorial (coming soon)"))
+		fmt.Println(utils.FormatKeyValue("advanced", "Advanced NixOS usage (coming soon)"))
+		fmt.Println(utils.FormatKeyValue("troubleshooting", "Troubleshooting exercises (coming soon)"))
+		fmt.Println(utils.FormatKeyValue("quiz", "Take a NixOS quiz (coming soon)"))
+		fmt.Println()
+		fmt.Println(utils.FormatTip("Use 'nixai learn <topic>' to start a learning module (when available)."))
 	},
 }
 var logsCmd = &cobra.Command{
 	Use:   "logs",
-	Short: "Analyze and parse NixOS logs (not yet implemented)",
+	Short: "Analyze and parse NixOS logs",
+	Long: `Analyze and parse NixOS logs for troubleshooting, error detection, and AI-powered diagnostics.
+
+Examples:
+  nixai logs /var/log/messages
+  nixai logs --file systemd.log
+  journalctl -xe | nixai logs
+`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("[nixai] The 'logs' command is not yet implemented.")
+		fmt.Println(utils.FormatHeader("📝 NixOS Log Analysis & Diagnostics"))
+		fmt.Println()
+		fmt.Println(utils.FormatKeyValue("logs <file>", "Analyze a log file for errors and warnings (coming soon)"))
+		fmt.Println(utils.FormatKeyValue("logs --file <file>", "Specify a log file to analyze (coming soon)"))
+		fmt.Println(utils.FormatKeyValue("logs (piped input)", "Analyze logs from stdin (coming soon)"))
+		fmt.Println()
+		fmt.Println(utils.FormatTip("Use 'nixai logs <file>' or pipe logs to 'nixai logs' for analysis (feature coming soon)."))
 	},
 }
 var mcpServerCmd = &cobra.Command{
 	Use:   "mcp-server",
-	Short: "Start or manage the MCP server (not yet implemented)",
+	Short: "Start or manage the MCP server",
+	Long: `Start, stop, or check the status of the Model Context Protocol (MCP) server for advanced NixOS documentation queries and AI integration.
+
+Examples:
+  nixai mcp-server start         # Start the MCP server
+  nixai mcp-server stop          # Stop the MCP server
+  nixai mcp-server status        # Show MCP server status
+  nixai mcp-server logs          # Show recent MCP server logs
+`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("[nixai] The 'mcp-server' command is not yet implemented.")
+		fmt.Println(utils.FormatHeader("🛰️  MCP Server Management"))
+		fmt.Println()
+		fmt.Println(utils.FormatKeyValue("start", "Start the MCP server (coming soon)"))
+		fmt.Println(utils.FormatKeyValue("stop", "Stop the MCP server (coming soon)"))
+		fmt.Println(utils.FormatKeyValue("status", "Show MCP server status (coming soon)"))
+		fmt.Println(utils.FormatKeyValue("logs", "Show recent MCP server logs (coming soon)"))
+		fmt.Println()
+		fmt.Println(utils.FormatTip("Use 'nixai mcp-server <subcommand>' to manage the MCP server (feature coming soon)."))
 	},
 }
 var neovimSetupCmd = &cobra.Command{
 	Use:   "neovim-setup",
-	Short: "Neovim integration setup (not yet implemented)",
+	Short: "Neovim integration setup",
+	Long: `Set up and integrate Neovim with NixOS and nixai for enhanced development workflows.
+
+Examples:
+  nixai neovim-setup install         # Install Neovim and recommended plugins
+  nixai neovim-setup configure      # Configure Neovim for NixOS
+  nixai neovim-setup check          # Check Neovim integration status
+`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("[nixai] The 'neovim-setup' command is not yet implemented.")
+		fmt.Println(utils.FormatHeader("📝 Neovim Integration Setup"))
+		fmt.Println()
+		fmt.Println(utils.FormatKeyValue("install", "Install Neovim and recommended plugins (coming soon)"))
+		fmt.Println(utils.FormatKeyValue("configure", "Configure Neovim for NixOS (coming soon)"))
+		fmt.Println(utils.FormatKeyValue("check", "Check Neovim integration status (coming soon)"))
+		fmt.Println()
+		fmt.Println(utils.FormatTip("Use 'nixai neovim-setup <subcommand>' to manage Neovim integration (feature coming soon)."))
 	},
 }
 var packageRepoCmd = &cobra.Command{
 	Use:   "package-repo",
-	Short: "Analyze Git repos and generate Nix derivations (not yet implemented)",
+	Short: "Analyze Git repos and generate Nix derivations",
+	Long: `Analyze a Git repository and generate a Nix derivation (package) for it. Useful for packaging new software or automating Nix expressions for projects.
+
+Examples:
+  nixai package-repo https://github.com/example/project
+  nixai package-repo --analyze .
+  nixai package-repo --output myproject.nix
+`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("[nixai] The 'package-repo' command is not yet implemented.")
+		fmt.Println(utils.FormatHeader("📦 Package Repository Analysis"))
+		fmt.Println()
+		fmt.Println(utils.FormatKeyValue("package-repo <url>", "Analyze a remote Git repository and generate a Nix derivation (coming soon)"))
+		fmt.Println(utils.FormatKeyValue("package-repo --analyze <dir>", "Analyze a local directory and generate a Nix derivation (coming soon)"))
+		fmt.Println(utils.FormatKeyValue("package-repo --output <file>", "Write the generated Nix expression to a file (coming soon)"))
+		fmt.Println()
+		fmt.Println(utils.FormatTip("Use 'nixai package-repo <url or dir>' to start packaging a repository (feature coming soon)."))
 	},
 }
 
