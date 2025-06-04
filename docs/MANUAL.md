@@ -154,25 +154,73 @@ nixai health --log-level debug
 
 ### Multi-Machine Management (Flake-based)
 
-All machine management is now handled via `flake.nix` using the `nixosConfigurations` attribute. There is no registry or YAML file. All commands operate on hosts defined in your flake.
+nixai provides powerful flake-based machine management using your `nixosConfigurations` from `flake.nix`, with integrated deploy-rs support for streamlined deployments.
 
-### Listing Hosts
+#### 🔍 Discovering and Listing Hosts
 
 ```zsh
+# List all hosts from your flake.nix
 nixai machines list
+
+# Automatically discovers hosts from ~/.config/nixos/flake.nix
+# Example output: ["dex5550", "p510", "p620", "razer"]
 ```
 
-### Deploying to a Host
+#### 🚀 Deployment Options
+
+**Traditional nixos-rebuild (Default):**
 
 ```zsh
-nixai machines deploy --machine <hostname>
+# Deploy to a specific host
+nixai machines deploy --machine hostname
+
+# Deploy with custom target
+nixai machines deploy --machine hostname --target-host user@remote-host
 ```
 
-- Hosts must be defined in `flake.nix` under `nixosConfigurations`.
-- For remote deploy, use `nixos-rebuild switch --flake .#<hostname> --target-host <host>`.
-- For advanced fleet deploy, configure `deploy-rs` in your flake.
+**Deploy-rs Integration (Recommended):**
 
-See `docs/FLAKE_INTEGRATION_GUIDE.md` for migration details.
+```zsh
+# Interactive setup with prompts for SSH details
+nixai machines setup-deploy-rs
+
+# Non-interactive setup with defaults
+nixai machines setup-deploy-rs --non-interactive
+
+# Deploy specific host with deploy-rs
+nixai machines deploy --method deploy-rs --machine hostname
+
+# Deploy all hosts (parallel deployment)
+nixai machines deploy --method deploy-rs
+
+# Dry run to check configuration
+nixai machines deploy --method deploy-rs --dry-run
+```
+
+#### 🛠️ Deploy-rs Configuration
+
+The `setup-deploy-rs` command automatically:
+
+1. **Adds deploy-rs input** to your flake.nix
+2. **Discovers all hosts** from nixosConfigurations  
+3. **Prompts for SSH details** (hostnames, users) per host
+4. **Generates deploy configuration** in your flake outputs
+5. **Creates deploy nodes** for each host with proper settings
+
+#### 📋 Requirements
+
+- **flake.nix** with `nixosConfigurations` defining your hosts
+- **SSH access** configured for remote hosts (for deploy-rs)
+- **deploy-rs** added as flake input (automated by setup command)
+
+#### 💡 Best Practices
+
+- **Use deploy-rs** for production deployments (more robust, parallel support)
+- **Test with --dry-run** before deploying to production systems
+- **Use meaningful hostnames** in nixosConfigurations that match your network
+- **Keep SSH configurations** properly maintained for reliable deployments
+
+For comprehensive setup details, see `docs/FLAKE_INTEGRATION_GUIDE.md`.
 
 ### Configuration Templates & Snippets
 

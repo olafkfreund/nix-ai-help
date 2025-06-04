@@ -133,17 +133,4 @@
         platforms = ["x86_64-linux" "aarch64-linux"];
       };
     };
-
-    # deploy-rs minimal config
-    deploy = {
-      nodes = {
-        example = {
-          hostname = "your-host";
-          sshUser = "nixos";
-          profiles.system = {
-            path = self.nixosConfigurations.example.config.system.build.toplevel;
-          };
-        };
-      };
-    };
-  };
+}
