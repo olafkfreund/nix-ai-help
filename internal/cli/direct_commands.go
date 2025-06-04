@@ -638,21 +638,18 @@ func runSearchCmd(args []string, out io.Writer) {
 	}
 
 	exec := nixos.NewExecutor(cfg.NixosFolder)
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("🔍 NixOS Search Results for: "+query))
-	_, _ = fmt.Fprintln(out)
-
-	// Package search
 	pkgOut, pkgErr := exec.SearchNixPackages(query)
-	if pkgErr == nil && pkgOut != "" {
+	if pkgErr != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("NixOS package search failed: "+pkgErr.Error()))
+	} else if pkgOut != "" {
+		_, _ = fmt.Fprintln(out, utils.FormatHeader("🔍 NixOS Search Results for: "+query))
 		_, _ = fmt.Fprintln(out, pkgOut)
 	}
 
-	// Query MCP for documentation context (with progress indicator)
 	providerName := cfg.AIProvider
 	if providerName == "" {
 		providerName = "ollama"
 	}
-
 	var aiProvider ai.AIProvider
 	switch providerName {
 	case "ollama":
@@ -668,7 +665,6 @@ func runSearchCmd(args []string, out io.Writer) {
 
 	var docExcerpts []string
 	_, _ = fmt.Fprint(out, utils.FormatInfo("Querying documentation... "))
-
 	mcpBase := cfg.MCPServer.Host
 	mcpContextAdded := false
 	if mcpBase != "" {
@@ -690,7 +686,6 @@ func runSearchCmd(args []string, out io.Writer) {
 		_, _ = fmt.Fprintln(out, utils.FormatWarning("skipped (no MCP host configured)"))
 	}
 
-	// Always add a strong NixOS-specific instruction to the prompt
 	promptInstruction := "You are a NixOS expert. Always provide NixOS-specific configuration.nix examples, use the NixOS module system, and avoid generic Linux or upstream package advice. Show how to enable and configure this package/service in NixOS."
 	if !mcpContextAdded {
 		docExcerpts = append(docExcerpts, promptInstruction)
@@ -705,18 +700,15 @@ func runSearchCmd(args []string, out io.Writer) {
 		OutputFormat: "markdown",
 		Provider:     providerName,
 	}
-
 	builder := ai.DefaultPromptBuilder{}
 	prompt, err := builder.BuildPrompt(promptCtx)
 	if err != nil {
 		_, _ = fmt.Fprintln(out, utils.FormatError("Prompt build error: "+err.Error()))
 		return
 	}
-
 	_, _ = fmt.Fprint(out, utils.FormatInfo("Querying AI provider... "))
 	aiAnswer, aiErr := aiProvider.Query(prompt)
 	_, _ = fmt.Fprintln(out, utils.FormatSuccess("done"))
-
 	if aiErr == nil && aiAnswer != "" {
 		_, _ = fmt.Fprintln(out, utils.FormatHeader("🤖 AI Best Practices & Tips"))
 		_, _ = fmt.Fprintln(out, utils.RenderMarkdown(aiAnswer))
