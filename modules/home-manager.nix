@@ -32,7 +32,6 @@ with lib; let
           EOF
                   chmod +x $out/bin/nixai
         '';
-        meta.description = "Placeholder for nixai when package is not available";
       };
 in {
   options.services.nixai = {
