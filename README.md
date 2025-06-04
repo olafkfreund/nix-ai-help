@@ -155,7 +155,7 @@ nixai is designed for privacy, productivity, and beautiful terminal output. Whet
 
 The `nixai doctor` command provides a comprehensive diagnostics report for your nixai setup, including:
 - **MCP Server Health**: Checks if the documentation server is running, healthy, and accessible (port/socket, process, /healthz endpoint)
-- **AI Provider Health**: Verifies connectivity and configuration for Ollama, OpenAI, and Gemini (API reachability, key presence/validity)
+- **AI Provider Health**: Verifies connectivity and configuration for Ollama, OpenAI, Gemini, and llamacpp (API reachability, key presence/validity)
 - **Actionable Feedback**: Glamour-formatted output with clear next steps for resolving common issues
 
 ### Usage Example
@@ -181,6 +181,7 @@ AI Provider Diagnostics
 ✅ Ollama API reachable at http://localhost:11434
 ✅ OpenAI API reachable (key valid).
 ✅ Gemini API reachable (key valid).
+✅ llamacpp API reachable at http://localhost:8080/completion
 
 ℹ️  See the README or docs/MANUAL.md for troubleshooting steps and more details.
 ```
@@ -191,11 +192,11 @@ If any issues are detected, nixai doctor will provide warnings, errors, and acti
 
 ## 🩺 Doctor Command: Diagnose MCP Server & AI Providers
 
-The `nixai doctor` command provides a comprehensive diagnostic checkup for your nixai environment. It helps you quickly identify and resolve common setup and runtime problems with the MCP server and all supported AI providers (Ollama, OpenAI, Gemini).
+The `nixai doctor` command provides a comprehensive diagnostic checkup for your nixai environment. It helps you quickly identify and resolve common setup and runtime problems with the MCP server and all supported AI providers (Ollama, OpenAI, Gemini, llamacpp).
 
 ### What It Does
 - Checks if the MCP server is running, healthy, and accessible (including port/socket and process status)
-- Diagnoses connectivity and configuration for Ollama, OpenAI, and Gemini AI providers
+- Diagnoses connectivity and configuration for Ollama, OpenAI, Gemini, and llamacpp AI providers
 - Detects missing or invalid API keys, unreachable endpoints, and common misconfigurations
 - Provides actionable, glamour-formatted feedback and next steps for troubleshooting
 
@@ -222,6 +223,7 @@ AI Provider Diagnostics
 ✅ Ollama API reachable at http://localhost:11434
 ✅ OpenAI API reachable (key valid).
 ✅ Gemini API reachable (key valid).
+✅ llamacpp API reachable at http://localhost:8080/completion
 
 ℹ️  See the README or docs/MANUAL.md for troubleshooting steps and more details.
 ```
@@ -1098,7 +1100,7 @@ nixai can be integrated into your NixOS or Home Manager configuration using the 
 - ✅ Adding nixai as a flake input
 - ✅ NixOS and Home Manager module configuration
 - ✅ All available options and features
-- ✅ AI provider setup (Ollama, OpenAI, Gemini)
+- ✅ AI provider setup (Ollama, OpenAI, Gemini, llamacpp)
 - ✅ Editor integrations (VS Code, Neovim)
 - ✅ Troubleshooting and examples
 
@@ -1149,7 +1151,7 @@ Want to add nixai to your flake.nix and install it system-wide or per-user? We'v
 ### What You Can Do
 - Add nixai as a flake input to your NixOS or Home Manager configuration
 - Enable system-wide or per-user installation with modules
-- Configure AI providers (Ollama, OpenAI, Gemini) declaratively
+- Configure AI providers (Ollama, OpenAI, Gemini, llamacpp) declaratively
 - Auto-configure editor integrations (VS Code, Neovim)
 - Set up MCP server for advanced documentation features
 - Use in combination with other flake inputs seamlessly
@@ -1302,7 +1304,7 @@ This guide covers:
 - ✅ **Complete flake setup** - Step-by-step integration into your configurations
 - ✅ **All configuration options** - AI providers, MCP server, documentation sources
 - ✅ **Editor integrations** - VS Code and Neovim automatic configuration
-- ✅ **AI provider setup** - Ollama (local/private), OpenAI, and Gemini configuration
+- ✅ **AI provider setup** - Ollama (local/private), OpenAI, Gemini, and llamacpp configuration
 - ✅ **Advanced features** - Security hardening, multi-provider setups, custom sources
 - ✅ **Troubleshooting** - Common issues and solutions
 - ✅ **Real examples** - Complete working configurations for different use cases
@@ -1376,7 +1378,7 @@ go mod tidy                              # Update dependencies
 ```
 ├── cmd/nixai/           # Main application entry point
 ├── internal/            # Internal packages
-│   ├── ai/             # LLM provider integrations (Ollama, OpenAI, Gemini)
+│   ├── ai/             # LLM provider integrations (Ollama, OpenAI, Gemini, llamacpp)
 │   ├── cli/            # CLI commands and interactive mode
 │   ├── config/         # Configuration management (YAML)
 │   ├── mcp/            # MCP server for documentation queries
@@ -1446,7 +1448,7 @@ nixai -a "what's the difference between NixOS and other Linux distributions?"
 
 **Features:**
 
-- 🤖 **AI-Powered Responses**: Get comprehensive answers using Ollama, Gemini, or OpenAI
+- 🤖 **AI-Powered Responses**: Get comprehensive answers using Ollama, Gemini, OpenAI, or llamacpp
 - 📚 **Documentation Context**: Automatic querying of official NixOS docs via MCP server
 - 🎨 **Beautiful Output**: Colorized markdown with syntax highlighting
 - ⚡ **Fast & Simple**: Just ask your question naturally
@@ -1892,5 +1894,21 @@ source ~/.config/nushell/scripts/nixai-completion.nu
   Type `nixai <TAB>` for completions.
 
 ---
+
+## Supported AI Providers
+- Ollama (local, private)
+- OpenAI (cloud)
+- Gemini (cloud)
+- llamacpp (local, open source)
+
+### llamacpp Example
+```yaml
+ai_provider: llamacpp
+ai_model: llama-2-7b-chat
+```
+Set endpoint:
+```sh
+export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
+```
 
 > See `docs/MANUAL.md` for more advanced integration and troubleshooting tips.

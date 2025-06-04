@@ -352,6 +352,19 @@ Set environment variable:
 export GEMINI_API_KEY="your-api-key-here"
 ```
 
+#### llamacpp (Local, Open Source)
+```nix
+services.nixai.mcp = {
+  aiProvider = "llamacpp";
+  aiModel = "llama-2-7b-chat";
+};
+```
+
+Set environment variable:
+```sh
+export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
+```
+
 ### MCP Server Options
 
 ```nix

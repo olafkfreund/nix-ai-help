@@ -1,5 +1,14 @@
 default:
-    ai_provider: openai  # Options: openai, ollama, gemini, custom
+    ai_provider: ollama  # Options: openai, ollama, gemini, llamacpp, custom
+    ai_model: llama3  # Model name for ollama or gemini, e.g., "llama3", "gemini-1.5-flash"
+    # For llamacpp, set endpoint via LLAMACPP_ENDPOINT env var (default: http://localhost:8080/completion)
+    # Example: export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
+    # Example configuration for llamacpp provider:
+    # ai_provider: llamacpp
+    # ai_model: llama-2-7b-chat
+    # Set endpoint via environment variable:
+    #   export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
+    # If unset, defaults to http://localhost:8080/completion
     # Custom AI provider configuration (used if ai_provider: custom)
     custom_ai:
         base_url: http://localhost:8080/api/generate  # HTTP API endpoint URL

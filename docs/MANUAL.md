@@ -23,6 +23,7 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 - Shell Integration
 - Command Reference (with real-life examples)
 - FAQ & Troubleshooting
+- 🦙 llamacpp Provider (Local, Fast, Open Source)
 
 ---
 
@@ -293,6 +294,51 @@ nixai store restore my-backup.tar.gz
 
 ---
 
+## 🦙 llamacpp Provider (Local, Fast, Open Source)
+
+llamacpp is supported as a local AI provider for privacy and speed. You can use any compatible model served by llamacpp's HTTP API.
+
+### Configuration Example
+
+```yaml
+ai_provider: llamacpp
+ai_model: llama-2-7b-chat
+```
+
+Set the endpoint for llamacpp via environment variable:
+
+```sh
+export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
+```
+
+If unset, the default endpoint is `http://localhost:8080/completion`.
+
+### Home Manager Example
+
+```nix
+services.nixai = {
+  enable = true;
+  mcp.enable = true;
+  mcp.aiProvider = "llamacpp";
+  mcp.aiModel = "llama-2-7b-chat";
+  mcp.documentationSources = [ "https://wiki.nixos.org/wiki/NixOS_Wiki" ];
+};
+```
+
+### CLI Usage Example
+
+```sh
+nixai --provider llamacpp "How do I enable SSH in NixOS?"
+```
+
+### Troubleshooting
+- Ensure your llamacpp server is running and accessible at the configured endpoint.
+- You can use any model supported by your llamacpp build.
+- For best results, use a chat-optimized model (e.g., llama-2-7b-chat).
+- If you get connection errors, check the `LLAMACPP_ENDPOINT` value and that the server is reachable.
+
+---
+
 ## 🐚 Shell Integration & Tips
 
 ### Quick Access Alias
@@ -342,7 +388,7 @@ echo "source ~/.nixai-completion.zsh" >> ~/.zshrc
 - **Q:** nixai says "MCP server unavailable"?
   - **A:** Start it with `nixai mcp-server start`.
 - **Q:** How do I change AI provider?
-  - **A:** `nixai config set ai_provider openai` (or ollama/gemini)
+  - **A:** `nixai config set ai_provider openai` (or ollama/gemini/llamacpp)
 - **Q:** How do I get more help?
   - **A:** `nixai help` or `nixai <command> --help` for all commands.
 
