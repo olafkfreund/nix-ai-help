@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -249,26 +250,65 @@ func buildExplainHomeOptionPrompt(option, documentation string) string {
 	return fmt.Sprintf(`You are a NixOS expert helping users understand Home Manager configuration options. Please explain the following Home Manager option in a clear, practical manner.\n\n**Option:** %s\n\n**Official Documentation:**\n%s\n\n**Please provide:**\n\n1. **Purpose & Overview**: What this option does and why you'd use it\n2. **Type & Default**: The data type and default value (if any)\n3. **Usage Examples**: Show 2-3 practical configuration examples\n4. **Best Practices**: How to use this option effectively\n5. **Related Options**: Other options that are commonly used with this one\n6. **Common Issues**: Potential problems and their solutions\n\nFormat your response using Markdown with section headings and code blocks for examples.`, option, documentation)
 }
 
-func buildEnhancedExplainOptionPrompt(option, documentation, format string) string {
-	return fmt.Sprintf(`You are a NixOS expert helping users understand configuration options. Please explain the following NixOS option in a clear, practical manner.
+// Helper struct for MCP option JSON
+// Only fields we care about
 
-**Option:** %s
+type mcpOptionDoc struct {
+	Name        string   `json:"option_name"`
+	Type        string   `json:"option_type"`
+	Default     string   `json:"option_default"`
+	Example     string   `json:"option_example"`
+	Description string   `json:"option_description"`
+	Source      string   `json:"option_source"`
+	Version     string   `json:"nixos_version"`
+	Related     []string `json:"related_options"`
+	Links       []string `json:"links"`
+}
 
-**Official Documentation:**
-%s
+// Parse MCP doc JSON, fallback to plain doc string if not JSON
+func parseMCPOptionDoc(doc string) (mcpOptionDoc, string) {
+	var opt mcpOptionDoc
+	if err := json.Unmarshal([]byte(doc), &opt); err == nil && opt.Name != "" {
+		return opt, ""
+	}
+	return mcpOptionDoc{}, doc
+}
 
-**Please provide:**
+func buildEnhancedExplainOptionPrompt(option, documentation, format, source, version string) string {
+	opt, fallbackDoc := parseMCPOptionDoc(documentation)
+	if opt.Name == "" {
+		// fallback to old prompt if not JSON
+		sourceInfo := ""
+		if source != "" {
+			sourceInfo += fmt.Sprintf("\n**Source:** %s", source)
+		}
+		if version != "" {
+			sourceInfo += fmt.Sprintf("\n**NixOS Version:** %s", version)
+		}
+		return fmt.Sprintf(`You are a NixOS expert helping users understand configuration options. Please explain the following NixOS option in a clear, practical manner.\n\n**Option:** %s%s\n\n**Official Documentation:**\n%s\n\n**Please provide:**\n\n1. **Purpose & Overview**: What this option does and why you'd use it\n2. **Type & Default**: The data type and default value (if any)\n3. **Usage Examples**: Show 2-3 practical configuration examples\n4. **Best Practices**: How to use this option effectively\n5. **Related Options**: List and briefly describe other options commonly used with this one\n6. **Troubleshooting Tips**: Common issues and how to resolve them\n7. **Links**: If possible, include links to relevant official documentation\n8. **Summary Table**: Provide a summary table of key attributes (name, type, default, description)\n\nFormat your response using %s with section headings and code blocks for examples.`, option, sourceInfo, fallbackDoc, format)
+	}
+	// Compose a rich prompt using all available fields
+	related := ""
+	if len(opt.Related) > 0 {
+		related = "- " + strings.Join(opt.Related, "\n- ")
+	}
+	links := ""
+	if len(opt.Links) > 0 {
+		links = "- " + strings.Join(opt.Links, "\n- ")
+	}
+	return fmt.Sprintf(`You are a NixOS expert. Explain the following option in detail for a Linux user.\n\n**Option:** %s\n**Type:** %s\n**Default:** %s\n**Example:** %s\n**Description:** %s\n**Source:** %s\n**NixOS Version:** %s\n\n**Related Options:**\n%s\n\n**Links:**\n%s\n\n**Please provide:**\n1. Purpose & Overview\n2. Usage Examples (with code)\n3. Best Practices\n4. Troubleshooting Tips\n5. Summary Table (name, type, default, description)\n\nFormat your response using %s.`,
+		opt.Name, opt.Type, opt.Default, opt.Example, opt.Description, opt.Source, opt.Version, related, links, format)
+}
 
-1. **Purpose & Overview**: What this option does and why you'd use it
-2. **Type & Default**: The data type and default value (if any)
-3. **Usage Examples**: Show 2-3 practical configuration examples
-4. **Best Practices**: How to use this option effectively
-5. **Related Options**: List and briefly describe other options commonly used with this one
-6. **Troubleshooting Tips**: Common issues and how to resolve them
-7. **Links**: If possible, include links to relevant official documentation
-8. **Summary Table**: Provide a summary table of key attributes (name, type, default, description)
-
-Format your response using %s with section headings and code blocks for examples.`, option, documentation, format)
+func buildExamplesOnlyPrompt(option, documentation, format, source, version string) string {
+	sourceInfo := ""
+	if source != "" {
+		sourceInfo += fmt.Sprintf("\n**Source:** %s", source)
+	}
+	if version != "" {
+		sourceInfo += fmt.Sprintf("\n**NixOS Version:** %s", version)
+	}
+	return fmt.Sprintf(`You are a NixOS expert. Show only 2-3 practical configuration examples for the following option.\n\n**Option:** %s%s\n\n**Official Documentation:**\n%s\n\nFormat your response using %s and code blocks.`, option, sourceInfo, documentation, format)
 }
 
 // searchCmd implements the enhanced search logic
@@ -322,16 +362,60 @@ var explainHomeOptionCmd = &cobra.Command{
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 			os.Exit(1)
 		}
-		mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
-		mcpClient := mcp.NewMCPClient(mcpURL)
-		doc, docErr := mcpClient.QueryDocumentation(option)
-		if docErr != nil || doc == "" {
-			fmt.Fprintln(os.Stderr, utils.FormatError("No documentation found for Home Manager option: "+option))
+		providerName := cfg.AIProvider
+		if providerName == "" {
+			providerName = "ollama"
+		}
+		var aiProvider ai.AIProvider
+		switch providerName {
+		case "ollama":
+			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+		case "openai":
+			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		case "gemini":
+			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
+		default:
+			fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
 			os.Exit(1)
 		}
-		aiProvider := ai.NewOllamaProvider("llama3") // Default, or use config
-		prompt := buildExplainHomeOptionPrompt(option, doc)
+
+		// Query MCP for documentation context (with progress indicator)
+		var docExcerpts []string
+		fmt.Print(utils.FormatInfo("Querying documentation... "))
+		mcpBase := cfg.MCPServer.Host
+		if mcpBase != "" {
+			mcpClient := mcp.NewMCPClient(mcpBase)
+			doc, err := mcpClient.QueryDocumentation(option)
+			fmt.Println(utils.FormatSuccess("done"))
+			if err == nil && doc != "" {
+				opt, fallbackDoc := parseMCPOptionDoc(doc)
+				if opt.Name != "" {
+					context := fmt.Sprintf("Option: %s\nType: %s\nDefault: %s\nExample: %s\nDescription: %s\nSource: %s\nNixOS Version: %s\nRelated: %v\nLinks: %v", opt.Name, opt.Type, opt.Default, opt.Example, opt.Description, opt.Source, opt.Version, opt.Related, opt.Links)
+					docExcerpts = append(docExcerpts, context)
+				} else {
+					docExcerpts = append(docExcerpts, fallbackDoc)
+				}
+			}
+		} else {
+			fmt.Println(utils.FormatWarning("skipped (no MCP host configured)"))
+		}
+
+		promptCtx := ai.PromptContext{
+			Question:     option,
+			DocExcerpts:  docExcerpts,
+			Intent:       "explain",
+			OutputFormat: "markdown",
+			Provider:     providerName,
+		}
+		builder := ai.DefaultPromptBuilder{}
+		prompt, err := builder.BuildPrompt(promptCtx)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Prompt build error: "+err.Error()))
+			os.Exit(1)
+		}
+		fmt.Print(utils.FormatInfo("Querying AI provider... "))
 		aiResp, aiErr := aiProvider.Query(prompt)
+		fmt.Println(utils.FormatSuccess("done"))
 		if aiErr != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+aiErr.Error()))
 			os.Exit(1)
@@ -348,6 +432,8 @@ var explainOptionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		option := args[0]
 		format, _ := cmd.Flags().GetString("format")
+		providerFlag, _ := cmd.Flags().GetString("provider")
+		examplesOnly, _ := cmd.Flags().GetBool("examples-only")
 		cfg, err := config.LoadUserConfig()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
@@ -355,15 +441,49 @@ var explainOptionCmd = &cobra.Command{
 		}
 		mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
 		mcpClient := mcp.NewMCPClient(mcpURL)
+		fmt.Print(utils.FormatInfo("Querying documentation... "))
 		doc, docErr := mcpClient.QueryDocumentation(option)
+		fmt.Println(utils.FormatSuccess("done"))
 		if docErr != nil || doc == "" {
 			fmt.Fprintln(os.Stderr, utils.FormatError("No documentation found for option: "+option))
-			// Exit with success so tests can check output
 			return
 		}
-		aiProvider := ai.NewOllamaProvider("llama3") // Default, or use config
-		prompt := buildEnhancedExplainOptionPrompt(option, doc, format)
+		// Try to extract source/version if present in doc (simple heuristic)
+		var source, version string
+		if strings.Contains(doc, "option_source") {
+			parts := strings.Split(doc, "option_source")
+			if len(parts) > 1 {
+				source = strings.Split(parts[1], "\"")[1]
+			}
+		}
+		if strings.Contains(doc, "nixos-") {
+			idx := strings.Index(doc, "nixos-")
+			version = doc[idx : idx+12]
+		}
+		aiProviderName := providerFlag
+		if aiProviderName == "" {
+			aiProviderName = cfg.AIProvider
+		}
+		var aiProvider ai.AIProvider
+		switch aiProviderName {
+		case "ollama":
+			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+		case "openai":
+			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		case "gemini":
+			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
+		default:
+			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+		}
+		var prompt string
+		if examplesOnly {
+			prompt = buildExamplesOnlyPrompt(option, doc, format, source, version)
+		} else {
+			prompt = buildEnhancedExplainOptionPrompt(option, doc, format, source, version)
+		}
+		fmt.Print(utils.FormatInfo("Querying AI provider... "))
 		aiResp, aiErr := aiProvider.Query(prompt)
+		fmt.Println(utils.FormatSuccess("done"))
 		if aiErr != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+aiErr.Error()))
 			os.Exit(1)
@@ -374,6 +494,8 @@ var explainOptionCmd = &cobra.Command{
 
 func init() {
 	explainOptionCmd.Flags().String("format", "markdown", "Output format: markdown, plain, or table")
+	explainOptionCmd.Flags().String("provider", "", "AI provider to use for this query (ollama, openai, gemini)")
+	explainOptionCmd.Flags().Bool("examples-only", false, "Show only usage examples for the option")
 }
 
 // interactiveCmd implements the interactive CLI mode
@@ -416,8 +538,62 @@ Examples:
 			os.Exit(1)
 		}
 
-		provider := InitializeAIProvider(cfg)
-		answer, err := provider.Query(question)
+		providerName := cfg.AIProvider
+		if providerName == "" {
+			providerName = "ollama"
+		}
+		var aiProvider ai.AIProvider
+		switch providerName {
+		case "ollama":
+			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+		case "openai":
+			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		case "gemini":
+			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
+		default:
+			fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
+			os.Exit(1)
+		}
+
+		// Query MCP for documentation context (optional, ignore errors)
+		var docExcerpts []string
+		fmt.Print(utils.FormatInfo("Querying documentation... "))
+		mcpBase := cfg.MCPServer.Host
+		if mcpBase != "" {
+			mcpClient := mcp.NewMCPClient(mcpBase)
+			doc, err := mcpClient.QueryDocumentation(question)
+			fmt.Println(utils.FormatSuccess("done"))
+			if err == nil && doc != "" {
+				// Try to parse as MCP option doc JSON
+				opt, fallbackDoc := parseMCPOptionDoc(doc)
+				if opt.Name != "" {
+					// Compose a rich context string from MCP fields
+					context := fmt.Sprintf("Option: %s\nType: %s\nDefault: %s\nExample: %s\nDescription: %s\nSource: %s\nNixOS Version: %s\nRelated: %v\nLinks: %v", opt.Name, opt.Type, opt.Default, opt.Example, opt.Description, opt.Source, opt.Version, opt.Related, opt.Links)
+					docExcerpts = append(docExcerpts, context)
+				} else {
+					docExcerpts = append(docExcerpts, fallbackDoc)
+				}
+			}
+		} else {
+			fmt.Println(utils.FormatWarning("skipped (no MCP host configured)"))
+		}
+
+		promptCtx := ai.PromptContext{
+			Question:     question,
+			DocExcerpts:  docExcerpts,
+			Intent:       "explain",
+			OutputFormat: "markdown",
+			Provider:     providerName,
+		}
+		builder := ai.DefaultPromptBuilder{}
+		prompt, err := builder.BuildPrompt(promptCtx)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Prompt build error: "+err.Error()))
+			os.Exit(1)
+		}
+		fmt.Print(utils.FormatInfo("Querying AI provider... "))
+		answer, err := aiProvider.Query(prompt)
+		fmt.Println(utils.FormatSuccess("done"))
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
 			os.Exit(1)
