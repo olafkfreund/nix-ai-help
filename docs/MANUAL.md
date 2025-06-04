@@ -237,15 +237,46 @@ nixai snippets add my-nvidia-config --file /etc/nixos/hardware.nix
 
 - **Tip:** Use --merge and --backup when applying templates.
 
-### Interactive Mode
+### Interactive Mode (Updated June 2025)
 
-Conversational shell for guided assistance:
+The interactive shell now supports all major commands listed in the menu. Every command in the interactive menu is enabled and produces output—either actionable help, options, or a stub message. This ensures a consistent and user-friendly experience for troubleshooting, configuration, and learning.
 
-```sh
-nixai interactive
-```
+### Available Commands in Interactive Mode
 
-- **Tip:** Type 'help' for available commands. Tab completion is supported!
+- `ask <question>`: Ask any NixOS question
+- `build`: Enhanced build troubleshooting and optimization
+- `community`: Community resources and support
+- `completion`: Generate the autocompletion script for the specified shell
+- `config`: Manage nixai configuration
+- `configure`: Configure NixOS interactively
+- `deps`: Analyze NixOS configuration dependencies and imports
+- `devenv`: Create and manage development environments with devenv
+- `diagnose`: Diagnose NixOS issues
+- `doctor`: Run NixOS health checks
+- `explain-option <option>`: Explain a NixOS option
+- `flake`: Nix flake utilities
+- `gc`: AI-powered garbage collection analysis and cleanup
+- `hardware`: AI-powered hardware configuration optimizer
+- `help`: Help about any command
+- `interactive`: Launch interactive AI-powered NixOS assistant shell
+- `learn`: NixOS learning and training commands
+- `logs`: Analyze and parse NixOS logs
+- `machines`: Manage and synchronize NixOS configurations across multiple machines
+- `mcp-server`: Start or manage the MCP server
+- `migrate`: AI-powered migration assistant for channels and flakes
+- `neovim-setup`: Neovim integration setup
+- `package-repo <url>`: Analyze Git repos and generate Nix derivations
+- `search <package>`: Search for NixOS packages/services and get config/AI tips
+- `snippets`: Manage NixOS configuration snippets
+- `store`: Manage, backup, and analyze the Nix store
+- `templates`: Manage NixOS configuration templates and snippets
+- `exit`: Exit interactive mode
+
+All commands are accessible by typing their name at the `nixai>` prompt. Subcommands and arguments are supported where relevant. If a command is not yet fully implemented, it will display a stub or help message, ensuring no command is silent or unresponsive.
+
+**Tip:** Use `help` or `?` at any time to see the full menu.
+
+---
 
 ### Editor Integration
 
