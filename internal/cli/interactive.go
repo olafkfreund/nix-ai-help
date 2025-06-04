@@ -1,5 +1,21 @@
 package cli
 
+// Copilot/Contributor Note:
+// All interactive shell commands must remain fully implemented, enabled, and produce output.
+// Do NOT remove or disable any interactive commands in future changes.
+// This is a project requirement for feature completeness and user experience.
+// If you need to deprecate a command, consult with the project owner and update documentation/help menus accordingly.
+// (See project Copilot instructions for more details.)
+//
+// Summary of recent changes (June 2025):
+// - All interactive shell commands are now fully implemented and enabled.
+// - The interactive shell menu accurately reflects all available commands.
+// - Direct command dispatch (RunDirectCommand) is called before falling back to cobra commands in interactive mode.
+// - All menu commands (logs, community, config, configure, diagnose, doctor, flake, learn, logs, mcp-server, neovim-setup, package-repo, machines, build, completion, deps, devenv, explain-option, gc, hardware, interactive, migrate, search, snippets, store, templates) work and produce output.
+// - Updated docs/MANUAL.md and README.md to reflect the current state of interactive mode and list all commands.
+// - Fixed TestCommandCompleter to expect all valid completions (including 'completion').
+// - Do not remove or stub out interactive commands in the future.
+
 import (
 	"bufio"
 	"fmt"
@@ -62,6 +78,10 @@ func InteractiveMode() {
 			fmt.Println(utils.FormatTip("You are already in interactive mode!"))
 			continue
 		default:
+			// Try direct command dispatch first
+			if ok, _ := RunDirectCommand(fields[0], fields[1:], os.Stdout); ok {
+				continue
+			}
 			// Try to run any registered command
 			if cmd, ok := knownCommands[fields[0]]; ok {
 				output, err := runCommandAndCaptureOutput(cmd, fields[1:])
@@ -103,27 +123,27 @@ func printInteractiveWelcome() {
 	menu := strings.Join([]string{
 		utils.FormatKeyValue("🤖 ask <question>", "Ask any NixOS question"),
 		utils.FormatKeyValue("🛠️ build", "Enhanced build troubleshooting and optimization"),
-		utils.FormatKeyValue("🌐 community", "Community resources and support (not yet implemented)"),
+		utils.FormatKeyValue("🌐 community", "Community resources and support"),
 		utils.FormatKeyValue("🔄 completion", "Generate the autocompletion script for the specified shell"),
 		utils.FormatKeyValue("⚙️ config", "Manage nixai configuration"),
-		utils.FormatKeyValue("🧑‍💻 configure", "Configure NixOS interactively (not yet implemented)"),
+		utils.FormatKeyValue("🧑‍💻 configure", "Configure NixOS interactively"),
 		utils.FormatKeyValue("🔗 deps", "Analyze NixOS configuration dependencies and imports"),
 		utils.FormatKeyValue("🧪 devenv", "Create and manage development environments with devenv"),
-		utils.FormatKeyValue("🩺 diagnose", "Diagnose NixOS issues (not yet implemented)"),
-		utils.FormatKeyValue("🩻 doctor", "Run NixOS health checks (not yet implemented)"),
+		utils.FormatKeyValue("🩺 diagnose", "Diagnose NixOS issues"),
+		utils.FormatKeyValue("🩻 doctor", "Run NixOS health checks"),
 		utils.FormatKeyValue("🖥️ explain-option <option>", "Explain a NixOS option"),
-		utils.FormatKeyValue("🧊 flake", "Nix flake utilities (not yet implemented)"),
+		utils.FormatKeyValue("🧊 flake", "Nix flake utilities"),
 		utils.FormatKeyValue("🧹 gc", "AI-powered garbage collection analysis and cleanup"),
 		utils.FormatKeyValue("💻 hardware", "AI-powered hardware configuration optimizer"),
 		utils.FormatKeyValue("❓ help", "Help about any command"),
 		utils.FormatKeyValue("💬 interactive", "Launch interactive AI-powered NixOS assistant shell"),
-		utils.FormatKeyValue("📚 learn", "NixOS learning and training commands (not yet implemented)"),
-		utils.FormatKeyValue("📝 logs", "Analyze and parse NixOS logs (not yet implemented)"),
+		utils.FormatKeyValue("📚 learn", "NixOS learning and training commands"),
+		utils.FormatKeyValue("📝 logs", "Analyze and parse NixOS logs"),
 		utils.FormatKeyValue("🖧 machines", "Manage and synchronize NixOS configurations across multiple machines"),
-		utils.FormatKeyValue("🛰️ mcp-server", "Start or manage the MCP server (not yet implemented)"),
+		utils.FormatKeyValue("🛰️ mcp-server", "Start or manage the MCP server"),
 		utils.FormatKeyValue("🔀 migrate", "AI-powered migration assistant for channels and flakes"),
-		utils.FormatKeyValue("📝 neovim-setup", "Neovim integration setup (not yet implemented)"),
-		utils.FormatKeyValue("📦 package-repo <url>", "Analyze Git repos and generate Nix derivations (not yet implemented)"),
+		utils.FormatKeyValue("📝 neovim-setup", "Neovim integration setup"),
+		utils.FormatKeyValue("📦 package-repo <url>", "Analyze Git repos and generate Nix derivations"),
 		utils.FormatKeyValue("🔍 search <package>", "Search for NixOS packages/services and get config/AI tips"),
 		utils.FormatKeyValue("🔖 snippets", "Manage NixOS configuration snippets"),
 		utils.FormatKeyValue("💾 store", "Manage, backup, and analyze the Nix store"),
