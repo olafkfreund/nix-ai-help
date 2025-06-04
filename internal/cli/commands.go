@@ -32,8 +32,55 @@ Usage:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if askQuestion != "" {
 			fmt.Println(utils.FormatHeader("🤖 AI Answer to your question:"))
-			aiProvider := ai.NewOllamaProvider("llama3") // Default, or use config
-			answer, err := aiProvider.Query(askQuestion)
+
+			cfg, err := config.LoadUserConfig()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
+				os.Exit(1)
+			}
+
+			providerName := cfg.AIProvider
+			if providerName == "" {
+				providerName = "ollama"
+			}
+			var aiProvider ai.AIProvider
+			switch providerName {
+			case "ollama":
+				aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			case "openai":
+				aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			case "gemini":
+				aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
+			default:
+				fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
+				os.Exit(1)
+			}
+
+			// Query MCP for documentation context (optional, ignore errors)
+			var docExcerpts []string
+			mcpBase := cfg.MCPServer.Host
+			if mcpBase != "" {
+				mcpClient := mcp.NewMCPClient(mcpBase)
+				doc, err := mcpClient.QueryDocumentation(askQuestion)
+				if err == nil && doc != "" {
+					docExcerpts = append(docExcerpts, doc)
+				}
+			}
+
+			promptCtx := ai.PromptContext{
+				Question:     askQuestion,
+				DocExcerpts:  docExcerpts,
+				Intent:       "explain",
+				OutputFormat: "markdown",
+				Provider:     providerName,
+			}
+			builder := ai.DefaultPromptBuilder{}
+			prompt, err := builder.BuildPrompt(promptCtx)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Prompt build error: "+err.Error()))
+				os.Exit(1)
+			}
+			answer, err := aiProvider.Query(prompt)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
 				os.Exit(1)
