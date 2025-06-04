@@ -273,10 +273,4 @@ in {
       };
     })
   ];
-
-  meta = {
-    maintainers = [lib.maintainers.olf];
-    description = "NixAI Home Manager module. Provides options to enable the NixAI MCP server, configure AI provider/model, and set documentation sources.\n\nExample usage:\n```nix\nservices.nixai = {\n  enable = true;\n  mcp.enable = true;\n  mcp.aiProvider = \"ollama\";\n  mcp.aiModel = \"llama3\";\n  mcp.documentationSources = [ \"https://wiki.nixos.org/wiki/NixOS_Wiki\" ];\n};\n```\n";
-    doc = ./home-manager.nix;
-  };
 }
