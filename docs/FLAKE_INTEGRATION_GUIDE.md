@@ -13,6 +13,7 @@ This comprehensive guide shows you how to integrate **nixai** into your NixOS an
 - [Example: Nixvim + Home Manager + nixai Neovim Integration](#example-nixvim--home-manager--nixai-neovim-integration)
 - [Troubleshooting](#troubleshooting)
 - [Multi-Endpoint MCP Server Support](#multi-endpoint-mcp-server-support)
+- [Flake-based Multi-Machine Management Migration Guide](#flake-based-multi-machine-management-migration-guide)
 
 ---
 
@@ -742,7 +743,7 @@ services.nixai = {
       socketPath = "/tmp/nixai-test.sock";
       host = "localhost";
       port = 8082;
-    }
+    };
   ];
 };
 ```
@@ -752,6 +753,53 @@ services.nixai = {
 - The CLI and integrations will use the correct socket/host/port for each endpoint.
 
 See also: [docs/neovim-integration.md](docs/neovim-integration.md) for Neovim multi-endpoint usage.
+
+---
+
+## Flake-based Multi-Machine Management Migration Guide
+
+## Overview
+
+nixai now manages all machines directly from your `flake.nix` using the `nixosConfigurations` attribute. The old registry and YAML files are no longer used or supported.
+
+## Migration Steps
+
+1. **Define all hosts in `flake.nix`**
+   - Add each machine as an entry under `nixosConfigurations`.
+2. **Remove registry files**
+   - Delete any old registry YAML files and references.
+3. **Use CLI commands**
+   - `nixai machines list` to enumerate hosts
+   - `nixai machines deploy --machine <hostname>` to deploy
+
+## Example `flake.nix`
+
+```nix
+{
+  outputs = { self, nixpkgs, ... }:
+    {
+      nixosConfigurations = {
+        myhost = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [ ./hosts/myhost/configuration.nix ];
+        };
+        anotherhost = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [ ./hosts/anotherhost/configuration.nix ];
+        };
+      };
+    };
+}
+```
+
+## Deployment
+
+- For remote deploy: `nixos-rebuild switch --flake .#<hostname> --target-host <host>`
+- For advanced fleet deploy: configure `deploy-rs` in your flake
+
+## Notes
+- All machine management is now flake-centric.
+- Tags, groups, and metadata are not currently supported unless encoded in flake.nix.
 
 ---
 

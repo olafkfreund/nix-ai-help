@@ -15,7 +15,7 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 - Searching for Packages and Services
 - AI-Powered Package Repository Analysis
 - System Health Checks
-- Multi-Machine Configuration Manager
+- Multi-Machine Management (Flake-based)
 - Configuration Templates & Snippets
 - Interactive Mode
 - Editor Integration
@@ -152,19 +152,27 @@ nixai health --log-level debug
 
 - **Tip:** Use before/after upgrades or for daily maintenance.
 
-### Multi-Machine Configuration Manager
+### Multi-Machine Management (Flake-based)
 
-Register, group, deploy, and monitor multiple machines:
+All machine management is now handled via `flake.nix` using the `nixosConfigurations` attribute. There is no registry or YAML file. All commands operate on hosts defined in your flake.
 
-```sh
-nixai machines add web1 192.168.1.10 --description "Web server 1"
-nixai machines groups add production web1 db1
-nixai machines deploy --group production
-nixai machines status
-nixai machines drift-check --all
+### Listing Hosts
+
+```zsh
+nixai machines list
 ```
 
-- **Tip:** Use groups for bulk operations and drift detection.
+### Deploying to a Host
+
+```zsh
+nixai machines deploy --machine <hostname>
+```
+
+- Hosts must be defined in `flake.nix` under `nixosConfigurations`.
+- For remote deploy, use `nixos-rebuild switch --flake .#<hostname> --target-host <host>`.
+- For advanced fleet deploy, configure `deploy-rs` in your flake.
+
+See `docs/FLAKE_INTEGRATION_GUIDE.md` for migration details.
 
 ### Configuration Templates & Snippets
 

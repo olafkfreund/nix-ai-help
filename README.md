@@ -29,7 +29,7 @@ See the full [nixai User Manual](docs/MANUAL.md) for comprehensive feature docum
 - **🆕 Dedicated Home Manager Command:** New `explain-home-option` command specifically for Home Manager configuration options.
 - **🆕 AI-Powered Package Repository Analysis:** New `package-repo` command automatically analyzes Git repositories and generates complete Nix derivations using AI-powered build system detection and dependency analysis.
 - **📝 Configuration Templates & Snippets:** Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
-- **🖥️ Multi-Machine Configuration Manager:** Centrally manage, synchronize, and deploy NixOS configurations across multiple machines. Register, group, sync, deploy, and monitor fleets of NixOS systems from the CLI. See below for details and usage examples.
+- **🖥️ Multi-Machine Management (Flake-based):** Centrally manage, synchronize, and deploy NixOS configurations across multiple machines directly from your `flake.nix`. See below for details and usage examples.
 - **More Tests:** New tests cover service option lookup, diagnostics, error handling, and packaging features for robust reliability.
 - **🆕 Nix Store Management**: Backup, restore, verify, and analyze the Nix store directly from the CLI.
 - **System State Backup & Restore**: Comprehensive backup/restore with validation and incremental support.
@@ -69,7 +69,7 @@ All other dependencies are managed by the Nix flake and justfile.
 - [🔄 MCP Server Configuration & Autostart](#-mcp-server-configuration--autostart)
 - [🔄 Migration Assistant (Channels ↔ Flakes)](#-migration-assistant-channels--flakes)
 - [🎨 Terminal Output Formatting](#-terminal-output-formatting)
-- [🖥️ Multi-Machine Configuration Manager](#-multi-machine-configuration-manager)
+- [🖥️ Multi-Machine Management (Flake-based)](#-multi-machine-management-flake-based)
 - [🛠️ Installation & Usage](#%EF%B8%8F-installation--usage)
 - [📚 Flake Integration Guide](#-flake-integration-guide)
 - [📝 Commands & Usage](#-commands--usage)
@@ -143,7 +143,7 @@ nixai is designed for privacy, productivity, and beautiful terminal output. Whet
 
 - **NEW:** 📝 **Configuration Templates & Snippets** — Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
 
-- **NEW:** 🖥️ **Multi-Machine Configuration Manager** — Register, manage, group, and deploy NixOS configurations to multiple machines with a single CLI. Includes machine registry, group management, configuration sync, deployment, diff analysis, and status monitoring.
+- **NEW:** 🖥️ **Multi-Machine Management (Flake-based)** — Centrally manage, group, and deploy NixOS configurations to multiple machines directly from your `flake.nix`. Includes machine registry, group management, configuration sync, deployment, diff analysis, and status monitoring.
 
 - **NEW:** 🆕 **Nix Store Management** — Backup, restore, verify, and analyze the Nix store directly from the CLI.
 
@@ -662,59 +662,30 @@ See the [User Manual](docs/MANUAL.md#searching-for-packages-and-services) for fu
 
 ---
 
-## 🖥️ Multi-Machine Configuration Manager
+## 🖥️ Multi-Machine Management (Flake-based)
 
-The Multi-Machine Configuration Manager lets you centrally manage and synchronize NixOS configurations across many machines. You can register machines, organize them into groups, sync and deploy configurations, compare differences, and monitor status—all from the command line.
+nixai now manages all machines directly from your `flake.nix` using the `nixosConfigurations` attribute. There is no registry or YAML file. All commands operate on hosts defined in your flake.
 
-### Key Features
-- Register and manage multiple NixOS machines in a central registry
-- Group machines for fleet operations (e.g., deploy to all web servers)
-- Sync configurations between local and remote machines
-- Deploy configuration changes with rollback support
-- Compare configurations across machines (diff)
-- Check connectivity and status of all registered machines
-- All features available via the `nixai machines` command and subcommands
+### Listing Hosts
 
-### Example Workflow
-
-```sh
-# Register machines
-nixai machines add web1 192.168.1.10 --description "Web server 1"
-nixai machines add db1 192.168.1.20 --description "Database server"
-
-# List all machines
-nixai machines list
-
-# Show details for a machine
-nixai machines show web1
-
-# Group machines
-nixai machines groups add production web1 db1
-nixai machines groups list
-
-# Deploy config to all machines in a group
-nixai machines deploy --group production
-
-# Check status
-nixai machines status
-
-# Remove a machine
-nixai machines remove db1 --force
 ```
+nixai machines list
+```
+Lists all hosts from `flake.nix`.
 
-### Commands Overview
+### Deploying to a Host
 
-- `nixai machines list` — List all registered machines
-- `nixai machines add <name> <host> [--description ...]` — Register a new machine
-- `nixai machines show <name>` — Show details for a machine
-- `nixai machines remove <name> --force` — Remove a machine
-- `nixai machines groups ...` — Manage machine groups
-- `nixai machines sync <machine>` — Sync configs to a machine
-- `nixai machines deploy [--group <group>]` — Deploy to one or more machines
-- `nixai machines diff` — Compare configurations
-- `nixai machines status` — Check machine status
+```
+nixai machines deploy --machine <hostname>
+```
+Deploys to the specified host using `nixos-rebuild` (default) or `deploy-rs` if configured.
 
-See the [User Manual](docs/MANUAL.md#multi-machine-configuration-manager) for more real-world examples and advanced usage.
+### Requirements
+- Your `flake.nix` must define all hosts under `nixosConfigurations`.
+- For remote deploy, use `nixos-rebuild switch --flake .#<hostname> --target-host <host>`.
+- For advanced fleet deploy, configure `deploy-rs` in your flake.
+
+See `docs/FLAKE_INTEGRATION_GUIDE.md` for migration details.
 
 ---
 
