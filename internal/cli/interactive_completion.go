@@ -144,7 +144,7 @@ func InteractiveModeWithCompletion() {
 		InteractiveMode()
 		return
 	}
-	defer rl.Close()
+	defer func() { _ = rl.Close() }()
 
 	// Print welcome message
 	printInteractiveWelcome()

@@ -55,7 +55,6 @@ func ParseLog(log string) ([]LogEntry, error) {
 		if m := systemdRe.FindStringSubmatch(line); m != nil {
 			if inMultiline {
 				entries = append(entries, current)
-				inMultiline = false
 			}
 			current = LogEntry{
 				Timestamp: m[1],
@@ -67,7 +66,6 @@ func ParseLog(log string) ([]LogEntry, error) {
 		} else if m := genericRe.FindStringSubmatch(line); m != nil {
 			if inMultiline {
 				entries = append(entries, current)
-				inMultiline = false
 			}
 			current = LogEntry{
 				Timestamp: m[1],
@@ -79,7 +77,6 @@ func ParseLog(log string) ([]LogEntry, error) {
 		} else if m := simpleLevelRe.FindStringSubmatch(line); m != nil {
 			if inMultiline {
 				entries = append(entries, current)
-				inMultiline = false
 			}
 			current = LogEntry{
 				Timestamp: "",
@@ -97,7 +94,6 @@ func ParseLog(log string) ([]LogEntry, error) {
 			// Fallback: treat as a new message with unknown fields
 			if inMultiline {
 				entries = append(entries, current)
-				inMultiline = false
 			}
 			current = LogEntry{
 				Timestamp: "",
@@ -135,21 +131,18 @@ func ParseLogStream(input <-chan string) <-chan LogEntry {
 			if m := systemdRe.FindStringSubmatch(line); m != nil {
 				if inMultiline {
 					output <- current
-					inMultiline = false
 				}
 				current = LogEntry{Timestamp: m[1], Level: "", Unit: m[3], Message: m[4]}
 				inMultiline = true
 			} else if m := genericRe.FindStringSubmatch(line); m != nil {
 				if inMultiline {
 					output <- current
-					inMultiline = false
 				}
 				current = LogEntry{Timestamp: m[1], Level: m[2], Unit: m[3], Message: m[4]}
 				inMultiline = true
 			} else if m := simpleLevelRe.FindStringSubmatch(line); m != nil {
 				if inMultiline {
 					output <- current
-					inMultiline = false
 				}
 				current = LogEntry{Timestamp: "", Level: m[1], Unit: "", Message: m[2]}
 				inMultiline = true
@@ -160,7 +153,6 @@ func ParseLogStream(input <-chan string) <-chan LogEntry {
 			} else {
 				if inMultiline {
 					output <- current
-					inMultiline = false
 				}
 				current = LogEntry{Timestamp: "", Level: "", Unit: "", Message: line}
 				inMultiline = true

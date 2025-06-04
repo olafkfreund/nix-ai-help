@@ -54,15 +54,15 @@ func TestExplainOptionCmd_Mock(t *testing.T) {
 
 	cmd.SetArgs([]string{option})
 	if err := cmd.Execute(); err != nil {
-		w.Close()
+		_ = w.Close()
 		os.Stdout = oldStdout
 		t.Fatalf("command failed: %v", err)
 	}
-	w.Close()
+	_ = w.Close()
 	os.Stdout = oldStdout
 
 	var buf bytes.Buffer
-	buf.ReadFrom(r)
+	_, _ = buf.ReadFrom(r)
 	output := buf.String()
 	if !strings.Contains(output, "nginx web server") {
 		t.Errorf("expected AI explanation in output, got: %s", output)

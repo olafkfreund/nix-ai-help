@@ -105,7 +105,7 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 				"version": "1.0.0",
 			},
 		}
-		conn.Reply(ctx, req.ID, result)
+		_ = conn.Reply(ctx, req.ID, result)
 
 	case "tools/list":
 		tools := []Tool{
@@ -130,7 +130,7 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 				Description: "Autocomplete NixOS option names for a given prefix",
 			},
 		}
-		conn.Reply(ctx, req.ID, map[string]interface{}{"tools": tools})
+		_ = conn.Reply(ctx, req.ID, map[string]interface{}{"tools": tools})
 
 	case "tools/call":
 		var params struct {
@@ -139,7 +139,7 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 		}
 
 		if err := json.Unmarshal(*req.Params, &params); err != nil {
-			conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+			_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 				Code:    jsonrpc2.CodeInvalidParams,
 				Message: "Invalid parameters",
 			})
@@ -150,7 +150,7 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 		case "query_nixos_docs":
 			if query, ok := params.Arguments["query"].(string); ok {
 				result := m.handleDocQuery(query)
-				conn.Reply(ctx, req.ID, map[string]interface{}{
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
 					"content": []map[string]interface{}{
 						{
 							"type": "text",
@@ -159,7 +159,7 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 					},
 				})
 			} else {
-				conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInvalidParams,
 					Message: "Missing query parameter",
 				})
@@ -168,7 +168,7 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 		case "explain_nixos_option":
 			if option, ok := params.Arguments["option"].(string); ok {
 				result := m.handleOptionExplain(option)
-				conn.Reply(ctx, req.ID, map[string]interface{}{
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
 					"content": []map[string]interface{}{
 						{
 							"type": "text",
@@ -177,7 +177,7 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 					},
 				})
 			} else {
-				conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInvalidParams,
 					Message: "Missing option parameter",
 				})
@@ -186,7 +186,7 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 		case "explain_home_manager_option":
 			if option, ok := params.Arguments["option"].(string); ok {
 				result := m.handleHomeManagerOptionExplain(option)
-				conn.Reply(ctx, req.ID, map[string]interface{}{
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
 					"content": []map[string]interface{}{
 						{
 							"type": "text",
@@ -195,7 +195,7 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 					},
 				})
 			} else {
-				conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInvalidParams,
 					Message: "Missing option parameter",
 				})
@@ -204,7 +204,7 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 		case "search_nixos_packages":
 			if query, ok := params.Arguments["query"].(string); ok {
 				result := m.handlePackageSearch(query)
-				conn.Reply(ctx, req.ID, map[string]interface{}{
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
 					"content": []map[string]interface{}{
 						{
 							"type": "text",
@@ -213,7 +213,7 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 					},
 				})
 			} else {
-				conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInvalidParams,
 					Message: "Missing query parameter",
 				})
@@ -222,25 +222,25 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 		case "complete_nixos_option":
 			if prefix, ok := params.Arguments["prefix"].(string); ok {
 				results := m.handleOptionCompletion(prefix)
-				conn.Reply(ctx, req.ID, map[string]interface{}{
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
 					"options": results,
 				})
 			} else {
-				conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 					Code:    jsonrpc2.CodeInvalidParams,
 					Message: "Missing prefix parameter",
 				})
 			}
 
 		default:
-			conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+			_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 				Code:    jsonrpc2.CodeMethodNotFound,
 				Message: "Unknown tool: " + params.Name,
 			})
 		}
 
 	default:
-		conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+		_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
 			Code:    jsonrpc2.CodeMethodNotFound,
 			Message: "Method not found: " + req.Method,
 		})
@@ -250,7 +250,7 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 // Start starts the MCP server on Unix socket
 func (m *MCPServer) Start(socketPath string) error {
 	// Remove existing socket file if it exists
-	os.Remove(socketPath)
+	_ = os.Remove(socketPath)
 
 	listener, err := net.Listen("unix", socketPath)
 	if err != nil {
@@ -274,7 +274,7 @@ func (m *MCPServer) Start(socketPath string) error {
 		}
 
 		go func(conn net.Conn) {
-			defer conn.Close()
+			defer func() { _ = conn.Close() }()
 			m.logger.Debug(fmt.Sprintf("New MCP client connected | remoteAddr=%v", conn.RemoteAddr()))
 
 			// Handle connection with JSON-RPC2
@@ -283,7 +283,7 @@ func (m *MCPServer) Start(socketPath string) error {
 
 			jsonConn := jsonrpc2.NewConn(context.Background(), stream, m)
 			m.logger.Debug("Created JSON-RPC2 connection")
-			defer jsonConn.Close()
+			defer func() { _ = jsonConn.Close() }()
 
 			// Keep connection alive
 			m.logger.Debug("Waiting for disconnect notification")
@@ -298,7 +298,7 @@ func (m *MCPServer) Stop() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.listener != nil {
-		m.listener.Close()
+		_ = m.listener.Close()
 		m.listener = nil
 	}
 }
@@ -442,7 +442,9 @@ func NewServerFromConfig(configPath string) (*Server, error) {
 	if err == nil {
 		srv.watcher = watcher
 		go srv.watchConfig()
-		watcher.Add(configPath)
+		if err := watcher.Add(configPath); err != nil {
+			srv.logger.Error(fmt.Sprintf("Failed to watch config file: %v", err))
+		}
 	} else {
 		srv.logger.Error(fmt.Sprintf("Failed to initialize config watcher: %v", err))
 	}
@@ -492,24 +494,24 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "uptime": time.Now().Format(time.RFC3339)})
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"status": "ok", "uptime": time.Now().Format(time.RFC3339)})
 	})
 
 	// /metrics endpoint (simple Prometheus format)
 	mux.HandleFunc("/metrics", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; version=0.0.4")
 		// Example metrics (replace with real metrics as needed)
-		fmt.Fprintln(w, "# HELP nixai_mcp_requests_total Total number of /query requests")
-		fmt.Fprintln(w, "# TYPE nixai_mcp_requests_total counter")
-		fmt.Fprintln(w, "nixai_mcp_requests_total 0")
-		fmt.Fprintln(w, "# HELP nixai_mcp_uptime_seconds Uptime in seconds")
+		_, _ = fmt.Fprintln(w, "# HELP nixai_mcp_requests_total Total number of /query requests")
+		_, _ = fmt.Fprintln(w, "# TYPE nixai_mcp_requests_total counter")
+		_, _ = fmt.Fprintln(w, "nixai_mcp_requests_total 0")
+		_, _ = fmt.Fprintln(w, "# HELP nixai_mcp_uptime_seconds Uptime in seconds")
 		uptime := int(time.Since(startTime).Seconds())
-		fmt.Fprintf(w, "nixai_mcp_uptime_seconds %d\n", uptime)
+		_, _ = fmt.Fprintf(w, "nixai_mcp_uptime_seconds %d\n", uptime)
 	})
 
 	shutdownCh := make(chan struct{})
 	mux.HandleFunc("/shutdown", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("Shutting down MCP server...\n"))
+		_, _ = w.Write([]byte("Shutting down MCP server...\n"))
 		s.logger.Info("Shutdown endpoint called, shutting down MCP server")
 		go func() {
 			shutdownCh <- struct{}{}
@@ -620,31 +622,32 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	var query string
 
 	// Handle both GET requests with 'q' parameter and POST requests with JSON body
-	if r.Method == "GET" {
+	switch r.Method {
+	case "GET":
 		query = r.URL.Query().Get("q")
 		if query == "" {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintln(w, "Missing 'q' query parameter.")
+			_, _ = fmt.Fprintln(w, "Missing 'q' query parameter.")
 			return
 		}
-	} else if r.Method == "POST" {
+	case "POST":
 		var requestBody struct {
 			Query string `json:"query"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintln(w, "Invalid JSON body.")
+			_, _ = fmt.Fprintln(w, "Invalid JSON body.")
 			return
 		}
 		query = requestBody.Query
 		if query == "" {
 			w.WriteHeader(http.StatusBadRequest)
-			fmt.Fprintln(w, "Missing 'query' field in JSON body.")
+			_, _ = fmt.Fprintln(w, "Missing 'query' field in JSON body.")
 			return
 		}
-	} else {
+	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
-		fmt.Fprintln(w, "Method not allowed. Use GET or POST.")
+		_, _ = fmt.Fprintln(w, "Method not allowed. Use GET or POST.")
 		return
 	}
 
@@ -655,7 +658,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	// Helper to write JSON response
 	writeJSON := func(result string) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"result": result})
+		_ = json.NewEncoder(w).Encode(map[string]string{"result": result})
 	}
 
 	// Check cache first
@@ -795,7 +798,7 @@ func fetchDocSource(urlStr string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to fetch %s: %s", urlStr, resp.Status)
 	}
@@ -859,7 +862,7 @@ func fetchNixOSOptionsAPI(_ string, option string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to query ElasticSearch: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("ElasticSearch returned status %d", resp.StatusCode)
@@ -919,7 +922,7 @@ func fetchHomeManagerOptionsAPI(baseURL, option string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to fetch %s: %s", apiURL, resp.Status)
 	}

@@ -86,7 +86,7 @@ func (c *GeminiClient) Query(prompt string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to send request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
 		fmt.Printf("[Gemini Debug] Non-200 response: %s\n%s\n", resp.Status, string(b))

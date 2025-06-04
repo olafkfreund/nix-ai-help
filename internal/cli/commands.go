@@ -213,7 +213,7 @@ func getConfig(key string) {
 func resetConfig() {
 	fmt.Println(utils.FormatWarning("⚠️  This will reset all configuration to defaults. Continue? (y/N)"))
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 	if response != "y" && response != "Y" {
 		fmt.Println(utils.FormatInfo("Operation cancelled"))
 		return
@@ -758,7 +758,7 @@ Examples:
 		fmt.Println(utils.FormatInfo("Describe what you want to configure (e.g. desktop, web server, user, etc):"))
 		var input string
 		fmt.Print("> ")
-		fmt.Scanln(&input)
+		_, _ = fmt.Scanln(&input)
 		if input == "" {
 			fmt.Println(utils.FormatWarning("No input provided. Exiting."))
 			return
@@ -1232,7 +1232,7 @@ var mcpServerStopCmd = &cobra.Command{
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to stop MCP server: "+err.Error()))
 			os.Exit(1)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		fmt.Println(utils.FormatSuccess("✅ MCP server stop requested."))
 	},
 }
@@ -1252,7 +1252,7 @@ var mcpServerStatusCmd = &cobra.Command{
 			fmt.Println(utils.FormatWarning("MCP server is not running or unreachable."))
 			return
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		fmt.Println(utils.FormatSuccess("✅ MCP server is running."))
 	},
 }
@@ -1366,7 +1366,9 @@ func initializeCommands() {
 func Execute() {
 	cobra.OnInitialize(func() {
 		if nixosPath != "" {
-			os.Setenv("NIXAI_NIXOS_PATH", nixosPath)
+			if err := os.Setenv("NIXAI_NIXOS_PATH", nixosPath); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to set NIXAI_NIXOS_PATH: %v\n", err)
+			}
 		}
 	})
 	initializeCommands()

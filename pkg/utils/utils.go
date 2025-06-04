@@ -181,7 +181,7 @@ func FlakeHasDeployConfig(flakePath string) bool {
 	if err != nil {
 		return false
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		if strings.Contains(scanner.Text(), "deploy") {
@@ -195,7 +195,7 @@ func FlakeHasDeployConfig(flakePath string) bool {
 func PromptYesNo(prompt string) bool {
 	fmt.Printf("%s [y/N]: ", prompt)
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes"
 }
@@ -206,7 +206,7 @@ func GenerateMinimalDeployConfig(flakePath string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	config := `\n  # deploy-rs minimal config\n  deploy = {\n    nodes = {\n      example = {\n        hostname = \"your-host\";\n        sshUser = \"nixos\";\n        profiles.system = {\n          path = self.nixosConfigurations.example.config.system.build.toplevel;\n        };\n      };\n    };\n  };\n`
 	_, err = f.WriteString(config)
 	return err
@@ -319,7 +319,7 @@ func generateDeployNodes(hosts []string, interactive bool) (string, error) {
 			// Prompt for hostname
 			fmt.Printf("Enter hostname/IP for '%s' (press Enter for '%s'): ", host, host)
 			var input string
-			fmt.Scanln(&input)
+			_, _ = fmt.Scanln(&input)
 			if strings.TrimSpace(input) == "" {
 				hostname = host
 			} else {
@@ -328,7 +328,7 @@ func generateDeployNodes(hosts []string, interactive bool) (string, error) {
 
 			// Prompt for SSH user
 			fmt.Printf("Enter SSH user for '%s' (press Enter for 'nixos'): ", host)
-			fmt.Scanln(&input)
+			_, _ = fmt.Scanln(&input)
 			if strings.TrimSpace(input) == "" {
 				sshUser = "nixos"
 			} else {

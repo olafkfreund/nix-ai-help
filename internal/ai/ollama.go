@@ -74,11 +74,11 @@ func (o *OllamaProvider) Query(prompt string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to send request to Ollama server: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("Ollama server returned non-200 response: %s\n%s", resp.Status, string(body))
+		return "", fmt.Errorf("ollama server returned non-200 response: %s\n%s", resp.Status, string(body))
 	}
 
 	// Parse the response

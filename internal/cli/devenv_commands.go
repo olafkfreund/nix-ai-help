@@ -194,7 +194,7 @@ Examples:
 		fmt.Println(utils.FormatDivider())
 
 		// Collect template options
-		options := make(map[string]string)
+		var options map[string]string
 		if interactive {
 			options = collectTemplateOptions(template)
 		} else {
@@ -337,7 +337,7 @@ func collectTemplateOptions(template devenv.Template) map[string]string {
 
 		fmt.Print(prompt)
 		var value string
-		fmt.Scanln(&value)
+		_, _ = fmt.Scanln(&value)
 
 		if value == "" && input.Default != "" {
 			value = input.Default

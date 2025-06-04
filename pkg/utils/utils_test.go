@@ -10,7 +10,7 @@ func TestIsFileAndIsDirectory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create temp file: %v", err)
 	}
-	defer os.Remove(f.Name())
+	defer func() { _ = os.Remove(f.Name()) }()
 
 	if !IsFile(f.Name()) {
 		t.Errorf("expected %s to be a file", f.Name())

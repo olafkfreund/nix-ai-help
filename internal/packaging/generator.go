@@ -311,9 +311,10 @@ func (dg *DerivationGenerator) extractDerivation(response string) string {
 		if inDerivation {
 			// Count braces to know when derivation ends
 			for _, char := range line {
-				if char == '{' {
+				switch char {
+				case '{':
 					braceCount++
-				} else if char == '}' {
+				case '}':
 					braceCount--
 				}
 			}
@@ -446,9 +447,10 @@ func (dg *DerivationGenerator) ValidateDerivation(derivation string) []string {
 	// Check for balanced braces
 	braceCount := 0
 	for _, char := range derivation {
-		if char == '{' {
+		switch char {
+		case '{':
 			braceCount++
-		} else if char == '}' {
+		case '}':
 			braceCount--
 		}
 	}

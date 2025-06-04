@@ -208,7 +208,7 @@ func (ra *RepositoryAnalyzer) parseRequirementsTxt(filePath string) ([]Dependenc
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {

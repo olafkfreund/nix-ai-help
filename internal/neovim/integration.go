@@ -60,7 +60,7 @@ func CreateNeovimModule(socketPath string, configDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create nixai.lua: %w", err)
 	}
-	defer nixaiLuaFile.Close()
+	defer func() { _ = nixaiLuaFile.Close() }()
 
 	// Use default socket path if not provided
 	if socketPath == "" {
@@ -68,7 +68,7 @@ func CreateNeovimModule(socketPath string, configDir string) error {
 	}
 
 	// Replace $HOME with the literal string "$HOME" for the template
-	socketPath = strings.Replace(socketPath, os.Getenv("HOME"), "$HOME", -1)
+	socketPath = strings.ReplaceAll(socketPath, os.Getenv("HOME"), "$HOME")
 
 	data := ConfigData{
 		SocketPath: socketPath,
@@ -95,7 +95,7 @@ func GenerateInitConfig(socketPath string) string {
 	}
 
 	// Replace $HOME with the actual home directory for the snippet
-	socketPath = strings.Replace(socketPath, "$HOME", os.Getenv("HOME"), -1)
+	socketPath = strings.ReplaceAll(socketPath, "$HOME", os.Getenv("HOME"))
 
 	return fmt.Sprintf(initLuaSnippet, socketPath)
 }
