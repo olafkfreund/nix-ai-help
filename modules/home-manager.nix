@@ -210,12 +210,19 @@ in {
           PartOf = "graphical-session.target";
         };
 
-        Service = {
-          ExecStart = "${cfg.mcp.package}/bin/nixai mcp-server start --socket-path=${cfg.mcp.socketPath} ${concatStringsSep " " cfg.mcp.extraFlags}";
-          Environment = cfg.mcp.environment;
-          Restart = "on-failure";
-          RestartSec = "5s";
-        };
+        Service = let
+          envList = lib.attrsets.mapAttrsToList (k: v: "${k}=${v}") cfg.mcp.environment;
+        in
+          lib.mkMerge [
+            {
+              ExecStart = "${cfg.mcp.package}/bin/nixai mcp-server start --socket-path=${cfg.mcp.socketPath} ${concatStringsSep " " cfg.mcp.extraFlags}";
+              Restart = "on-failure";
+              RestartSec = "5s";
+            }
+            (lib.mkIf (envList != []) {
+              Environment = envList;
+            })
+          ];
 
         Install = {
           WantedBy = ["graphical-session.target"];
