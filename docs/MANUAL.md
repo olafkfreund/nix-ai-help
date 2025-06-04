@@ -40,14 +40,14 @@ Welcome to **nixai** – your AI-powered NixOS assistant for diagnostics, docume
 ### Basic Setup
 
 ```sh
-# Ask questions directly by providing them as arguments
-nixai "how do I enable SSH in NixOS?"
-nixai "what is a Nix flake?"
-nixai "how to configure services.postgresql in NixOS?"
+# Ask questions using the --ask or -a flag (required)
+nixai -a "how do I enable SSH in NixOS?"
+nixai -a "what is a Nix flake?"
+nixai -a "how to configure services.postgresql in NixOS?"
 
-# Alternative: use the --ask or -a flag
+# Alternative: use the --ask flag
 nixai --ask "how do I update packages in NixOS?"
-nixai -a "what are NixOS generations?"
+nixai --ask "what are NixOS generations?"
 ```
 
 #### Real-World Scenarios
@@ -55,19 +55,19 @@ nixai -a "what are NixOS generations?"
 - **New NixOS User:**
 
   ```sh
-  nixai "I just installed NixOS and need to enable SSH access for remote work. How do I do this securely?"
+  nixai -a "I just installed NixOS and need to enable SSH access for remote work. How do I do this securely?"
   ```
 
 - **Developer Environment:**
 
   ```sh
-  nixai "I'm a Python developer who needs Docker, PostgreSQL, and VS Code on NixOS. What's the best way to set this up?"
+  nixai -a "I'm a Python developer who needs Docker, PostgreSQL, and VS Code on NixOS. What's the best way to set this up?"
   ```
 
 - **Troubleshooting:**
 
   ```sh
-  nixai "My nginx service keeps failing to start after I added SSL configuration. How do I debug this?"
+  nixai -a "My nginx service keeps failing to start after I added SSL configuration. How do I debug this?"
   ```
 
 #### Pro Tips
@@ -86,11 +86,11 @@ nixai -a "what are NixOS generations?"
 Ask anything about NixOS, Home Manager, packaging, or troubleshooting:
 
 ```sh
-nixai "How do I enable SSH in NixOS?"
+nixai -a "How do I enable SSH in NixOS?"
 nixai --ask "How do I update packages in NixOS?"
 ```
 
-- **Tip:** Use quotes for multi-word questions. Both direct and --ask/-a flag work identically.
+- **Tip:** Use quotes for multi-word questions. The -a/--ask flag is now required for questions.
 
 ### Diagnose NixOS Issues
 
@@ -359,7 +359,7 @@ services.nixai = {
 ### CLI Usage Example
 
 ```sh
-nixai --provider llamacpp "How do I enable SSH in NixOS?"
+nixai --provider llamacpp -a "How do I enable SSH in NixOS?"
 ```
 
 ### Troubleshooting
@@ -409,7 +409,7 @@ echo "source ~/.nixai-completion.zsh" >> ~/.zshrc
 - Use `nixai --help` or `nixai <command> --help` for detailed help and examples for every command.
 - Combine `nixai` with pipes, files, or interactive mode for maximum flexibility.
 - Integrate with your editor for in-place explanations and diagnostics.
-- **Pro tip:** If you ever get a cryptic error, just ask: `nixai "What does this error mean?"` – nixai loves a good mystery!
+- **Pro tip:** If you ever get a cryptic error, just ask: `nixai -a "What does this error mean?"` – nixai loves a good mystery!
 - **Joke:** Why did the NixOS user refuse to cross the road? Because the other side had an imperative configuration!
 
 ---

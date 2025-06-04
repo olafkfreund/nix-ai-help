@@ -24,7 +24,7 @@ var rootCmd = &cobra.Command{
 	Long: `nixai is a command-line tool that assists users in diagnosing and solving NixOS configuration issues using AI models and documentation queries.
 
 You can also ask questions directly, e.g.:
-  nixai "how can I configure curl?"
+  nixai -a "how can I configure curl?"
 
 Usage:
   nixai [question] [flags]

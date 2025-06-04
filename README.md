@@ -21,7 +21,7 @@ See the full [nixai User Manual](docs/MANUAL.md) for comprehensive feature docum
 ## 🚀 What's New (June 2025)
 
 - **🔧 Enhanced Build Troubleshooter:** New `build` command with advanced build failure analysis, intelligent retry mechanisms, cache analysis, sandbox debugging, and performance profiling.
-- **🤖 Direct Question Assistant**: Ask questions instantly with `nixai "your question"` or `nixai --ask "question"` for immediate AI-powered NixOS help with documentation context.
+- **🤖 Direct Question Assistant**: Ask questions instantly with `nixai -a "your question"` or `nixai --ask "question"` for immediate AI-powered NixOS help with documentation context.
 - **Config Path Awareness Everywhere:** All features now respect the NixOS config path, settable via `--nixos-path`, config file, or interactively. If unset or invalid, you'll get clear guidance on how to fix it.
 - **Automated Service Option Lookup:** When searching for services, nixai now lists all available options for a service using `nixos-option --find services.<n>`, not just the top-level enable flag.
 - **Enhanced Error Handling:** If your config path is missing or invalid, nixai will print actionable instructions for setting it (CLI flag, config, or interactive command).
@@ -105,7 +105,7 @@ nixai is designed for privacy, productivity, and beautiful terminal output. Whet
 
 ## ✨ Features
 
-- **🤖 Direct Question Assistant**: Ask questions directly with `nixai "your question"` or `nixai --ask "question"` for instant AI-powered NixOS help.
+- **🤖 Direct Question Assistant**: Ask questions directly with `nixai -a "your question"` or `nixai --ask "question"` for instant AI-powered NixOS help.
 
 - Diagnose NixOS issues from logs, config snippets, or `nix log` output.
 
@@ -490,7 +490,7 @@ See the [User Manual](docs/MANUAL.md#migration-assistant) for full details and t
 
 ### Core Features
 
-- **🤖 Direct Question Assistant:** Ask questions directly with `nixai "your question"` or `nixai --ask "question"` for instant AI-powered NixOS help with documentation context.
+- **🤖 Direct Question Assistant:** Ask questions directly with `nixai -a "your question"` or `nixai --ask "question"` for instant AI-powered NixOS help with documentation context.
 - **🎯 Config Path Awareness Everywhere:** All features respect the NixOS config path, settable via `--nixos-path`, config file, or interactively. If unset or invalid, you'll get clear guidance on how to fix it.
 - **🔍 Automated Service Option Lookup:** When searching for services, nixai lists all available options for a service using `nixos-option --find services.<name>`, not just the top-level enable flag.
 - **📦 AI-Powered Package Repository Analysis:** Analyze Git repositories and generate complete Nix derivations with support for Go, Python, Node.js, and Rust projects.
@@ -1427,23 +1427,22 @@ go mod tidy                              # Update dependencies
 
 ### Ask Questions Directly
 
-The quickest way to get help with NixOS configuration is to ask questions directly:
+The quickest way to get help with NixOS configuration is to ask questions using the `-a` or `--ask` flag:
 
 ```sh
-# Ask questions directly (most common usage)
-nixai "how do I enable SSH in NixOS?"
-nixai "what is a Nix flake?"
-nixai "how do I configure nginx with SSL?"
+# Ask questions (most common usage)
+nixai -a "how do I enable SSH in NixOS?"
+nixai -a "what is a Nix flake?"
+nixai -a "how do I configure nginx with SSL?"
 
 # Alternative: use the --ask flag
 nixai --ask "how do I update packages in NixOS?"
-nixai -a "what's the difference between NixOS and other Linux distributions?"
+nixai --ask "what's the difference between NixOS and other Linux distributions?"
 
 # Both methods work identically and provide:
 # - AI-powered answers with examples
 # - Context from official NixOS documentation  
 # - Best practices and recommendations
-# - Beautiful formatted terminal output
 ```
 
 **Features:**
