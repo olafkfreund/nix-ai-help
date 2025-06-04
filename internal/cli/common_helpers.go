@@ -21,6 +21,8 @@ func InitializeAIProvider(cfg *config.UserConfig) ai.AIProvider {
 		)
 	case "openai":
 		return ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+	case "llamacpp":
+		return ai.NewLlamaCppProvider(cfg.AIModel)
 	case "custom":
 		if cfg.CustomAI.BaseURL != "" {
 			return ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
