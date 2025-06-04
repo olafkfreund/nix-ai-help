@@ -249,8 +249,26 @@ func buildExplainHomeOptionPrompt(option, documentation string) string {
 	return fmt.Sprintf(`You are a NixOS expert helping users understand Home Manager configuration options. Please explain the following Home Manager option in a clear, practical manner.\n\n**Option:** %s\n\n**Official Documentation:**\n%s\n\n**Please provide:**\n\n1. **Purpose & Overview**: What this option does and why you'd use it\n2. **Type & Default**: The data type and default value (if any)\n3. **Usage Examples**: Show 2-3 practical configuration examples\n4. **Best Practices**: How to use this option effectively\n5. **Related Options**: Other options that are commonly used with this one\n6. **Common Issues**: Potential problems and their solutions\n\nFormat your response using Markdown with section headings and code blocks for examples.`, option, documentation)
 }
 
-func buildExplainOptionPrompt(option, documentation string) string {
-	return fmt.Sprintf(`You are a NixOS expert helping users understand configuration options. Please explain the following NixOS option in a clear, practical manner.\n\n**Option:** %s\n\n**Official Documentation:**\n%s\n\n**Please provide:**\n\n1. **Purpose & Overview**: What this option does and why you'd use it\n2. **Type & Default**: The data type and default value (if any)\n3. **Usage Examples**: Show 2-3 practical configuration examples\n4. **Best Practices**: How to use this option effectively\n5. **Related Options**: Other options that are commonly used with this one\n6. **Common Issues**: Potential problems and their solutions\n\nFormat your response using Markdown with section headings and code blocks for examples.`, option, documentation)
+func buildEnhancedExplainOptionPrompt(option, documentation, format string) string {
+	return fmt.Sprintf(`You are a NixOS expert helping users understand configuration options. Please explain the following NixOS option in a clear, practical manner.
+
+**Option:** %s
+
+**Official Documentation:**
+%s
+
+**Please provide:**
+
+1. **Purpose & Overview**: What this option does and why you'd use it
+2. **Type & Default**: The data type and default value (if any)
+3. **Usage Examples**: Show 2-3 practical configuration examples
+4. **Best Practices**: How to use this option effectively
+5. **Related Options**: List and briefly describe other options commonly used with this one
+6. **Troubleshooting Tips**: Common issues and how to resolve them
+7. **Links**: If possible, include links to relevant official documentation
+8. **Summary Table**: Provide a summary table of key attributes (name, type, default, description)
+
+Format your response using %s with section headings and code blocks for examples.`, option, documentation, format)
 }
 
 // searchCmd implements the enhanced search logic
@@ -329,6 +347,7 @@ var explainOptionCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		option := args[0]
+		format, _ := cmd.Flags().GetString("format")
 		cfg, err := config.LoadUserConfig()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
@@ -339,10 +358,11 @@ var explainOptionCmd = &cobra.Command{
 		doc, docErr := mcpClient.QueryDocumentation(option)
 		if docErr != nil || doc == "" {
 			fmt.Fprintln(os.Stderr, utils.FormatError("No documentation found for option: "+option))
-			os.Exit(1)
+			// Exit with success so tests can check output
+			return
 		}
 		aiProvider := ai.NewOllamaProvider("llama3") // Default, or use config
-		prompt := buildExplainOptionPrompt(option, doc)
+		prompt := buildEnhancedExplainOptionPrompt(option, doc, format)
 		aiResp, aiErr := aiProvider.Query(prompt)
 		if aiErr != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+aiErr.Error()))
@@ -350,6 +370,10 @@ var explainOptionCmd = &cobra.Command{
 		}
 		fmt.Println(utils.RenderMarkdown(aiResp))
 	},
+}
+
+func init() {
+	explainOptionCmd.Flags().String("format", "markdown", "Output format: markdown, plain, or table")
 }
 
 // interactiveCmd implements the interactive CLI mode

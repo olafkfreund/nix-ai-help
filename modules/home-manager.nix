@@ -210,12 +210,19 @@ in {
           PartOf = "graphical-session.target";
         };
 
-        Service = {
-          ExecStart = "${cfg.mcp.package}/bin/nixai mcp-server start --socket-path=${cfg.mcp.socketPath} ${concatStringsSep " " cfg.mcp.extraFlags}";
-          Environment = cfg.mcp.environment;
-          Restart = "on-failure";
-          RestartSec = "5s";
-        };
+        Service = let
+          envList = lib.attrsets.mapAttrsToList (k: v: "${k}=${v}") cfg.mcp.environment;
+        in
+          lib.mkMerge [
+            {
+              ExecStart = "${cfg.mcp.package}/bin/nixai mcp-server start --socket-path=${cfg.mcp.socketPath} ${concatStringsSep " " cfg.mcp.extraFlags}";
+              Restart = "on-failure";
+              RestartSec = "5s";
+            }
+            (lib.mkIf (envList != []) {
+              Environment = envList;
+            })
+          ];
 
         Install = {
           WantedBy = ["graphical-session.target"];
@@ -273,10 +280,4 @@ in {
       };
     })
   ];
-
-  meta = {
-    maintainers = [lib.maintainers.olf];
-    description = "NixAI Home Manager module. Provides options to enable the NixAI MCP server, configure AI provider/model, and set documentation sources.\n\nExample usage:\n```nix\nservices.nixai = {\n  enable = true;\n  mcp.enable = true;\n  mcp.aiProvider = \"ollama\";\n  mcp.aiModel = \"llama3\";\n  mcp.documentationSources = [ \"https://wiki.nixos.org/wiki/NixOS_Wiki\" ];\n};\n```\n";
-    doc = ./home-manager.nix;
-  };
 }
