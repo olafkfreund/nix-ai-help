@@ -29,7 +29,7 @@ See the full [nixai User Manual](docs/MANUAL.md) for comprehensive feature docum
 - **🆕 Dedicated Home Manager Command:** New `explain-home-option` command specifically for Home Manager configuration options.
 - **🆕 AI-Powered Package Repository Analysis:** New `package-repo` command automatically analyzes Git repositories and generates complete Nix derivations using AI-powered build system detection and dependency analysis.
 - **📝 Configuration Templates & Snippets:** Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
-- **🖥️ Multi-Machine Configuration Manager:** Centrally manage, synchronize, and deploy NixOS configurations across multiple machines. Register, group, sync, deploy, and monitor fleets of NixOS systems from the CLI. See below for details and usage examples.
+- **🖥️ Multi-Machine Management (Flake-based):** Centrally manage, synchronize, and deploy NixOS configurations across multiple machines directly from your `flake.nix`. Includes automated deploy-rs integration, parallel deployments, SSH configuration, and intelligent host discovery from nixosConfigurations.
 - **More Tests:** New tests cover service option lookup, diagnostics, error handling, and packaging features for robust reliability.
 - **🆕 Nix Store Management**: Backup, restore, verify, and analyze the Nix store directly from the CLI.
 - **System State Backup & Restore**: Comprehensive backup/restore with validation and incremental support.
@@ -69,7 +69,7 @@ All other dependencies are managed by the Nix flake and justfile.
 - [🔄 MCP Server Configuration & Autostart](#-mcp-server-configuration--autostart)
 - [🔄 Migration Assistant (Channels ↔ Flakes)](#-migration-assistant-channels--flakes)
 - [🎨 Terminal Output Formatting](#-terminal-output-formatting)
-- [🖥️ Multi-Machine Configuration Manager](#-multi-machine-configuration-manager)
+- [🖥️ Multi-Machine Management (Flake-based)](#-multi-machine-management-flake-based)
 - [🛠️ Installation & Usage](#%EF%B8%8F-installation--usage)
 - [📚 Flake Integration Guide](#-flake-integration-guide)
 - [📝 Commands & Usage](#-commands--usage)
@@ -143,7 +143,7 @@ nixai is designed for privacy, productivity, and beautiful terminal output. Whet
 
 - **NEW:** 📝 **Configuration Templates & Snippets** — Browse, apply, and manage curated NixOS configuration templates with `nixai templates` and save/reuse configuration snippets with `nixai snippets`. Includes GitHub search integration for discovering real-world configurations.
 
-- **NEW:** 🖥️ **Multi-Machine Configuration Manager** — Register, manage, group, and deploy NixOS configurations to multiple machines with a single CLI. Includes machine registry, group management, configuration sync, deployment, diff analysis, and status monitoring.
+- **NEW:** 🖥️ **Multi-Machine Management (Flake-based)** — Centrally manage and deploy NixOS configurations across multiple machines directly from your `flake.nix`. Features automated deploy-rs integration, parallel deployments, SSH configuration, and intelligent host discovery from nixosConfigurations.
 
 - **NEW:** 🆕 **Nix Store Management** — Backup, restore, verify, and analyze the Nix store directly from the CLI.
 
@@ -662,59 +662,135 @@ See the [User Manual](docs/MANUAL.md#searching-for-packages-and-services) for fu
 
 ---
 
-## 🖥️ Multi-Machine Configuration Manager
+## 🖥️ Multi-Machine Management (Flake-based)
 
-The Multi-Machine Configuration Manager lets you centrally manage and synchronize NixOS configurations across many machines. You can register machines, organize them into groups, sync and deploy configurations, compare differences, and monitor status—all from the command line.
+nixai provides powerful flake-based machine management using your `nixosConfigurations` from `flake.nix`. No registry files needed - all configuration is managed through your flake, with integrated deploy-rs support for streamlined deployments.
 
-### Key Features
-- Register and manage multiple NixOS machines in a central registry
-- Group machines for fleet operations (e.g., deploy to all web servers)
-- Sync configurations between local and remote machines
-- Deploy configuration changes with rollback support
-- Compare configurations across machines (diff)
-- Check connectivity and status of all registered machines
-- All features available via the `nixai machines` command and subcommands
-
-### Example Workflow
+### 🔍 Discovering and Listing Hosts
 
 ```sh
-# Register machines
-nixai machines add web1 192.168.1.10 --description "Web server 1"
-nixai machines add db1 192.168.1.20 --description "Database server"
-
-# List all machines
+# List all hosts from your flake.nix
 nixai machines list
 
-# Show details for a machine
-nixai machines show web1
-
-# Group machines
-nixai machines groups add production web1 db1
-nixai machines groups list
-
-# Deploy config to all machines in a group
-nixai machines deploy --group production
-
-# Check status
-nixai machines status
-
-# Remove a machine
-nixai machines remove db1 --force
+# Automatically discovers hosts from ~/.config/nixos/flake.nix
+# Shows: ["host1", "host2", "host3"]
 ```
 
-### Commands Overview
+**How it works:**
+- Reads `nixosConfigurations` from your flake.nix
+- Automatically looks in `~/.config/nixos/` by default
+- Supports custom flake paths with `--nixos-path`
 
-- `nixai machines list` — List all registered machines
-- `nixai machines add <name> <host> [--description ...]` — Register a new machine
-- `nixai machines show <name>` — Show details for a machine
-- `nixai machines remove <name> --force` — Remove a machine
-- `nixai machines groups ...` — Manage machine groups
-- `nixai machines sync <machine>` — Sync configs to a machine
-- `nixai machines deploy [--group <group>]` — Deploy to one or more machines
-- `nixai machines diff` — Compare configurations
-- `nixai machines status` — Check machine status
+### 🚀 Deployment Options
 
-See the [User Manual](docs/MANUAL.md#multi-machine-configuration-manager) for more real-world examples and advanced usage.
+#### Traditional nixos-rebuild (Default)
+```sh
+# Deploy to a specific host
+nixai machines deploy --machine hostname
+
+# Deploy with custom target
+nixai machines deploy --machine hostname --target-host user@remote-host
+```
+
+#### 🌟 Deploy-rs Integration (Recommended)
+
+deploy-rs provides robust, parallel deployment capabilities for flake-based NixOS systems.
+
+**Quick Setup:**
+```sh
+# Interactive setup with prompts
+nixai machines setup-deploy-rs
+
+# Non-interactive with defaults
+nixai machines setup-deploy-rs --non-interactive
+```
+
+**Deploy with deploy-rs:**
+```sh
+# Deploy specific host with deploy-rs
+nixai machines deploy --method deploy-rs --machine hostname
+
+# Deploy all hosts (parallel)
+nixai machines deploy --method deploy-rs
+
+# Dry run to check configuration
+nixai machines deploy --method deploy-rs --dry-run
+```
+
+### 🛠️ Deploy-rs Configuration
+
+The `setup-deploy-rs` command automatically:
+
+1. **Adds deploy-rs input** to your flake.nix
+2. **Discovers all hosts** from nixosConfigurations
+3. **Prompts for SSH details** (hostnames, users) per host
+4. **Generates deploy configuration** in your flake outputs
+5. **Creates deploy nodes** for each host with proper settings
+
+**Generated Configuration Example:**
+```nix
+# Added to flake.nix outputs
+deploy.nodes = {
+  hostname1 = {
+    hostname = "192.168.1.100";
+    profiles.system = {
+      sshUser = "admin";
+      path = deploy-rs.lib.x86_64-linux.activate.nixos self.nixosConfigurations.hostname1;
+      user = "root";
+    };
+  };
+  hostname2 = {
+    hostname = "hostname2.local";
+    profiles.system = {
+      sshUser = "user";
+      path = deploy-rs.lib.x86_64-linux.activate.nixos self.nixosConfigurations.hostname2;
+      user = "root";
+    };
+  };
+};
+
+# Deployment checks
+checks = builtins.mapAttrs (system: deployLib: deployLib.deployChecks self.deploy) deploy-rs.lib;
+```
+
+### 🔧 Advanced Features
+
+**Debug Mode:**
+```sh
+# Enable debug output
+NIXAI_DEBUG=1 nixai machines list
+NIXAI_DEBUG=1 nixai machines deploy --method deploy-rs
+```
+
+**Custom Flake Paths:**
+```sh
+# Use custom flake location
+nixai machines list --nixos-path /path/to/nixos-config
+nixai machines deploy --nixos-path ./custom-flake
+```
+
+### 📋 Requirements
+
+- **flake.nix** with `nixosConfigurations` defining your hosts
+- **SSH access** configured for remote hosts (for deploy-rs)
+- **deploy-rs** added as flake input (automated by setup command)
+
+### 🔄 Migration from Registry-based
+
+If migrating from the old registry system:
+
+1. Ensure all machines are defined in `flake.nix` under `nixosConfigurations`
+2. Run `nixai machines setup-deploy-rs` to configure deploy-rs
+3. Old registry files (`~/.config/nixai/machines.yaml`) are no longer used
+
+### 💡 Best Practices
+
+- **Use deploy-rs** for production deployments (more robust, parallel support)
+- **Test with --dry-run** before deploying to production systems
+- **Use meaningful hostnames** in nixosConfigurations that match your network
+- **Keep SSH configurations** properly maintained for reliable deployments
+
+See `docs/FLAKE_INTEGRATION_GUIDE.md` for comprehensive setup and migration details.
 
 ---
 
@@ -1445,9 +1521,6 @@ nixai package-repo /path/to/project
 nixai package-repo . --analyze-only
 
 # Remote repository analysis
-nixai package-repo https://github.com/user/project
-
-# Custom output directory and package name
 nixai package-repo https://github.com/user/rust-app --output ./derivations --name my-package
 ```
 
@@ -1487,6 +1560,38 @@ The Dependency & Import Graph Analyzer provides comprehensive tools for visualiz
 - **📊 Visual Graphs**: Generate visual dependency graphs for better understanding of your system
 
 This feature is particularly useful for debugging complex dependency issues, optimizing system performance, and understanding the relationships between packages in your NixOS configuration.
+
+---
+
+### Machine Management (Flake-based)
+
+Manage and deploy NixOS configurations across multiple machines using your `flake.nix`:
+
+```sh
+# List all hosts from your flake.nix
+nixai machines list
+
+# Deploy to a specific host (traditional nixos-rebuild)
+nixai machines deploy --machine hostname
+nixai machines deploy --machine hostname --target-host user@remote-host
+
+# Setup deploy-rs integration (one-time setup)
+nixai machines setup-deploy-rs
+
+# Deploy with deploy-rs (recommended for production)
+nixai machines deploy --method deploy-rs --machine hostname
+nixai machines deploy --method deploy-rs  # Deploy all hosts
+nixai machines deploy --method deploy-rs --dry-run  # Test deployment
+```
+
+**Key Features:**
+
+- **Flake-based**: Uses `nixosConfigurations` from your flake.nix
+- **Deploy-rs Integration**: Automated setup and parallel deployments
+- **SSH Configuration**: Interactive setup for remote hosts
+- **Debug Mode**: Enable with `NIXAI_DEBUG=1` for detailed logging
+
+See the [Multi-Machine Management](#️-multi-machine-management-flake-based) section for detailed setup and examples.
 
 ---
 

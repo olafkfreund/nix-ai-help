@@ -4,12 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"sort"
-	"strconv"
 	"strings"
-	"time"
 
-	"nix-ai-help/internal/machines"
 	"nix-ai-help/pkg/utils"
 
 	"github.com/spf13/cobra"
@@ -19,50 +15,28 @@ import (
 func createMachinesCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "machines",
-		Short: "Manage and synchronize NixOS configurations across multiple machines",
-		Long: `Multi-Machine Configuration Manager for NixOS.
+		Short: "Manage and deploy NixOS configurations across multiple machines (flake.nix-based)",
+		Long: `Multi-Machine Configuration Manager for NixOS (flake.nix-based).
 
-Manage and synchronize NixOS configurations across multiple machines with:
-- Machine registry for centralized management
-- Configuration synchronization between machines
-- Remote deployment with rollback support
-- Configuration comparison and diff analysis
-- Fleet management with machine groups
+Manage and deploy NixOS configurations across multiple machines using flake.nix as the single source of truth.
 
 Features:
-- Register and manage multiple NixOS machines
-- Sync configurations between local and remote machines
-- Deploy configurations remotely with safety checks
-- Compare configurations across machines
-- Group machines for fleet operations
-- SSH-based secure communication
-- Automatic status monitoring
-- Rollback capabilities
+- List all hosts from flake.nix nixosConfigurations
+- Deploy configurations remotely using native NixOS tools
+- No registry or custom YAML files required
 
 Examples:
-  nixai machines list                    # List all registered machines
-  nixai machines add server1 192.168.1.10  # Register new machine
-  nixai machines sync server1           # Sync configs to machine
-  nixai machines diff                   # Compare configurations
-  nixai machines deploy --group webservers  # Deploy to machine group`,
+  nixai machines list                    # List all hosts from flake.nix
+  nixai machines deploy --machine myhost # Deploy to a specific host
+  nixai machines deploy --method deploy-rs # Use deploy-rs if configured
+`,
 		Run: func(cmd *cobra.Command, args []string) {
-			// Show help if no subcommand provided
 			cmd.Help()
 		},
 	}
-
-	// Add subcommands
 	cmd.AddCommand(createMachinesListCommand())
-	cmd.AddCommand(createMachinesAddCommand())
-	cmd.AddCommand(createMachinesRemoveCommand())
-	cmd.AddCommand(createMachinesShowCommand())
-	cmd.AddCommand(createMachinesUpdateCommand())
-	cmd.AddCommand(createMachinesSyncCommand())
 	cmd.AddCommand(createMachinesDeployCommand())
-	cmd.AddCommand(createMachinesDiffCommand())
-	cmd.AddCommand(createMachinesStatusCommand())
-	cmd.AddCommand(createMachinesGroupsCommand())
-
+	cmd.AddCommand(createMachinesSetupDeployRsCommand())
 	return cmd
 }
 
@@ -70,409 +44,39 @@ Examples:
 func createMachinesListCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list",
-		Short: "List all registered machines",
-		Long: `List all registered machines in the registry.
+		Short: "List all NixOS hosts from flake.nix",
+		Long: `List all NixOS hosts defined in nixosConfigurations in flake.nix.
 
-Displays machine information including:
-- Name and host address
-- Connection status
-- Last sync and deploy times
-- Tags and groups
-- Machine metadata
-
-Output can be formatted as table, JSON, or YAML.`,
-		Example: `  nixai machines list
-  nixai machines list --tag web
-  nixai machines list --group production
-  nixai machines list --format json`,
-		Run: func(cmd *cobra.Command, args []string) {
-			registry, err := machines.NewRegistryManager()
-			if err != nil {
-				fmt.Printf("Error: Failed to load machine registry: %v\n", err)
-				os.Exit(1)
-			}
-
-			// Get filter options
-			tag, _ := cmd.Flags().GetString("tag")
-			group, _ := cmd.Flags().GetString("group")
-			format, _ := cmd.Flags().GetString("format")
-			status, _ := cmd.Flags().GetString("status")
-
-			// Get machines list
-			var machinesList []machines.Machine
-			if group != "" {
-				groupMachines, err := registry.GetMachinesByGroup(group)
-				if err != nil {
-					fmt.Printf("Error: %v\n", err)
-					os.Exit(1)
-				}
-				machinesList = groupMachines
-			} else if tag != "" {
-				machinesList = registry.GetMachinesByTag(tag)
-			} else {
-				machinesList = registry.ListMachines()
-			}
-
-			// Filter by status if specified
-			if status != "" {
-				var filtered []machines.Machine
-				targetStatus := machines.MachineStatus(status)
-				for _, machine := range machinesList {
-					if machine.Status == targetStatus {
-						filtered = append(filtered, machine)
-					}
-				}
-				machinesList = filtered
-			}
-
-			if len(machinesList) == 0 {
-				fmt.Println(utils.FormatInfo(fmt.Sprintf("No machines found matching the criteria")))
-				return
-			}
-
-			// Format output
-			switch format {
-			case "json":
-				data, _ := json.MarshalIndent(machinesList, "", "  ")
-				fmt.Println(string(data))
-			case "yaml":
-				// TODO: Add YAML formatting if needed
-				fmt.Println("YAML format not yet implemented")
-			default:
-				displayMachinesTable(machinesList)
-			}
-		},
-	}
-
-	cmd.Flags().String("tag", "", "Filter machines by tag")
-	cmd.Flags().String("group", "", "Filter machines by group")
-	cmd.Flags().String("status", "", "Filter machines by status (online, offline, syncing, deploying, error, unknown)")
-	cmd.Flags().String("format", "table", "Output format (table, json, yaml)")
-
-	return cmd
-}
-
-// createMachinesAddCommand creates the machines add command
-func createMachinesAddCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "add <name> <host>",
-		Short: "Register a new machine in the registry",
-		Long: `Register a new NixOS machine for management.
-
-The machine will be added to the registry with the specified name and host.
-You can optionally specify additional connection details and metadata.
+This command enumerates all hosts from your flake.nix, which is now the single source of truth for machine management.
 
 Examples:
-  nixai machines add server1 192.168.1.10
-  nixai machines add server1 server1.example.com --user nixos --port 2222
-  nixai machines add server1 192.168.1.10 --nixos-path /etc/nixos --tag production`,
-		Args: cobra.ExactArgs(2),
+  nixai machines list
+  nixai machines list --format json`,
 		Run: func(cmd *cobra.Command, args []string) {
-			name := args[0]
-			host := args[1]
-
-			// Get optional flags
-			user, _ := cmd.Flags().GetString("user")
-			port, _ := cmd.Flags().GetInt("port")
-			sshKey, _ := cmd.Flags().GetString("ssh-key")
-			nixosPath, _ := cmd.Flags().GetString("nixos-path")
-			description, _ := cmd.Flags().GetString("description")
-			tags, _ := cmd.Flags().GetStringSlice("tag")
-
-			// Create machine object
-			machine := machines.Machine{
-				Name:        name,
-				Host:        host,
-				Port:        port,
-				User:        user,
-				SSHKey:      sshKey,
-				NixOSPath:   nixosPath,
-				Description: description,
-				Tags:        tags,
-				Metadata:    make(map[string]string),
-			}
-
-			// Set default values
-			if machine.Port == 0 {
-				machine.Port = 22
-			}
-			if machine.User == "" {
-				machine.User = "root"
-			}
-			if machine.NixOSPath == "" {
-				machine.NixOSPath = "/etc/nixos"
-			}
-
-			// Add to registry
-			registry, err := machines.NewRegistryManager()
+			format, _ := cmd.Flags().GetString("format")
+			debug := os.Getenv("NIXAI_DEBUG") == "1"
+			hosts, err := utils.GetFlakeHosts("", debug)
 			if err != nil {
-				fmt.Printf("Error: Failed to load machine registry: %v\n", err)
+				fmt.Printf("Error: Failed to enumerate hosts from flake.nix: %v\n", err)
 				os.Exit(1)
 			}
-
-			if err := registry.AddMachine(machine); err != nil {
-				fmt.Printf("Error: Failed to add machine: %v\n", err)
-				os.Exit(1)
+			if len(hosts) == 0 {
+				fmt.Println(utils.FormatInfo("No hosts found in flake.nix nixosConfigurations."))
+				return
 			}
-
-			fmt.Println(utils.FormatHeader(fmt.Sprintf("🖥️  Machine Added Successfully")))
-			fmt.Println()
-			fmt.Println(utils.FormatKeyValue("Name", machine.Name))
-			fmt.Println(utils.FormatKeyValue("Host", machine.Host))
-			fmt.Println(utils.FormatKeyValue("Port", strconv.Itoa(machine.Port)))
-			fmt.Println(utils.FormatKeyValue("User", machine.User))
-			fmt.Println(utils.FormatKeyValue("NixOS Path", machine.NixOSPath))
-			if machine.Description != "" {
-				fmt.Println(utils.FormatKeyValue("Description", machine.Description))
-			}
-			if len(machine.Tags) > 0 {
-				fmt.Println(utils.FormatKeyValue("Tags", strings.Join(machine.Tags, ", ")))
-			}
-			fmt.Println()
-			fmt.Println(utils.FormatInfo(fmt.Sprintf("Machine '%s' has been registered. Use 'nixai machines status %s' to test connectivity.", machine.Name, machine.Name)))
-		},
-	}
-
-	cmd.Flags().String("user", "root", "SSH user (default: root)")
-	cmd.Flags().Int("port", 22, "SSH port (default: 22)")
-	cmd.Flags().String("ssh-key", "", "Path to SSH private key")
-	cmd.Flags().String("nixos-path", "/etc/nixos", "Path to NixOS configuration on remote machine")
-	cmd.Flags().String("description", "", "Description of the machine")
-	cmd.Flags().StringSlice("tag", []string{}, "Tags to apply to the machine (can be used multiple times)")
-
-	return cmd
-}
-
-// createMachinesRemoveCommand creates the machines remove command
-func createMachinesRemoveCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "remove <name>",
-		Short: "Remove a machine from the registry",
-		Long: `Remove a machine from the registry.
-
-This will permanently remove the machine from the registry and from all groups.
-The machine's configuration files will not be affected.`,
-		Args: cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			name := args[0]
-
-			registry, err := machines.NewRegistryManager()
-			if err != nil {
-				fmt.Printf("Error: Failed to load machine registry: %v\n", err)
-				os.Exit(1)
-			}
-
-			// Check if machine exists
-			machine, err := registry.GetMachine(name)
-			if err != nil {
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
-			}
-
-			// Confirm removal unless --force is used
-			force, _ := cmd.Flags().GetBool("force")
-			if !force {
-				fmt.Printf("Are you sure you want to remove machine '%s' (%s)? [y/N]: ", machine.Name, machine.Host)
-				var response string
-				fmt.Scanln(&response)
-				if strings.ToLower(response) != "y" && strings.ToLower(response) != "yes" {
-					fmt.Println("Removal cancelled.")
-					return
-				}
-			}
-
-			if err := registry.RemoveMachine(name); err != nil {
-				fmt.Printf("Error: Failed to remove machine: %v\n", err)
-				os.Exit(1)
-			}
-
-			fmt.Println(utils.FormatSuccess(fmt.Sprintf("Machine '%s' removed from registry", name)))
-		},
-	}
-
-	cmd.Flags().Bool("force", false, "Remove without confirmation")
-
-	return cmd
-}
-
-// createMachinesShowCommand creates the machines show command
-func createMachinesShowCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "show <name>",
-		Short: "Show detailed information about a machine",
-		Long:  `Display detailed information about a registered machine.`,
-		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			name := args[0]
-
-			registry, err := machines.NewRegistryManager()
-			if err != nil {
-				fmt.Printf("Error: Failed to load machine registry: %v\n", err)
-				os.Exit(1)
-			}
-
-			machine, err := registry.GetMachine(name)
-			if err != nil {
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
-			}
-
-			fmt.Println(utils.FormatHeader(fmt.Sprintf("🖥️  Machine Details: " + machine.Name)))
-			fmt.Println()
-			fmt.Println(utils.FormatKeyValue("Name", machine.Name))
-			fmt.Println(utils.FormatKeyValue("Host", machine.Host))
-			fmt.Println(utils.FormatKeyValue("Port", strconv.Itoa(machine.Port)))
-			fmt.Println(utils.FormatKeyValue("User", machine.User))
-			fmt.Println(utils.FormatKeyValue("NixOS Path", machine.NixOSPath))
-			fmt.Println(utils.FormatKeyValue("Status", string(machine.Status)))
-
-			if machine.Description != "" {
-				fmt.Println(utils.FormatKeyValue("Description", machine.Description))
-			}
-
-			if len(machine.Tags) > 0 {
-				fmt.Println(utils.FormatKeyValue("Tags", strings.Join(machine.Tags, ", ")))
-			}
-
-			if len(machine.Groups) > 0 {
-				fmt.Println(utils.FormatKeyValue("Groups", strings.Join(machine.Groups, ", ")))
-			}
-
-			if machine.SSHKey != "" {
-				fmt.Println(utils.FormatKeyValue("SSH Key", machine.SSHKey))
-			}
-
-			fmt.Println(utils.FormatKeyValue("Created", machine.CreatedAt.Format(time.RFC3339)))
-			fmt.Println(utils.FormatKeyValue("Updated", machine.UpdatedAt.Format(time.RFC3339)))
-
-			if machine.LastSync != nil {
-				fmt.Println(utils.FormatKeyValue("Last Sync", machine.LastSync.Format(time.RFC3339)))
-			}
-
-			if machine.LastDeploy != nil {
-				fmt.Println(utils.FormatKeyValue("Last Deploy", machine.LastDeploy.Format(time.RFC3339)))
-			}
-
-			// Show metadata if any
-			if len(machine.Metadata) > 0 {
-				fmt.Println()
-				fmt.Println(utils.FormatSubheader(fmt.Sprintf("Metadata:")))
-				for key, value := range machine.Metadata {
-					fmt.Println(utils.FormatKeyValue(key, value))
+			switch format {
+			case "json":
+				data, _ := json.MarshalIndent(hosts, "", "  ")
+				fmt.Println(string(data))
+			default:
+				fmt.Println(utils.FormatHeader("NixOS Hosts from flake.nix:"))
+				for _, h := range hosts {
+					fmt.Println("-", h)
 				}
 			}
 		},
 	}
-
-	return cmd
-}
-
-// createMachinesUpdateCommand creates the machines update command
-func createMachinesUpdateCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "update <name>",
-		Short: "Update machine configuration",
-		Long:  `Update the configuration of a registered machine.`,
-		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			name := args[0]
-
-			registry, err := machines.NewRegistryManager()
-			if err != nil {
-				fmt.Printf("Error: Failed to load machine registry: %v\n", err)
-				os.Exit(1)
-			}
-
-			machine, err := registry.GetMachine(name)
-			if err != nil {
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
-			}
-
-			// Update fields if flags are provided
-			if cmd.Flags().Changed("host") {
-				host, _ := cmd.Flags().GetString("host")
-				machine.Host = host
-			}
-			if cmd.Flags().Changed("port") {
-				port, _ := cmd.Flags().GetInt("port")
-				machine.Port = port
-			}
-			if cmd.Flags().Changed("user") {
-				user, _ := cmd.Flags().GetString("user")
-				machine.User = user
-			}
-			if cmd.Flags().Changed("ssh-key") {
-				sshKey, _ := cmd.Flags().GetString("ssh-key")
-				machine.SSHKey = sshKey
-			}
-			if cmd.Flags().Changed("nixos-path") {
-				nixosPath, _ := cmd.Flags().GetString("nixos-path")
-				machine.NixOSPath = nixosPath
-			}
-			if cmd.Flags().Changed("description") {
-				description, _ := cmd.Flags().GetString("description")
-				machine.Description = description
-			}
-			if cmd.Flags().Changed("tag") {
-				tags, _ := cmd.Flags().GetStringSlice("tag")
-				machine.Tags = tags
-			}
-
-			if err := registry.UpdateMachine(name, *machine); err != nil {
-				fmt.Printf("Error: Failed to update machine: %v\n", err)
-				os.Exit(1)
-			}
-
-			fmt.Println(utils.FormatSuccess(fmt.Sprintf("Machine '%s' updated successfully", name)))
-		},
-	}
-
-	cmd.Flags().String("host", "", "Update host address")
-	cmd.Flags().Int("port", 0, "Update SSH port")
-	cmd.Flags().String("user", "", "Update SSH user")
-	cmd.Flags().String("ssh-key", "", "Update SSH key path")
-	cmd.Flags().String("nixos-path", "", "Update NixOS configuration path")
-	cmd.Flags().String("description", "", "Update description")
-	cmd.Flags().StringSlice("tag", []string{}, "Update tags (replaces existing tags)")
-
-	return cmd
-}
-
-// createMachinesSyncCommand creates the machines sync command
-func createMachinesSyncCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "sync <machine>",
-		Short: "Synchronize configurations to a machine",
-		Long: `Synchronize NixOS configurations from local machine to remote machine.
-
-This command will:
-1. Copy configuration files to the remote machine
-2. Verify file integrity
-3. Update sync timestamps
-4. Provide rollback information if needed`,
-		Args: cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			machineName := args[0]
-
-			// TODO: Implement sync functionality
-			fmt.Println(utils.FormatHeader(fmt.Sprintf("🔄 Configuration Sync")))
-			fmt.Println()
-			fmt.Printf("Synchronizing configurations to machine '%s'...\n", machineName)
-			fmt.Println()
-			fmt.Println(utils.FormatInfo(fmt.Sprintf("Sync functionality will be implemented in the next iteration.")))
-			fmt.Println(utils.FormatInfo(fmt.Sprintf("This will include:")))
-			fmt.Println("  • SSH-based file transfer with rsync")
-			fmt.Println("  • Configuration validation")
-			fmt.Println("  • Integrity verification")
-			fmt.Println("  • Automatic rollback on failure")
-		},
-	}
-
-	cmd.Flags().Bool("dry-run", false, "Show what would be synced without making changes")
-	cmd.Flags().String("source", "", "Source directory to sync (default: current nixos-path)")
-	cmd.Flags().Bool("force", false, "Force sync even if target is newer")
-
+	cmd.Flags().String("format", "", "Output format: table (default) or json")
 	return cmd
 }
 
@@ -489,349 +93,176 @@ This command will:
 3. Monitor deployment progress
 4. Provide rollback commands if deployment fails`,
 		Run: func(cmd *cobra.Command, args []string) {
-			// TODO: Implement deploy functionality
-			fmt.Println(utils.FormatHeader(fmt.Sprintf("🚀 Configuration Deployment")))
+			fmt.Println(utils.FormatHeader("🚀 Configuration Deployment"))
 			fmt.Println()
-			fmt.Println(utils.FormatInfo(fmt.Sprintf("Deploy functionality will be implemented in the next iteration.")))
-			fmt.Println(utils.FormatInfo(fmt.Sprintf("This will include:")))
-			fmt.Println("  • Remote nixos-rebuild execution")
-			fmt.Println("  • Generation management")
-			fmt.Println("  • Parallel deployment to multiple machines")
-			fmt.Println("  • Automatic rollback on failure")
-			fmt.Println("  • Deployment progress monitoring")
+
+			method, _ := cmd.Flags().GetString("method")
+			machine := cmd.Flag("machine").Value.String()
+			group := cmd.Flag("group").Value.String()
+			dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+			if method == "deploy-rs" {
+				// Check if deploy-rs is installed
+				if _, err := utils.LookPath("deploy"); err != nil {
+					fmt.Println(utils.FormatError("deploy-rs is not installed. Install it with: nix profile install nixpkgs#deploy-rs"))
+					return
+				}
+				// Check for deploy config in flake.nix
+				flakeDir := "."
+				if nixosPath := cmd.Flag("nixos-path").Value.String(); nixosPath != "" {
+					flakeDir = nixosPath
+				}
+
+				flakePath := flakeDir + "/flake.nix"
+				if !utils.FlakeHasDeployConfig(flakePath) {
+					fmt.Println(utils.FormatWarning("No deploy-rs configuration found in flake.nix."))
+					fmt.Println(utils.FormatInfo("nixai can automatically generate a deploy-rs configuration based on your existing nixosConfigurations."))
+					fmt.Println()
+
+					if utils.PromptYesNo("Generate deploy-rs configuration for all your hosts?") {
+						fmt.Println(utils.FormatInfo("Generating deploy-rs configuration..."))
+						fmt.Println(utils.FormatInfo("This will add deploy-rs input and configuration to your flake.nix"))
+						fmt.Println()
+
+						// Use interactive mode to prompt for hostnames and SSH users
+						if err := utils.GenerateDeployRsConfig(flakeDir, true); err != nil {
+							fmt.Println(utils.FormatError("Failed to generate deploy-rs config: " + err.Error()))
+							return
+						}
+
+						fmt.Println()
+						fmt.Println(utils.FormatSuccess("✅ Deploy-rs configuration generated successfully!"))
+						fmt.Println(utils.FormatInfo("📝 Please review the generated configuration in flake.nix"))
+						fmt.Println(utils.FormatInfo("🔧 You may need to adjust hostnames and SSH settings"))
+						fmt.Println(utils.FormatInfo("📚 See: https://github.com/serokell/deploy-rs#configuration"))
+						fmt.Println()
+					} else {
+						fmt.Println(utils.FormatInfo("Aborting deploy. Please add deploy-rs config manually and try again."))
+						fmt.Println(utils.FormatInfo("Or run: nixai machines setup-deploy-rs"))
+						return
+					}
+				}
+				// Run deploy-rs
+				cmdArgs := []string{"deploy", "--auto-rollback", "true"}
+				if group != "" {
+					cmdArgs = append(cmdArgs, "--group", group)
+				}
+				if machine != "" {
+					cmdArgs = append(cmdArgs, "--hostname", machine)
+				}
+				if dryRun {
+					cmdArgs = append(cmdArgs, "--dry-activate")
+				}
+				fmt.Println(utils.FormatInfo("Running deploy-rs: deploy " + strings.Join(cmdArgs[1:], " ")))
+				if err := utils.RunCommand("deploy", cmdArgs[1:]...); err != nil {
+					fmt.Println(utils.FormatError("deploy-rs failed: " + err.Error()))
+					return
+				}
+				fmt.Println(utils.FormatSuccess("deploy-rs deployment complete."))
+				return
+			}
+			// Default: flakes (nixos-rebuild)
+			fmt.Println(utils.FormatInfo("Using flakes (nixos-rebuild) deployment method."))
+			// ...existing code for flakes deployment...
 		},
 	}
 
 	cmd.Flags().String("machine", "", "Deploy to specific machine")
 	cmd.Flags().String("group", "", "Deploy to all machines in group")
-	cmd.Flags().String("tag", "", "Deploy to all machines with tag")
 	cmd.Flags().Bool("dry-run", false, "Show what would be deployed without making changes")
-	cmd.Flags().String("action", "switch", "Deployment action (switch, boot, test)")
+	cmd.Flags().String("method", "flakes", "Deployment method: flakes (default) or deploy-rs")
 
 	return cmd
 }
 
-// createMachinesDiffCommand creates the machines diff command
-func createMachinesDiffCommand() *cobra.Command {
+// createMachinesSetupDeployRsCommand creates the setup-deploy-rs command
+func createMachinesSetupDeployRsCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "diff [machine1] [machine2]",
-		Short: "Compare configurations between machines",
-		Long: `Compare NixOS configurations between machines.
-
-If no machines are specified, compares all machines.
-If one machine is specified, compares it with the local configuration.
-If two machines are specified, compares them with each other.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			// TODO: Implement diff functionality
-			fmt.Println(utils.FormatHeader(fmt.Sprintf("🔍 Configuration Comparison")))
-			fmt.Println()
-
-			switch len(args) {
-			case 0:
-				fmt.Println(utils.FormatInfo(fmt.Sprintf("Comparing all registered machines...")))
-			case 1:
-				fmt.Printf("Comparing machine '%s' with local configuration...\n", args[0])
-			case 2:
-				fmt.Printf("Comparing machines '%s' and '%s'...\n", args[0], args[1])
-			default:
-				fmt.Println("Error: Too many arguments. Expected 0-2 machine names.")
-				os.Exit(1)
-			}
-
-			fmt.Println()
-			fmt.Println(utils.FormatInfo(fmt.Sprintf("Diff functionality will be implemented in the next iteration.")))
-			fmt.Println(utils.FormatInfo(fmt.Sprintf("This will include:")))
-			fmt.Println("  • Configuration file comparison")
-			fmt.Println("  • Package difference analysis")
-			fmt.Println("  • Service configuration comparison")
-			fmt.Println("  • AI-powered difference explanations")
-		},
-	}
-
-	cmd.Flags().Bool("summary", false, "Show only summary of differences")
-	cmd.Flags().String("format", "unified", "Diff format (unified, context, side-by-side)")
-
-	return cmd
-}
-
-// createMachinesStatusCommand creates the machines status command
-func createMachinesStatusCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "status [machine]",
-		Short: "Check status and connectivity of machines",
-		Long: `Check the status and connectivity of one or all machines.
+		Use:   "setup-deploy-rs",
+		Short: "Setup deploy-rs configuration for your flake.nix",
+		Long: `Setup deploy-rs configuration based on your existing nixosConfigurations.
 
 This command will:
-1. Test SSH connectivity
-2. Check NixOS system status  
-3. Update machine status in registry
-4. Show system information if available`,
+1. Add deploy-rs input to your flake.nix if not present
+2. Generate deploy configuration for all hosts in nixosConfigurations
+3. Prompt for hostnames and SSH users for each host
+4. Create a complete deploy-rs configuration
+
+Examples:
+  nixai machines setup-deploy-rs               # Interactive setup
+  nixai machines setup-deploy-rs --non-interactive # Use defaults`,
 		Run: func(cmd *cobra.Command, args []string) {
-			registry, err := machines.NewRegistryManager()
-			if err != nil {
-				fmt.Printf("Error: Failed to load machine registry: %v\n", err)
-				os.Exit(1)
+			fmt.Println(utils.FormatHeader("🚀 Deploy-rs Configuration Setup"))
+			fmt.Println()
+
+			// Get flake directory
+			flakeDir := "."
+			if nixosPath := cmd.Flag("nixos-path").Value.String(); nixosPath != "" {
+				flakeDir = nixosPath
 			}
 
-			var machinesToCheck []machines.Machine
+			interactive := !cmd.Flag("non-interactive").Changed
 
-			if len(args) == 1 {
-				// Check specific machine
-				machine, err := registry.GetMachine(args[0])
-				if err != nil {
-					fmt.Printf("Error: %v\n", err)
-					os.Exit(1)
-				}
-				machinesToCheck = []machines.Machine{*machine}
-			} else {
-				// Check all machines
-				machinesToCheck = registry.ListMachines()
-			}
-
-			if len(machinesToCheck) == 0 {
-				fmt.Println(utils.FormatInfo(fmt.Sprintf("No machines to check")))
+			// Check if flake.nix exists
+			flakePath := flakeDir + "/flake.nix"
+			if !utils.IsFile(flakePath) {
+				fmt.Println(utils.FormatError("flake.nix not found in " + flakeDir))
+				fmt.Println(utils.FormatInfo("Please run this command from your NixOS configuration directory"))
 				return
 			}
 
-			fmt.Println(utils.FormatHeader(fmt.Sprintf("🔍 Machine Status Check")))
-			fmt.Println()
-
-			// TODO: Implement actual connectivity testing
-			for _, machine := range machinesToCheck {
-				fmt.Printf("Checking %s (%s)... ", machine.Name, machine.Host)
-
-				// Simulate status check - will be replaced with actual SSH connectivity test
-				fmt.Println(utils.FormatInfo(fmt.Sprintf("Status check will be implemented in next iteration")))
-
-				// For now, just show current status
-				fmt.Println(utils.FormatKeyValue("  Current Status", string(machine.Status)))
-				fmt.Println()
+			// Check if deploy-rs config already exists
+			if utils.FlakeHasDeployConfig(flakePath) {
+				fmt.Println(utils.FormatWarning("Deploy-rs configuration already exists in flake.nix"))
+				if !utils.PromptYesNo("Overwrite existing configuration?") {
+					fmt.Println(utils.FormatInfo("Setup cancelled."))
+					return
+				}
 			}
 
-			fmt.Println(utils.FormatInfo(fmt.Sprintf("Status check functionality will include:")))
-			fmt.Println("  • SSH connectivity testing")
-			fmt.Println("  • NixOS system status verification")
-			fmt.Println("  • Automatic status updates in registry")
-			fmt.Println("  • System information gathering")
-		},
-	}
-
-	return cmd
-}
-
-// createMachinesGroupsCommand creates the machines groups command
-func createMachinesGroupsCommand() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "groups",
-		Short: "Manage machine groups",
-		Long:  `Manage groups of machines for fleet operations.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
-		},
-	}
-
-	// Add group subcommands
-	cmd.AddCommand(createGroupsListCommand())
-	cmd.AddCommand(createGroupsCreateCommand())
-	cmd.AddCommand(createGroupsDeleteCommand())
-	cmd.AddCommand(createGroupsAddMachineCommand())
-	cmd.AddCommand(createGroupsRemoveMachineCommand())
-
-	return cmd
-}
-
-// Helper function to display machines in a table format
-func displayMachinesTable(machinesList []machines.Machine) {
-	if len(machinesList) == 0 {
-		fmt.Println(utils.FormatInfo(fmt.Sprintf("No machines found")))
-		return
-	}
-
-	fmt.Println(utils.FormatHeader(fmt.Sprintf("🖥️  Registered Machines")))
-	fmt.Println()
-
-	// Sort by name for consistent output
-	sort.Slice(machinesList, func(i, j int) bool {
-		return machinesList[i].Name < machinesList[j].Name
-	})
-
-	// Print table header
-	fmt.Printf("%-20s %-20s %-10s %-15s %-20s %-15s\n",
-		"NAME", "HOST", "STATUS", "LAST SYNC", "LAST DEPLOY", "TAGS")
-	fmt.Println(strings.Repeat("-", 100))
-
-	// Print machine rows
-	for _, machine := range machinesList {
-		lastSync := "Never"
-		if machine.LastSync != nil {
-			lastSync = machine.LastSync.Format("2006-01-02 15:04")
-		}
-
-		lastDeploy := "Never"
-		if machine.LastDeploy != nil {
-			lastDeploy = machine.LastDeploy.Format("2006-01-02 15:04")
-		}
-
-		tags := strings.Join(machine.Tags, ",")
-		if len(tags) > 14 {
-			tags = tags[:11] + "..."
-		}
-
-		fmt.Printf("%-20s %-20s %-10s %-15s %-20s %-15s\n",
-			truncateString(machine.Name, 19),
-			truncateString(machine.Host, 19),
-			string(machine.Status),
-			lastSync,
-			lastDeploy,
-			tags)
-	}
-
-	fmt.Println()
-	fmt.Printf("Total: %d machines\n", len(machinesList))
-}
-
-// Helper function to truncate strings for table display
-func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + "..."
-}
-
-// Group management subcommands
-func createGroupsListCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "list",
-		Short: "List machine groups",
-		Run: func(cmd *cobra.Command, args []string) {
-			registry, err := machines.NewRegistryManager()
+			// Get existing hosts
+			hosts, err := utils.GetFlakeHosts(flakeDir)
 			if err != nil {
-				fmt.Printf("Error: Failed to load machine registry: %v\n", err)
-				os.Exit(1)
-			}
-
-			groups := registry.ListGroups()
-			if len(groups) == 0 {
-				fmt.Println(utils.FormatInfo(fmt.Sprintf("No machine groups found")))
+				fmt.Println(utils.FormatError("Failed to read hosts from flake.nix: " + err.Error()))
 				return
 			}
 
-			fmt.Println(utils.FormatHeader(fmt.Sprintf("👥 Machine Groups")))
+			if len(hosts) == 0 {
+				fmt.Println(utils.FormatError("No hosts found in nixosConfigurations"))
+				fmt.Println(utils.FormatInfo("Please add some nixosConfigurations to your flake.nix first"))
+				return
+			}
+
+			fmt.Println(utils.FormatInfo("Found hosts: " + strings.Join(hosts, ", ")))
 			fmt.Println()
 
-			for _, group := range groups {
-				fmt.Printf("📁 %s (%d machines)\n", group.Name, len(group.Machines))
-				if group.Description != "" {
-					fmt.Printf("   %s\n", group.Description)
-				}
-				fmt.Printf("   Machines: %s\n", strings.Join(group.Machines, ", "))
+			if interactive {
+				fmt.Println(utils.FormatInfo("Setting up deploy-rs configuration..."))
+				fmt.Println(utils.FormatInfo("For each host, you'll be prompted for:"))
+				fmt.Println("  • Hostname/IP address (defaults to host name)")
+				fmt.Println("  • SSH user (defaults to 'nixos')")
 				fmt.Println()
 			}
+
+			// Generate deploy-rs configuration
+			if err := utils.GenerateDeployRsConfig(flakeDir, interactive); err != nil {
+				fmt.Println(utils.FormatError("Failed to generate deploy-rs config: " + err.Error()))
+				return
+			}
+
+			fmt.Println()
+			fmt.Println(utils.FormatSuccess("✅ Deploy-rs configuration generated successfully!"))
+			fmt.Println()
+			fmt.Println(utils.FormatInfo("📝 Next steps:"))
+			fmt.Println("  1. Review the generated configuration in flake.nix")
+			fmt.Println("  2. Update hostnames and SSH settings as needed")
+			fmt.Println("  3. Install deploy-rs: nix profile install nixpkgs#deploy-rs")
+			fmt.Println("  4. Test deployment: nixai machines deploy --method deploy-rs --dry-run")
+			fmt.Println()
+			fmt.Println(utils.FormatInfo("📚 Documentation: https://github.com/serokell/deploy-rs#configuration"))
 		},
 	}
-}
 
-func createGroupsCreateCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "create <name>",
-		Short: "Create a new machine group",
-		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			name := args[0]
-			description, _ := cmd.Flags().GetString("description")
-
-			registry, err := machines.NewRegistryManager()
-			if err != nil {
-				fmt.Printf("Error: Failed to load machine registry: %v\n", err)
-				os.Exit(1)
-			}
-
-			group := machines.MachineGroup{
-				Name:        name,
-				Description: description,
-				Machines:    []string{},
-			}
-
-			if err := registry.AddGroup(group); err != nil {
-				fmt.Printf("Error: Failed to create group: %v\n", err)
-				os.Exit(1)
-			}
-
-			fmt.Println(utils.FormatSuccess(fmt.Sprintf("Group '%s' created successfully", name)))
-		},
-	}
-}
-
-func createGroupsDeleteCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "delete <name>",
-		Short: "Delete a machine group",
-		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			name := args[0]
-
-			registry, err := machines.NewRegistryManager()
-			if err != nil {
-				fmt.Printf("Error: Failed to load machine registry: %v\n", err)
-				os.Exit(1)
-			}
-
-			if err := registry.RemoveGroup(name); err != nil {
-				fmt.Printf("Error: Failed to delete group: %v\n", err)
-				os.Exit(1)
-			}
-
-			fmt.Println(utils.FormatSuccess(fmt.Sprintf("Group '%s' deleted successfully", name)))
-		},
-	}
-}
-
-func createGroupsAddMachineCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "add-machine <group> <machine>",
-		Short: "Add a machine to a group",
-		Args:  cobra.ExactArgs(2),
-		Run: func(cmd *cobra.Command, args []string) {
-			groupName := args[0]
-			machineName := args[1]
-
-			registry, err := machines.NewRegistryManager()
-			if err != nil {
-				fmt.Printf("Error: Failed to load machine registry: %v\n", err)
-				os.Exit(1)
-			}
-
-			if err := registry.AddMachineToGroup(groupName, machineName); err != nil {
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
-			}
-
-			fmt.Println(utils.FormatSuccess(fmt.Sprintf("Machine '%s' added to group '%s'", machineName, groupName)))
-		},
-	}
-}
-
-func createGroupsRemoveMachineCommand() *cobra.Command {
-	return &cobra.Command{
-		Use:   "remove-machine <group> <machine>",
-		Short: "Remove a machine from a group",
-		Args:  cobra.ExactArgs(2),
-		Run: func(cmd *cobra.Command, args []string) {
-			groupName := args[0]
-			machineName := args[1]
-
-			registry, err := machines.NewRegistryManager()
-			if err != nil {
-				fmt.Printf("Error: Failed to load machine registry: %v\n", err)
-				os.Exit(1)
-			}
-
-			if err := registry.RemoveMachineFromGroup(groupName, machineName); err != nil {
-				fmt.Printf("Error: %v\n", err)
-				os.Exit(1)
-			}
-
-			fmt.Println(utils.FormatSuccess(fmt.Sprintf("Machine '%s' removed from group '%s'", machineName, groupName)))
-		},
-	}
+	cmd.Flags().Bool("non-interactive", false, "Use default values without prompting")
+	return cmd
 }
