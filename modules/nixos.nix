@@ -194,6 +194,6 @@ in {
 
   meta = {
     maintainers = [lib.maintainers.olf];
-    doc = ./nixos.nix;
+    # doc = ./nixos.nix;
   };
 }

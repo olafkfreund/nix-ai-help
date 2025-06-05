@@ -2,31 +2,30 @@
 
 This directory contains NixOS and Home Manager modules for integrating nixai into your configuration.
 
-> **Note**: Home Manager integration has been recently fixed to resolve package reference issues. The module now properly handles the nixai package and creates a valid derivation fallback when needed.
+---
 
-## 📚 Complete Flake Integration Guides
+## 🚀 Quick Start: Flake-based Installation
 
-For comprehensive setup instructions, see our detailed guides:
+**1. Add nixai as an input to your flake:**
 
-- **📋 [Flake Quick Reference](../docs/FLAKE_QUICK_REFERENCE.md)** - Essential copy-paste snippets
-- **📚 [Complete Flake Integration Guide](../docs/FLAKE_INTEGRATION_GUIDE.md)** - Detailed setup with all options
+```nix
+inputs.nixai.url = "github:olafkfreund/nix-ai-help";
+```
 
-## Using with Flakes
+**2. Use the module in your NixOS or Home Manager configuration:**
 
-If you're using Nix flakes, you can import the modules directly from the nixai flake:
+### NixOS Example
 
 ```nix
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    home-manager.url = "github:nix-community/home-manager";
     nixai.url = "github:olafkfreund/nix-ai-help";
   };
 
-  outputs = { self, nixpkgs, home-manager, nixai, ... }: {
-    # NixOS configuration
-    nixosConfigurations.yourhostname = nixpkgs.lib.nixosSystem {
-      # ...
+  outputs = { self, nixpkgs, nixai, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
       modules = [
         nixai.nixosModules.default
         {
@@ -37,10 +36,23 @@ If you're using Nix flakes, you can import the modules directly from the nixai f
         }
       ];
     };
-    
-    # Home Manager configuration
-    homeConfigurations.yourusername = home-manager.lib.homeManagerConfiguration {
-      # ...
+  };
+}
+```
+
+### Home Manager Example
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    home-manager.url = "github:nix-community/home-manager";
+    nixai.url = "github:olafkfreund/nix-ai-help";
+  };
+
+  outputs = { self, nixpkgs, home-manager, nixai, ... }: {
+    homeConfigurations.myuser = home-manager.lib.homeManagerConfiguration {
+      pkgs = import nixpkgs { system = "x86_64-linux"; };
       modules = [
         nixai.homeManagerModules.default
         {
@@ -54,6 +66,51 @@ If you're using Nix flakes, you can import the modules directly from the nixai f
   };
 }
 ```
+
+---
+
+## 🛠️ Troubleshooting: "attribute 'nixai' missing"
+
+If you see an error like:
+
+```
+error: attribute 'nixai' missing
+```
+
+**Solution:**
+- Always import the nixai module from the flake (as shown above), not as a raw .nix file.
+- The nixai package is only available as `pkgs.nixai` when you use the module from the flake.
+- If you use overlays or custom pkgs, ensure you pass the nixai package from the flake outputs.
+
+---
+
+## 📚 More Guides
+
+- [Flake Quick Reference](../docs/FLAKE_QUICK_REFERENCE.md) – Copy-paste snippets
+- [Complete Flake Integration Guide](../docs/FLAKE_INTEGRATION_GUIDE.md) – All options explained
+
+---
+
+## ⚙️ Advanced: Manual Import (Not Recommended)
+
+If you must use the module without flakes, you need to provide the nixai package yourself:
+
+```nix
+imports = [ ./path/to/nixai/modules/nixos.nix ];
+services.nixai = {
+  enable = true;
+  mcp = {
+    enable = true;
+    package = <your-nixai-package>;
+  };
+};
+```
+
+But for best results, always use the flake-based approach above.
+
+---
+
+# Full Manual and Advanced Configuration
 
 ## NixOS Module
 
@@ -219,3 +276,20 @@ services.nixai = {
 - The CLI and integrations will use the correct socket/host/port for each endpoint.
 
 See also: [docs/neovim-integration.md](../docs/neovim-integration.md) for Neovim multi-endpoint usage.
+
+---
+
+## 📝 Usage Examples
+
+- Run `nixai "your question"` or `nixai --ask "your question"` for direct AI help.
+- See the [manual](../docs/MANUAL.md) for all commands and options.
+
+---
+
+## 🧩 Multi-Endpoint & VS Code/Neovim Integration
+
+- See [docs/neovim-integration.md](../docs/neovim-integration.md) and [docs/MCP_VSCODE_INTEGRATION.md](../docs/MCP_VSCODE_INTEGRATION.md) for advanced workflows.
+
+---
+
+For any issues, see the troubleshooting section above or open an issue on GitHub.
