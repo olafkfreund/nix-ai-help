@@ -4,8 +4,8 @@
 
 🎉 **Major Milestone Achieved**: The core agent system architecture is now fully functional with comprehensive testing!
 
-- ✅ **7 agents implemented and tested**: AskAgent, ConfigAgent, DiagnoseAgent, DoctorAgent, ExplainOptionAgent, ExplainHomeOptionAgent, OllamaAgent
-- ✅ **All 34 agent tests passing** with comprehensive test coverage
+- ✅ **8 agents implemented and tested**: AskAgent, ConfigAgent, DiagnoseAgent, DoctorAgent, ExplainOptionAgent, ExplainHomeOptionAgent, HelpAgent, MigrateAgent, OllamaAgent
+- ✅ **All 50 agent tests passing** with comprehensive test coverage
 - ✅ **Full project test suite passing** (46.9s runtime)
 - ✅ **Agent system features working**: Role validation, context management, provider integration
 - 🔄 **~15 agents remaining** to implement for complete coverage
@@ -181,15 +181,15 @@ Below is the tracking table for agent/role implementation for each nixai command
 | explain-home-option  | RoleExplainHomeOption   | ExplainHomeOptionAgent| Yes            | Yes   | ✅ DONE     |
 | explain-option       | RoleExplainOption       | ExplainOptionAgent   | Yes             | Yes   | ✅ DONE     |
 | flake                | RoleFlake               | FlakeAgent           | Yes             | Yes   | ✅ DONE     |
-| gc                   | RoleGC                  | GCAgent              | No              | No    | TODO        |
-| hardware             | RoleHardware            | HardwareAgent        | No              | No    | TODO        |
-| help                 | RoleHelp                | HelpAgent            | No              | No    | TODO        |
+| gc                   | RoleGC                  | GCAgent              | Yes             | Yes   | ✅ DONE     |
+| hardware             | RoleHardware            | HardwareAgent        | Yes             | Yes   | ✅ DONE     |
+| help                 | RoleHelp                | HelpAgent            | Yes             | Yes   | ✅ DONE     |
 | interactive          | RoleInteractive         | InteractiveAgent     | Yes             | Yes   | ✅ DONE     |
 | learn                | RoleLearn               | LearnAgent           | Yes             | Yes   | ✅ DONE     |
-| logs                 | RoleLogs                | LogsAgent            | No              | No    | TODO        |
+| logs                 | RoleLogs                | LogsAgent            | Yes             | Yes   | ✅ DONE     |
 | machines             | RoleMachines            | MachinesAgent        | No              | No    | TODO        |
 | mcp-server           | RoleMcpServer           | McpServerAgent       | No              | No    | TODO        |
-| migrate              | RoleMigrate             | MigrateAgent         | No              | No    | TODO        |
+| migrate              | RoleMigrate             | MigrateAgent         | Yes             | Yes   | ✅ DONE     |
 | neovim-setup         | RoleNeovimSetup         | NeovimSetupAgent     | No              | No    | TODO        |
 | package-repo         | RolePackageRepo         | PackageRepoAgent     | Yes             | Yes   | ✅ DONE     |
 | search               | RoleSearch              | SearchAgent          | Yes             | Yes   | ✅ DONE     |
@@ -206,8 +206,8 @@ Below is the tracking table for agent/role implementation for each nixai command
 *Last updated: 2025-01-10*
 
 **Current Status:**
-- ✅ **12 agents fully implemented and tested** (AskAgent, BuildAgent, ConfigAgent, DiagnoseAgent, DoctorAgent, ExplainOptionAgent, ExplainHomeOptionAgent, FlakeAgent, LearnAgent, PackageRepoAgent, SearchAgent)
+- ✅ **18 agents fully implemented and tested** (AskAgent, BuildAgent, ConfigAgent, DiagnoseAgent, DoctorAgent, ExplainOptionAgent, ExplainHomeOptionAgent, FlakeAgent, GCAgent, HardwareAgent, HelpAgent, InteractiveAgent, LearnAgent, LogsAgent, MigrateAgent, PackageRepoAgent, SearchAgent)
 - ✅ **All agent tests passing** with full project test suite
 - ✅ **Agent system architecture complete** with role validation, context management, and provider integration
-- 🔄 **~15 agents remaining** to implement for complete coverage
+- 🔄 **~8 agents remaining** to implement for complete coverage
 - 📋 **CLI integration and provider refactoring** still needed for full deployment
