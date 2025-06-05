@@ -170,7 +170,7 @@ Below is the tracking table for agent/role implementation for each nixai command
 | Command              | RoleType                | Agent Implementation | Prompt Template | Tests | Status      |
 |----------------------|-------------------------|----------------------|-----------------|-------|-------------|
 | ask                  | RoleAsk                 | AskAgent             | Yes             | Yes   | ✅ DONE     |
-| build                | RoleBuild               | BuildAgent           | Yes             | No    | 🔄 PARTIAL  |
+| build                | RoleBuild               | BuildAgent           | Yes             | Yes   | ✅ DONE     |
 | community            | RoleCommunity           | CommunityAgent       | No              | No    | TODO        |
 | completion           | RoleCompletion          | CompletionAgent      | No              | No    | TODO        |
 | config               | RoleConfig              | ConfigAgent          | Yes             | Yes   | ✅ DONE     |
@@ -180,19 +180,19 @@ Below is the tracking table for agent/role implementation for each nixai command
 | doctor               | RoleDoctor              | DoctorAgent          | Yes             | Yes   | ✅ DONE     |
 | explain-home-option  | RoleExplainHomeOption   | ExplainHomeOptionAgent| Yes            | Yes   | ✅ DONE     |
 | explain-option       | RoleExplainOption       | ExplainOptionAgent   | Yes             | Yes   | ✅ DONE     |
-| flake                | RoleFlake               | FlakeAgent           | Yes             | No    | 🔄 PARTIAL  |
+| flake                | RoleFlake               | FlakeAgent           | Yes             | Yes   | ✅ DONE     |
 | gc                   | RoleGC                  | GCAgent              | No              | No    | TODO        |
 | hardware             | RoleHardware            | HardwareAgent        | No              | No    | TODO        |
 | help                 | RoleHelp                | HelpAgent            | No              | No    | TODO        |
 | interactive          | RoleInteractive         | InteractiveAgent     | No              | No    | TODO        |
-| learn                | RoleLearn               | LearnAgent           | Yes             | No    | 🔄 PARTIAL  |
+| learn                | RoleLearn               | LearnAgent           | Yes             | Yes   | ✅ DONE     |
 | logs                 | RoleLogs                | LogsAgent            | No              | No    | TODO        |
 | machines             | RoleMachines            | MachinesAgent        | No              | No    | TODO        |
 | mcp-server           | RoleMcpServer           | McpServerAgent       | No              | No    | TODO        |
 | migrate              | RoleMigrate             | MigrateAgent         | No              | No    | TODO        |
 | neovim-setup         | RoleNeovimSetup         | NeovimSetupAgent     | No              | No    | TODO        |
-| package-repo         | RolePackageRepo         | PackageRepoAgent     | Yes             | No    | 🔄 PARTIAL  |
-| search               | RoleSearch              | SearchAgent          | Yes             | No    | 🔄 PARTIAL  |
+| package-repo         | RolePackageRepo         | PackageRepoAgent     | Yes             | Yes   | ✅ DONE     |
+| search               | RoleSearch              | SearchAgent          | Yes             | Yes   | ✅ DONE     |
 | snippets             | RoleSnippets            | SnippetsAgent        | No              | No    | TODO        |
 | store                | RoleStore               | StoreAgent           | No              | No    | TODO        |
 | templates            | RoleTemplates           | TemplatesAgent       | No              | No    | TODO        |
@@ -206,8 +206,8 @@ Below is the tracking table for agent/role implementation for each nixai command
 *Last updated: 2025-01-10*
 
 **Current Status:**
-- ✅ **7 agents fully implemented and tested** (AskAgent, ConfigAgent, DiagnoseAgent, DoctorAgent, ExplainOptionAgent, ExplainHomeOptionAgent, OllamaAgent)
-- ✅ **All 34 agent tests passing** with full project test suite (46.9s runtime)
+- ✅ **12 agents fully implemented and tested** (AskAgent, BuildAgent, ConfigAgent, DiagnoseAgent, DoctorAgent, ExplainOptionAgent, ExplainHomeOptionAgent, FlakeAgent, LearnAgent, PackageRepoAgent, SearchAgent)
+- ✅ **All agent tests passing** with full project test suite
 - ✅ **Agent system architecture complete** with role validation, context management, and provider integration
 - 🔄 **~15 agents remaining** to implement for complete coverage
 - 📋 **CLI integration and provider refactoring** still needed for full deployment
