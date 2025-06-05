@@ -157,7 +157,7 @@ Full configuration with all available options:
       enable = true;
       socketPath = "/run/nixai/mcp.sock";
       host = "localhost";
-      port = 8080;
+      port = 8081;
       documentationSources = [
         "https://wiki.nixos.org/wiki/NixOS_Wiki"
         "https://nix.dev/manual/nix"

@@ -12,10 +12,12 @@
     flake-utils,
     ...
   }: let
-    # System-independent NixOS module
-    nixosModules = {
-      default = import ./modules/nixos.nix;
-    };
+    # System-dependent NixOS modules (using eachDefaultSystemPassThrough)
+    nixosModules = flake-utils.lib.eachDefaultSystemPassThrough (system: {
+      default = import ./modules/nixos.nix {
+        nixaiPackage = self.packages.${system}.nixai;
+      };
+    });
     nixosModule = nixosModules.default;
 
     # System-dependent Home Manager modules (using eachDefaultSystemPassThrough)
