@@ -184,7 +184,7 @@ Below is the tracking table for agent/role implementation for each nixai command
 | gc                   | RoleGC                  | GCAgent              | No              | No    | TODO        |
 | hardware             | RoleHardware            | HardwareAgent        | No              | No    | TODO        |
 | help                 | RoleHelp                | HelpAgent            | No              | No    | TODO        |
-| interactive          | RoleInteractive         | InteractiveAgent     | No              | No    | TODO        |
+| interactive          | RoleInteractive         | InteractiveAgent     | Yes             | Yes   | ✅ DONE     |
 | learn                | RoleLearn               | LearnAgent           | Yes             | Yes   | ✅ DONE     |
 | logs                 | RoleLogs                | LogsAgent            | No              | No    | TODO        |
 | machines             | RoleMachines            | MachinesAgent        | No              | No    | TODO        |
