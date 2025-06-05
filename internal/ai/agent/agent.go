@@ -2,6 +2,9 @@ package agent
 
 import (
 	"context"
+	"fmt"
+
+	"nix-ai-help/internal/ai/roles"
 )
 
 // Agent defines the interface for all AI agents.
@@ -23,13 +26,20 @@ func NewOllamaAgent() *OllamaAgent {
 }
 
 func (a *OllamaAgent) Query(ctx context.Context, input string, role string, contextData interface{}) (string, error) {
-	// TODO: Integrate with internal/ai/ollama provider logic
-	return "[OllamaAgent: Query not yet implemented]", nil
+	if !roles.ValidateRole(role) {
+		return "", fmt.Errorf("unsupported role: %s", role)
+	}
+	prompt, ok := roles.RolePromptTemplate[roles.RoleType(role)]
+	if !ok {
+		return "", fmt.Errorf("no prompt template for role: %s", role)
+	}
+	// For now, just return the formatted prompt and input (simulate LLM call)
+	return fmt.Sprintf("%s\n\n%s", prompt, input), nil
 }
 
 func (a *OllamaAgent) GenerateResponse(ctx context.Context, input string, role string, contextData interface{}) (string, error) {
-	// TODO: Integrate with internal/ai/ollama provider logic
-	return "[OllamaAgent: GenerateResponse not yet implemented]", nil
+	// For now, just call Query (simulate different logic if needed)
+	return a.Query(ctx, input, role, contextData)
 }
 
 func (a *OllamaAgent) SetRole(role string) {

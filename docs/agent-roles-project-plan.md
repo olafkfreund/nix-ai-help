@@ -135,5 +135,44 @@ This project introduces an "agent" abstraction layer for AI providers in nixai, 
 - Please add your name and date when you contribute to this project plan or implementation.
 
 ---
+## Command-to-Role/Agent Mapping Progress
+
+Below is the tracking table for agent/role implementation for each nixai command. Update this as you implement and test each one.
+
+| Command              | RoleType                | Agent Implementation | Prompt Template | Tests | Status      |
+|----------------------|-------------------------|----------------------|-----------------|-------|-------------|
+| ask                  | RoleAsk                 | AskAgent             | Yes             | No    | TODO        |
+| build                | RoleBuild               | BuildAgent           | Yes             | No    | TODO        |
+| community            | RoleCommunity           | CommunityAgent       | Yes             | No    | TODO        |
+| completion           | RoleCompletion          | CompletionAgent      | Yes             | No    | TODO        |
+| config               | RoleConfig              | ConfigAgent          | Yes             | No    | TODO        |
+| configure            | RoleConfigure           | ConfigureAgent       | Yes             | No    | TODO        |
+| devenv               | RoleDevenv              | DevenvAgent          | Yes             | No    | TODO        |
+| diagnose             | RoleDiagnose            | DiagnoseAgent        | Yes             | Yes   | DONE        |
+| doctor               | RoleDoctor              | DoctorAgent          | Yes             | No    | TODO        |
+| explain-home-option  | RoleExplainHomeOption   | ExplainHomeOptionAgent| Yes            | No    | TODO        |
+| explain-option       | RoleExplainOption       | ExplainOptionAgent   | Yes             | No    | TODO        |
+| flake                | RoleFlake               | FlakeAgent           | Yes             | No    | TODO        |
+| gc                   | RoleGC                  | GCAgent              | Yes             | No    | TODO        |
+| hardware             | RoleHardware            | HardwareAgent        | Yes             | No    | TODO        |
+| help                 | RoleHelp                | HelpAgent            | Yes             | No    | TODO        |
+| interactive          | RoleInteractive         | InteractiveAgent     | Yes             | No    | TODO        |
+| learn                | RoleLearn               | LearnAgent           | Yes             | No    | TODO        |
+| logs                 | RoleLogs                | LogsAgent            | Yes             | No    | TODO        |
+| machines             | RoleMachines            | MachinesAgent        | Yes             | No    | TODO        |
+| mcp-server           | RoleMcpServer           | McpServerAgent       | Yes             | No    | TODO        |
+| migrate              | RoleMigrate             | MigrateAgent         | Yes             | No    | TODO        |
+| neovim-setup         | RoleNeovimSetup         | NeovimSetupAgent     | Yes             | No    | TODO        |
+| package-repo         | RolePackageRepo         | PackageRepoAgent     | Yes             | No    | TODO        |
+| search               | RoleSearch              | SearchAgent          | Yes             | No    | TODO        |
+| snippets             | RoleSnippets            | SnippetsAgent        | Yes             | No    | TODO        |
+| store                | RoleStore               | StoreAgent           | Yes             | No    | TODO        |
+| templates            | RoleTemplates           | TemplatesAgent       | Yes             | No    | TODO        |
+
+---
+
+- Update the `internal/ai/roles/roles.go` and `internal/ai/agent/` for each command as you implement.
+- Mark each as DONE when prompt, agent, and tests are complete.
+- Add new commands/roles as needed.
 
 *Last updated: 2025-06-05*
