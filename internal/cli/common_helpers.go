@@ -13,7 +13,7 @@ import (
 func InitializeAIProvider(cfg *config.UserConfig) ai.AIProvider {
 	switch cfg.AIProvider {
 	case "ollama":
-		return ai.NewOllamaProvider(cfg.AIModel)
+		return ai.NewOllamaLegacyProvider(cfg.AIModel)
 	case "gemini":
 		return ai.NewGeminiClient(
 			os.Getenv("GEMINI_API_KEY"),
@@ -28,9 +28,9 @@ func InitializeAIProvider(cfg *config.UserConfig) ai.AIProvider {
 			return ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
 		}
 		// fallback to Ollama if not configured
-		return ai.NewOllamaProvider("llama3")
+		return ai.NewOllamaLegacyProvider("llama3")
 	default:
-		return ai.NewOllamaProvider("llama3")
+		return ai.NewOllamaLegacyProvider("llama3")
 	}
 }
 

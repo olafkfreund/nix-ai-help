@@ -506,13 +506,13 @@ Return only the flake.nix content without explanations.`, string(configContent))
 func getAIProvider(cfg *config.UserConfig, log *logger.Logger) ai.AIProvider {
 	switch cfg.AIProvider {
 	case "ollama":
-		return ai.NewOllamaProvider(cfg.AIModel)
+		return ai.NewOllamaLegacyProvider(cfg.AIModel)
 	case "gemini":
 		return ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 	case "openai":
 		return ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 	default:
-		return ai.NewOllamaProvider("llama3")
+		return ai.NewOllamaLegacyProvider("llama3")
 	}
 }
 

@@ -54,7 +54,7 @@ Usage:
 			var aiProvider ai.AIProvider
 			switch providerName {
 			case "ollama":
-				aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+				aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 			case "openai":
 				aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 			case "gemini":
@@ -345,7 +345,7 @@ var searchCmd = &cobra.Command{
 		var aiProvider ai.AIProvider
 		switch providerName {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		case "gemini":
@@ -429,7 +429,7 @@ var explainHomeOptionCmd = &cobra.Command{
 		var aiProvider ai.AIProvider
 		switch providerName {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		case "gemini":
@@ -530,13 +530,13 @@ func NewExplainOptionCommand() *cobra.Command {
 			var aiProvider ai.AIProvider
 			switch aiProviderName {
 			case "ollama":
-				aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+				aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 			case "openai":
 				aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 			case "gemini":
 				aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
 			default:
-				aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+				aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 			}
 			var prompt string
 			if examplesOnly {
@@ -735,7 +735,7 @@ Examples:
 		var aiProvider ai.AIProvider
 		switch providerName {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		case "gemini":
@@ -882,7 +882,7 @@ Examples:
 		var aiProvider ai.AIProvider
 		switch providerName {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		case "gemini":
@@ -956,7 +956,7 @@ Examples:
 		var aiProvider ai.AIProvider
 		switch providerName {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		case "gemini":
@@ -1000,7 +1000,7 @@ Examples:
 		var aiProvider ai.AIProvider
 		switch providerName {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		case "gemini":
@@ -1362,7 +1362,7 @@ func handleFlakeAnalyze(cmd *cobra.Command, args []string) {
 	var aiProvider ai.AIProvider
 	switch providerName {
 	case "ollama":
-		aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 	case "openai":
 		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 	case "gemini":
@@ -1501,7 +1501,7 @@ func handleLogsAnalyze(cmd *cobra.Command, args []string) {
 	var aiProvider ai.AIProvider
 	switch providerName {
 	case "ollama":
-		aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 	case "openai":
 		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 	case "gemini":
@@ -1749,7 +1749,7 @@ func handlePackageRepoAnalysis(cmd *cobra.Command, args []string) {
 	var aiProvider ai.AIProvider
 	switch providerName {
 	case "ollama":
-		aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 	case "openai":
 		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 	case "gemini":

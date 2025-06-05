@@ -3,49 +3,95 @@ package agent
 import (
 	"context"
 	"fmt"
+	"regexp"
 
+	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/ai/roles"
 )
 
 // Agent defines the interface for all AI agents.
 type Agent interface {
-	Query(ctx context.Context, input string, role string, contextData interface{}) (string, error)
-	GenerateResponse(ctx context.Context, input string, role string, contextData interface{}) (string, error)
-	SetRole(role string)
+	Query(ctx context.Context, question string) (string, error)
+	GenerateResponse(ctx context.Context, prompt string) (string, error)
+	SetRole(role roles.RoleType) error
 	SetContext(contextData interface{})
+}
+
+// BaseAgent provides common functionality for all agents.
+type BaseAgent struct {
+	provider    ai.Provider
+	role        roles.RoleType
+	contextData interface{}
+}
+
+// SetRole sets the role for the agent.
+func (a *BaseAgent) SetRole(role roles.RoleType) error {
+	if !roles.ValidateRole(string(role)) {
+		return fmt.Errorf("unsupported role: %s", role)
+	}
+	a.role = role
+	return nil
+}
+
+// SetContext sets the context data for the agent.
+func (a *BaseAgent) SetContext(contextData interface{}) {
+	a.contextData = contextData
+}
+
+// validateRole validates that the agent has a proper role set.
+func (a *BaseAgent) validateRole() error {
+	if a.role == "" {
+		return fmt.Errorf("agent role not set")
+	}
+	if !roles.ValidateRole(string(a.role)) {
+		return fmt.Errorf("invalid role: %s", a.role)
+	}
+	return nil
+}
+
+// findFirstMatch finds the first regex match in a string.
+func findFirstMatch(text, pattern string) string {
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return ""
+	}
+	match := re.FindString(text)
+	return match
 }
 
 // OllamaAgent is a basic implementation of the Agent interface using the Ollama provider.
 type OllamaAgent struct {
-	role        string
-	contextData interface{}
+	BaseAgent
 }
 
-func NewOllamaAgent() *OllamaAgent {
-	return &OllamaAgent{}
-}
-
-func (a *OllamaAgent) Query(ctx context.Context, input string, role string, contextData interface{}) (string, error) {
-	if !roles.ValidateRole(role) {
-		return "", fmt.Errorf("unsupported role: %s", role)
+func NewOllamaAgent(provider ai.Provider) *OllamaAgent {
+	return &OllamaAgent{
+		BaseAgent: BaseAgent{
+			provider: provider,
+		},
 	}
-	prompt, ok := roles.RolePromptTemplate[roles.RoleType(role)]
+}
+
+func (a *OllamaAgent) Query(ctx context.Context, question string) (string, error) {
+	if err := a.validateRole(); err != nil {
+		return "", err
+	}
+
+	prompt, ok := roles.RolePromptTemplate[a.role]
 	if !ok {
-		return "", fmt.Errorf("no prompt template for role: %s", role)
+		return "", fmt.Errorf("no prompt template for role: %s", a.role)
 	}
-	// For now, just return the formatted prompt and input (simulate LLM call)
-	return fmt.Sprintf("%s\n\n%s", prompt, input), nil
+
+	// Combine role prompt with question
+	fullPrompt := fmt.Sprintf("%s\n\n%s", prompt, question)
+
+	return a.provider.Query(ctx, fullPrompt)
 }
 
-func (a *OllamaAgent) GenerateResponse(ctx context.Context, input string, role string, contextData interface{}) (string, error) {
-	// For now, just call Query (simulate different logic if needed)
-	return a.Query(ctx, input, role, contextData)
-}
+func (a *OllamaAgent) GenerateResponse(ctx context.Context, prompt string) (string, error) {
+	if err := a.validateRole(); err != nil {
+		return "", err
+	}
 
-func (a *OllamaAgent) SetRole(role string) {
-	a.role = role
-}
-
-func (a *OllamaAgent) SetContext(contextData interface{}) {
-	a.contextData = contextData
+	return a.provider.GenerateResponse(ctx, prompt)
 }

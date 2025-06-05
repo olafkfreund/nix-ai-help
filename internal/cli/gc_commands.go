@@ -119,13 +119,13 @@ This command provides:
 		var aiProvider ai.AIProvider
 		switch cfg.AIProvider {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "gemini":
 			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		default:
-			aiProvider = ai.NewOllamaProvider("llama3")
+			aiProvider = ai.NewOllamaLegacyProvider("llama3")
 		}
 
 		// Perform analysis
@@ -178,13 +178,13 @@ This command:
 		var aiProvider ai.AIProvider
 		switch cfg.AIProvider {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "gemini":
 			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		default:
-			aiProvider = ai.NewOllamaProvider("llama3")
+			aiProvider = ai.NewOllamaLegacyProvider("llama3")
 		}
 
 		// Perform safe cleanup
@@ -228,13 +228,13 @@ This command analyzes:
 		var aiProvider ai.AIProvider
 		switch cfg.AIProvider {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "gemini":
 			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		default:
-			aiProvider = ai.NewOllamaProvider("llama3")
+			aiProvider = ai.NewOllamaLegacyProvider("llama3")
 		}
 
 		// Compare generations
@@ -276,13 +276,13 @@ Shows:
 		var aiProvider ai.AIProvider
 		switch cfg.AIProvider {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "gemini":
 			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		default:
-			aiProvider = ai.NewOllamaProvider("llama3")
+			aiProvider = ai.NewOllamaLegacyProvider("llama3")
 		}
 
 		// Analyze disk usage
