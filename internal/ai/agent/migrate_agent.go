@@ -16,18 +16,18 @@ type MigrateAgent struct {
 
 // MigrationContext provides context for migration operations.
 type MigrationContext struct {
-	SourceSystem     string   // Current NixOS version/system details
-	TargetSystem     string   // Target NixOS version/system
-	MigrationType    string   // "version", "machine", "config", "flake"
-	CurrentConfig    string   // Current configuration files
-	Issues           []string // Known migration issues or concerns
-	Hardware         string   // Hardware configuration details
-	Services         []string // Running services to migrate
-	Packages         []string // Custom packages that need migration
-	HomeManager      bool     // Whether Home Manager is used
-	FlakeUsage       bool     // Whether flakes are used
-	BackupStrategy   string   // Backup approach being used
-	RollbackPlan     string   // Rollback strategy if migration fails
+	SourceSystem   string   // Current NixOS version/system details
+	TargetSystem   string   // Target NixOS version/system
+	MigrationType  string   // "version", "machine", "config", "flake"
+	CurrentConfig  string   // Current configuration files
+	Issues         []string // Known migration issues or concerns
+	Hardware       string   // Hardware configuration details
+	Services       []string // Running services to migrate
+	Packages       []string // Custom packages that need migration
+	HomeManager    bool     // Whether Home Manager is used
+	FlakeUsage     bool     // Whether flakes are used
+	BackupStrategy string   // Backup approach being used
+	RollbackPlan   string   // Rollback strategy if migration fails
 }
 
 // NewMigrateAgent creates a new MigrateAgent with the specified provider.
@@ -100,7 +100,7 @@ func (a *MigrateAgent) buildMigrationPrompt(question string, context *MigrationC
 
 	// Add migration context
 	prompt.WriteString("Migration Context:\n")
-	
+
 	if context.SourceSystem != "" {
 		prompt.WriteString(fmt.Sprintf("- Source System: %s\n", context.SourceSystem))
 	}
@@ -148,10 +148,10 @@ func (a *MigrateAgent) buildMigrationPrompt(question string, context *MigrationC
 func (a *MigrateAgent) formatMigrationResponse(response string) string {
 	// Add migration-specific formatting and guidance
 	var formatted strings.Builder
-	
+
 	formatted.WriteString("🔄 Migration Guidance:\n\n")
 	formatted.WriteString(response)
-	
+
 	// Add common migration reminders
 	formatted.WriteString("\n\n📋 Migration Checklist Reminders:")
 	formatted.WriteString("\n• Always backup your current configuration")
@@ -160,7 +160,7 @@ func (a *MigrateAgent) formatMigrationResponse(response string) string {
 	formatted.WriteString("\n• Update your hardware-configuration.nix if moving machines")
 	formatted.WriteString("\n• Verify all services restart correctly after migration")
 	formatted.WriteString("\n• Check that all user data and home configurations are preserved")
-	
+
 	return formatted.String()
 }
 
@@ -179,18 +179,18 @@ func (a *MigrateAgent) AnalyzeMigrationPath(ctx context.Context, sourceSystem, t
 		TargetSystem:  targetSystem,
 		MigrationType: "version",
 	}
-	
+
 	a.SetMigrationContext(migrationCtx)
-	
+
 	question := fmt.Sprintf("Analyze the migration path from %s to %s. What are the key steps, potential issues, and best practices for this migration?", sourceSystem, targetSystem)
-	
+
 	return a.GenerateResponse(ctx, question)
 }
 
 // GenerateMigrationPlan creates a detailed migration plan.
 func (a *MigrateAgent) GenerateMigrationPlan(ctx context.Context, migrationCtx *MigrationContext) (string, error) {
 	a.SetMigrationContext(migrationCtx)
-	
+
 	var request strings.Builder
 	request.WriteString("Generate a comprehensive migration plan including:")
 	request.WriteString("\n1. Pre-migration preparation steps")
@@ -199,7 +199,7 @@ func (a *MigrateAgent) GenerateMigrationPlan(ctx context.Context, migrationCtx *
 	request.WriteString("\n4. Post-migration verification")
 	request.WriteString("\n5. Rollback procedures if needed")
 	request.WriteString("\n6. Common issues and troubleshooting")
-	
+
 	return a.GenerateResponse(ctx, request.String())
 }
 
@@ -207,8 +207,8 @@ func (a *MigrateAgent) GenerateMigrationPlan(ctx context.Context, migrationCtx *
 func (a *MigrateAgent) DiagnoseMigrationIssues(ctx context.Context, issues []string, context *MigrationContext) (string, error) {
 	context.Issues = issues
 	a.SetMigrationContext(context)
-	
+
 	question := fmt.Sprintf("Help diagnose and resolve these migration issues: %s", strings.Join(issues, ", "))
-	
+
 	return a.GenerateResponse(ctx, question)
 }

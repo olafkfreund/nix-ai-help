@@ -16,18 +16,18 @@ type TemplatesAgent struct {
 
 // TemplateContext provides context for template operations.
 type TemplateContext struct {
-	TemplateType   string            // "flake", "nixos", "home-manager", "devenv", "package"
-	ProjectName    string            // Name of the project/configuration
-	Purpose        string            // What the template will be used for
-	Features       []string          // Required features (GUI, development, server, etc.)
-	Architecture   string            // Target architecture
-	Language       string            // Primary programming language (if applicable)
-	Framework      string            // Framework or technology stack
-	Services       []string          // Services to include (postgres, redis, nginx, etc.)
-	Customization  string            // Specific customization requirements
-	BaseTemplate   string            // Base template to start from
-	OutputPath     string            // Where to generate the template
-	Metadata       map[string]string // Additional template metadata
+	TemplateType  string            // "flake", "nixos", "home-manager", "devenv", "package"
+	ProjectName   string            // Name of the project/configuration
+	Purpose       string            // What the template will be used for
+	Features      []string          // Required features (GUI, development, server, etc.)
+	Architecture  string            // Target architecture
+	Language      string            // Primary programming language (if applicable)
+	Framework     string            // Framework or technology stack
+	Services      []string          // Services to include (postgres, redis, nginx, etc.)
+	Customization string            // Specific customization requirements
+	BaseTemplate  string            // Base template to start from
+	OutputPath    string            // Where to generate the template
+	Metadata      map[string]string // Additional template metadata
 }
 
 // NewTemplatesAgent creates a new TemplatesAgent with the specified provider.
@@ -413,25 +413,25 @@ func (a *TemplatesAgent) enhanceResponseWithTemplateGuidance(response string) st
 // formatTemplateOutput formats template generation output for clarity.
 func (a *TemplatesAgent) formatTemplateOutput(response string, templateCtx *TemplateContext) string {
 	var formatted strings.Builder
-	
+
 	formatted.WriteString("# Generated ")
 	formatted.WriteString(strings.Title(templateCtx.TemplateType))
 	formatted.WriteString(" Template")
-	
+
 	if templateCtx.ProjectName != "" {
 		formatted.WriteString(" for ")
 		formatted.WriteString(templateCtx.ProjectName)
 	}
-	
+
 	formatted.WriteString("\n\n")
 	formatted.WriteString(response)
-	
+
 	// Add usage instructions
 	formatted.WriteString("\n\n## Usage Instructions\n")
 	formatted.WriteString("1. Save the configuration to appropriate files\n")
 	formatted.WriteString("2. Review and customize the settings for your environment\n")
 	formatted.WriteString("3. Test the configuration before applying to production\n")
 	formatted.WriteString("4. Use `nixos-rebuild switch` or appropriate commands to apply\n")
-	
+
 	return formatted.String()
 }

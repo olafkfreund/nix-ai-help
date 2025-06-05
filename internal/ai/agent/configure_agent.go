@@ -12,22 +12,22 @@ import (
 // ConfigurationContext represents context for system configuration operations.
 type ConfigurationContext struct {
 	// System information
-	Hardware      string   `json:"hardware,omitempty"`
-	Architecture  string   `json:"architecture,omitempty"`
-	BootLoader    string   `json:"boot_loader,omitempty"`
-	FileSystem    string   `json:"file_system,omitempty"`
-	
+	Hardware     string `json:"hardware,omitempty"`
+	Architecture string `json:"architecture,omitempty"`
+	BootLoader   string `json:"boot_loader,omitempty"`
+	FileSystem   string `json:"file_system,omitempty"`
+
 	// Configuration requirements
 	DesktopEnvironment string   `json:"desktop_environment,omitempty"`
-	Services          []string `json:"services,omitempty"`
-	Users             []string `json:"users,omitempty"`
-	NetworkConfig     string   `json:"network_config,omitempty"`
-	
+	Services           []string `json:"services,omitempty"`
+	Users              []string `json:"users,omitempty"`
+	NetworkConfig      string   `json:"network_config,omitempty"`
+
 	// Setup preferences
-	InstallationType  string   `json:"installation_type,omitempty"`
-	SecurityLevel     string   `json:"security_level,omitempty"`
-	PerformanceProfile string  `json:"performance_profile,omitempty"`
-	
+	InstallationType   string `json:"installation_type,omitempty"`
+	SecurityLevel      string `json:"security_level,omitempty"`
+	PerformanceProfile string `json:"performance_profile,omitempty"`
+
 	// Current status
 	CurrentConfig     string   `json:"current_config,omitempty"`
 	ConfigurationFile string   `json:"configuration_file,omitempty"`
@@ -57,19 +57,19 @@ func (a *ConfigureAgent) Query(ctx context.Context, input string) (string, error
 	if err := a.validateRole(); err != nil {
 		return "", err
 	}
-	
+
 	// Build configuration-specific prompt
 	prompt := a.buildConfigurationPrompt(input)
-	
+
 	// Query the provider
 	response, err := a.provider.Query(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("configuration query failed: %w", err)
 	}
-	
+
 	// Format and enhance the response
 	formattedResponse := a.formatConfigurationResponse(response)
-	
+
 	return formattedResponse, nil
 }
 
@@ -104,7 +104,7 @@ Please provide:
 
 Current Configuration Context:
 %s`, systemInfo, a.formatConfigurationContext())
-	
+
 	return a.Query(ctx, prompt)
 }
 
@@ -125,7 +125,7 @@ Please provide:
 4. Next steps for customization
 
 Focus on creating a working, secure, and maintainable configuration.`, requirements, a.formatConfigurationContext())
-	
+
 	return a.Query(ctx, prompt)
 }
 
@@ -148,7 +148,7 @@ Please check for:
 6. Conflicting configurations
 
 Provide specific fixes for any issues found.`, configContent, a.formatConfigurationContext())
-	
+
 	return a.Query(ctx, prompt)
 }
 
@@ -170,7 +170,7 @@ Please provide:
 5. Modern NixOS best practices
 
 Include specific configuration changes and explanations.`, configContent, a.formatConfigurationContext())
-	
+
 	return a.Query(ctx, prompt)
 }
 
@@ -192,20 +192,20 @@ Please provide:
 5. Testing and validation steps
 
 Include specific commands and configuration changes needed.`, issue, a.formatConfigurationContext())
-	
+
 	return a.Query(ctx, prompt)
 }
 
 // buildConfigurationPrompt builds a configuration-specific prompt.
 func (a *ConfigureAgent) buildConfigurationPrompt(input string) string {
 	var builder strings.Builder
-	
+
 	// Add role template
 	if template, exists := roles.RolePromptTemplate[roles.RoleConfigure]; exists {
 		builder.WriteString(template)
 		builder.WriteString("\n\n")
 	}
-	
+
 	// Add configuration context if available
 	if a.context != nil {
 		contextStr := a.formatConfigurationContext()
@@ -215,11 +215,11 @@ func (a *ConfigureAgent) buildConfigurationPrompt(input string) string {
 			builder.WriteString("\n\n")
 		}
 	}
-	
+
 	// Add user input
 	builder.WriteString("User Query: ")
 	builder.WriteString(input)
-	
+
 	return builder.String()
 }
 
@@ -228,9 +228,9 @@ func (a *ConfigureAgent) formatConfigurationContext() string {
 	if a.context == nil {
 		return ""
 	}
-	
+
 	var parts []string
-	
+
 	// System information
 	if a.context.Hardware != "" {
 		parts = append(parts, fmt.Sprintf("Hardware: %s", a.context.Hardware))
@@ -244,7 +244,7 @@ func (a *ConfigureAgent) formatConfigurationContext() string {
 	if a.context.FileSystem != "" {
 		parts = append(parts, fmt.Sprintf("File System: %s", a.context.FileSystem))
 	}
-	
+
 	// Configuration requirements
 	if a.context.DesktopEnvironment != "" {
 		parts = append(parts, fmt.Sprintf("Desktop Environment: %s", a.context.DesktopEnvironment))
@@ -258,7 +258,7 @@ func (a *ConfigureAgent) formatConfigurationContext() string {
 	if a.context.NetworkConfig != "" {
 		parts = append(parts, fmt.Sprintf("Network Configuration: %s", a.context.NetworkConfig))
 	}
-	
+
 	// Setup preferences
 	if a.context.InstallationType != "" {
 		parts = append(parts, fmt.Sprintf("Installation Type: %s", a.context.InstallationType))
@@ -269,7 +269,7 @@ func (a *ConfigureAgent) formatConfigurationContext() string {
 	if a.context.PerformanceProfile != "" {
 		parts = append(parts, fmt.Sprintf("Performance Profile: %s", a.context.PerformanceProfile))
 	}
-	
+
 	// Current status
 	if a.context.CurrentConfig != "" {
 		parts = append(parts, fmt.Sprintf("Current Configuration: %s", a.context.CurrentConfig))
@@ -280,17 +280,17 @@ func (a *ConfigureAgent) formatConfigurationContext() string {
 	if len(a.context.Issues) > 0 {
 		parts = append(parts, fmt.Sprintf("Known Issues: %s", strings.Join(a.context.Issues, "; ")))
 	}
-	
+
 	return strings.Join(parts, "\n")
 }
 
 // formatConfigurationResponse formats the agent response with configuration-specific enhancements.
 func (a *ConfigureAgent) formatConfigurationResponse(response string) string {
 	var builder strings.Builder
-	
+
 	builder.WriteString("## NixOS Configuration Assistant\n\n")
 	builder.WriteString(response)
-	
+
 	// Add configuration safety reminder
 	builder.WriteString("\n\n---\n")
 	builder.WriteString("**⚠️ Configuration Safety Tips:**\n")
@@ -299,7 +299,7 @@ func (a *ConfigureAgent) formatConfigurationResponse(response string) string {
 	builder.WriteString("- Use `nixos-rebuild switch` only after testing\n")
 	builder.WriteString("- Keep previous generations available for rollback\n")
 	builder.WriteString("- Validate configuration syntax before applying changes\n")
-	
+
 	return builder.String()
 }
 
@@ -308,10 +308,10 @@ func (a *ConfigureAgent) validateRole() error {
 	if a.role == "" {
 		return fmt.Errorf("configure agent role not set")
 	}
-	
+
 	if !roles.ValidateRole(string(a.role)) {
 		return fmt.Errorf("invalid configure agent role: %s", a.role)
 	}
-	
+
 	return nil
 }

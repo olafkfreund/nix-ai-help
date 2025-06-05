@@ -16,25 +16,25 @@ type DevenvAgent struct {
 
 // DevenvContext provides context for development environment operations.
 type DevenvContext struct {
-	ProjectType       string            // "web", "rust", "go", "python", "nodejs", etc.
-	Languages         []string          // Programming languages needed
-	Tools             []string          // Development tools required
-	Services          []string          // Services needed (databases, redis, etc.)
-	Frameworks        []string          // Frameworks being used
-	Dependencies      map[string]string // Package dependencies with versions
-	Environment       string            // "development", "testing", "ci", etc.
-	NixShell          bool              // Whether using nix-shell
-	Flakes            bool              // Whether using flakes
-	Direnv            bool              // Whether using direnv
-	ProjectRoot       string            // Project root directory
-	BuildSystem       string            // "cargo", "npm", "make", "cmake", etc.
-	DevServices       []string          // Development services (hot reload, etc.)
-	ContainerNeeds    bool              // Whether containers are needed
-	EditorConfig      string            // Editor/IDE configuration needs
-	TestingFramework  string            // Testing tools needed
-	LintingTools      []string          // Linting and formatting tools
-	DebugTools        []string          // Debugging tools needed
-	Documentation     []string          // Documentation generation tools
+	ProjectType      string            // "web", "rust", "go", "python", "nodejs", etc.
+	Languages        []string          // Programming languages needed
+	Tools            []string          // Development tools required
+	Services         []string          // Services needed (databases, redis, etc.)
+	Frameworks       []string          // Frameworks being used
+	Dependencies     map[string]string // Package dependencies with versions
+	Environment      string            // "development", "testing", "ci", etc.
+	NixShell         bool              // Whether using nix-shell
+	Flakes           bool              // Whether using flakes
+	Direnv           bool              // Whether using direnv
+	ProjectRoot      string            // Project root directory
+	BuildSystem      string            // "cargo", "npm", "make", "cmake", etc.
+	DevServices      []string          // Development services (hot reload, etc.)
+	ContainerNeeds   bool              // Whether containers are needed
+	EditorConfig     string            // Editor/IDE configuration needs
+	TestingFramework string            // Testing tools needed
+	LintingTools     []string          // Linting and formatting tools
+	DebugTools       []string          // Debugging tools needed
+	Documentation    []string          // Documentation generation tools
 }
 
 // NewDevenvAgent creates a new DevenvAgent with the specified provider.
@@ -107,7 +107,7 @@ func (a *DevenvAgent) buildDevenvPrompt(question string, context *DevenvContext)
 
 	// Add development environment context
 	prompt.WriteString("Development Environment Context:\n")
-	
+
 	if context.ProjectType != "" {
 		prompt.WriteString(fmt.Sprintf("- Project Type: %s\n", context.ProjectType))
 	}
@@ -184,10 +184,10 @@ func (a *DevenvAgent) buildDevenvPrompt(question string, context *DevenvContext)
 func (a *DevenvAgent) formatDevenvResponse(response string) string {
 	// Add devenv-specific formatting and guidance
 	var formatted strings.Builder
-	
+
 	formatted.WriteString("🛠️ Development Environment Guidance:\n\n")
 	formatted.WriteString(response)
-	
+
 	// Add common devenv reminders
 	formatted.WriteString("\n\n📋 Development Environment Best Practices:")
 	formatted.WriteString("\n• Use declarative configuration with nix-shell or flakes")
@@ -197,7 +197,7 @@ func (a *DevenvAgent) formatDevenvResponse(response string) string {
 	formatted.WriteString("\n• Document environment setup in README or docs")
 	formatted.WriteString("\n• Test the environment on a fresh system")
 	formatted.WriteString("\n• Consider using cachix for faster builds")
-	
+
 	return formatted.String()
 }
 
@@ -216,18 +216,18 @@ func (a *DevenvAgent) AnalyzeProject(ctx context.Context, projectPath, projectTy
 		ProjectRoot: projectPath,
 		Environment: "development",
 	}
-	
+
 	a.SetDevenvContext(devenvCtx)
-	
+
 	question := fmt.Sprintf("Analyze the %s project at %s and recommend a complete development environment setup including tools, dependencies, and configuration.", projectType, projectPath)
-	
+
 	return a.GenerateResponse(ctx, question)
 }
 
 // GenerateShellNix creates a shell.nix configuration for the project.
 func (a *DevenvAgent) GenerateShellNix(ctx context.Context, devenvCtx *DevenvContext) (string, error) {
 	a.SetDevenvContext(devenvCtx)
-	
+
 	var request strings.Builder
 	request.WriteString("Generate a comprehensive shell.nix file that includes:")
 	request.WriteString("\n1. All required packages and dependencies")
@@ -236,7 +236,7 @@ func (a *DevenvAgent) GenerateShellNix(ctx context.Context, devenvCtx *DevenvCon
 	request.WriteString("\n4. Build system integration")
 	request.WriteString("\n5. Editor/IDE support tools")
 	request.WriteString("\n6. Testing and debugging tools")
-	
+
 	return a.GenerateResponse(ctx, request.String())
 }
 
@@ -244,7 +244,7 @@ func (a *DevenvAgent) GenerateShellNix(ctx context.Context, devenvCtx *DevenvCon
 func (a *DevenvAgent) GenerateFlakeNix(ctx context.Context, devenvCtx *DevenvContext) (string, error) {
 	devenvCtx.Flakes = true
 	a.SetDevenvContext(devenvCtx)
-	
+
 	var request strings.Builder
 	request.WriteString("Generate a comprehensive flake.nix file that includes:")
 	request.WriteString("\n1. Development shell with all required packages")
@@ -253,7 +253,7 @@ func (a *DevenvAgent) GenerateFlakeNix(ctx context.Context, devenvCtx *DevenvCon
 	request.WriteString("\n4. Proper input management and version pinning")
 	request.WriteString("\n5. Cross-platform compatibility")
 	request.WriteString("\n6. Integration with common development workflows")
-	
+
 	return a.GenerateResponse(ctx, request.String())
 }
 
@@ -261,26 +261,26 @@ func (a *DevenvAgent) GenerateFlakeNix(ctx context.Context, devenvCtx *DevenvCon
 func (a *DevenvAgent) SetupDirenv(ctx context.Context, context *DevenvContext) (string, error) {
 	context.Direnv = true
 	a.SetDevenvContext(context)
-	
+
 	question := "Provide complete setup instructions for direnv integration including .envrc configuration, shell integration, and usage best practices."
-	
+
 	return a.GenerateResponse(ctx, question)
 }
 
 // OptimizeBuildPerformance provides build optimization suggestions.
 func (a *DevenvAgent) OptimizeBuildPerformance(ctx context.Context, context *DevenvContext) (string, error) {
 	a.SetDevenvContext(context)
-	
+
 	question := "Analyze the development environment setup and provide recommendations for optimizing build performance, including caching strategies, parallel builds, and dependency management."
-	
+
 	return a.GenerateResponse(ctx, question)
 }
 
 // TroubleshootEnvironment helps debug development environment issues.
 func (a *DevenvAgent) TroubleshootEnvironment(ctx context.Context, issues []string, context *DevenvContext) (string, error) {
 	a.SetDevenvContext(context)
-	
+
 	question := fmt.Sprintf("Help troubleshoot these development environment issues: %s. Provide specific debugging steps and solutions.", strings.Join(issues, ", "))
-	
+
 	return a.GenerateResponse(ctx, question)
 }

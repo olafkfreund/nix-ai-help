@@ -128,30 +128,30 @@ func (a *HelpAgent) buildHelpPrompt(question string, helpCtx *HelpContext) strin
 // buildCommandReference creates a comprehensive reference of nixai commands.
 func (a *HelpAgent) buildCommandReference() string {
 	commands := map[string]string{
-		"nixai ask":               "Ask direct questions about NixOS",
-		"nixai diagnose":          "Diagnose NixOS problems from logs/configs",
-		"nixai doctor":            "Perform comprehensive system health checks",
-		"nixai search":            "Search for NixOS packages and options",
-		"nixai explain-option":    "Explain NixOS configuration options",
+		"nixai ask":                 "Ask direct questions about NixOS",
+		"nixai diagnose":            "Diagnose NixOS problems from logs/configs",
+		"nixai doctor":              "Perform comprehensive system health checks",
+		"nixai search":              "Search for NixOS packages and options",
+		"nixai explain-option":      "Explain NixOS configuration options",
 		"nixai explain-home-option": "Explain Home Manager configuration options",
-		"nixai build":             "Get help with NixOS build issues",
-		"nixai flake":             "Manage and work with Nix flakes",
-		"nixai gc":                "Garbage collection and store cleanup",
-		"nixai hardware":          "Hardware detection and configuration",
-		"nixai interactive":       "Start interactive troubleshooting session",
-		"nixai learn":             "Access learning resources and tutorials",
-		"nixai logs":              "Analyze system and service logs",
-		"nixai package-repo":      "Analyze repositories for Nix packaging",
-		"nixai config":            "Configuration management assistance",
-		"nixai community":         "Access community resources and support",
-		"nixai machines":          "Manage multiple NixOS machines",
-		"nixai devenv":            "Development environment setup",
-		"nixai neovim-setup":      "Neovim configuration for NixOS",
-		"nixai templates":         "Configuration templates and examples",
-		"nixai migrate":           "Migration assistance between NixOS versions",
-		"nixai mcp-server":        "MCP server management",
-		"nixai snippets":          "Code snippets and configuration examples",
-		"nixai store":             "Nix store operations and management",
+		"nixai build":               "Get help with NixOS build issues",
+		"nixai flake":               "Manage and work with Nix flakes",
+		"nixai gc":                  "Garbage collection and store cleanup",
+		"nixai hardware":            "Hardware detection and configuration",
+		"nixai interactive":         "Start interactive troubleshooting session",
+		"nixai learn":               "Access learning resources and tutorials",
+		"nixai logs":                "Analyze system and service logs",
+		"nixai package-repo":        "Analyze repositories for Nix packaging",
+		"nixai config":              "Configuration management assistance",
+		"nixai community":           "Access community resources and support",
+		"nixai machines":            "Manage multiple NixOS machines",
+		"nixai devenv":              "Development environment setup",
+		"nixai neovim-setup":        "Neovim configuration for NixOS",
+		"nixai templates":           "Configuration templates and examples",
+		"nixai migrate":             "Migration assistance between NixOS versions",
+		"nixai mcp-server":          "MCP server management",
+		"nixai snippets":            "Code snippets and configuration examples",
+		"nixai store":               "Nix store operations and management",
 	}
 
 	var reference strings.Builder
@@ -221,7 +221,7 @@ func (a *HelpAgent) SuggestCommand(ctx context.Context, userInput string) (strin
 Suggest the single most appropriate nixai command from this list:
 %s
 
-Respond with just the command name (e.g., "ask", "diagnose", "doctor").`, 
+Respond with just the command name (e.g., "ask", "diagnose", "doctor").`,
 		userInput, strings.Join(a.GetAvailableCommands(), ", "))
 
 	return a.provider.Query(ctx, prompt)
@@ -234,7 +234,7 @@ func (a *HelpAgent) ExplainWorkflow(ctx context.Context, goal string) (string, e
 	}
 
 	helpCtx := &HelpContext{
-		UserGoal:    goal,
+		UserGoal:     goal,
 		AvailableCmd: a.GetAvailableCommands(),
 	}
 	a.SetHelpContext(helpCtx)

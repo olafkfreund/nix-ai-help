@@ -12,42 +12,42 @@ import (
 // MachineContext represents context for machine management operations.
 type MachineContext struct {
 	// Machine information
-	MachineName     string   `json:"machine_name,omitempty"`
-	HostName        string   `json:"host_name,omitempty"`
-	Architecture    string   `json:"architecture,omitempty"`
-	OSVersion       string   `json:"os_version,omitempty"`
-	
+	MachineName  string `json:"machine_name,omitempty"`
+	HostName     string `json:"host_name,omitempty"`
+	Architecture string `json:"architecture,omitempty"`
+	OSVersion    string `json:"os_version,omitempty"`
+
 	// Network and connectivity
-	IPAddress       string   `json:"ip_address,omitempty"`
-	SSHUser         string   `json:"ssh_user,omitempty"`
-	SSHPort         int      `json:"ssh_port,omitempty"`
-	NetworkStatus   string   `json:"network_status,omitempty"`
-	
+	IPAddress     string `json:"ip_address,omitempty"`
+	SSHUser       string `json:"ssh_user,omitempty"`
+	SSHPort       int    `json:"ssh_port,omitempty"`
+	NetworkStatus string `json:"network_status,omitempty"`
+
 	// Configuration context
-	FlakePath       string   `json:"flake_path,omitempty"`
-	ConfigHash      string   `json:"config_hash,omitempty"`
-	Generation      int      `json:"generation,omitempty"`
-	DeployMethod    string   `json:"deploy_method,omitempty"`
-	
+	FlakePath    string `json:"flake_path,omitempty"`
+	ConfigHash   string `json:"config_hash,omitempty"`
+	Generation   int    `json:"generation,omitempty"`
+	DeployMethod string `json:"deploy_method,omitempty"`
+
 	// Machine group and management
-	MachineGroup    string   `json:"machine_group,omitempty"`
-	MachineRole     string   `json:"machine_role,omitempty"`
-	Dependencies    []string `json:"dependencies,omitempty"`
-	
+	MachineGroup string   `json:"machine_group,omitempty"`
+	MachineRole  string   `json:"machine_role,omitempty"`
+	Dependencies []string `json:"dependencies,omitempty"`
+
 	// Deployment status
-	LastDeploy      string   `json:"last_deploy,omitempty"`
-	DeployStatus    string   `json:"deploy_status,omitempty"`
-	HealthStatus    string   `json:"health_status,omitempty"`
-	Issues          []string `json:"issues,omitempty"`
-	
+	LastDeploy   string   `json:"last_deploy,omitempty"`
+	DeployStatus string   `json:"deploy_status,omitempty"`
+	HealthStatus string   `json:"health_status,omitempty"`
+	Issues       []string `json:"issues,omitempty"`
+
 	// Performance and resources
-	CPUUsage        string   `json:"cpu_usage,omitempty"`
-	MemoryUsage     string   `json:"memory_usage,omitempty"`
-	DiskUsage       string   `json:"disk_usage,omitempty"`
-	LoadAverage     string   `json:"load_average,omitempty"`
-	
+	CPUUsage    string `json:"cpu_usage,omitempty"`
+	MemoryUsage string `json:"memory_usage,omitempty"`
+	DiskUsage   string `json:"disk_usage,omitempty"`
+	LoadAverage string `json:"load_average,omitempty"`
+
 	// Operation context
-	OperationType   string   `json:"operation_type,omitempty"`
+	OperationType string `json:"operation_type,omitempty"`
 }
 
 // MachinesAgent represents an agent specialized in multi-machine management.
@@ -111,19 +111,19 @@ func (a *MachinesAgent) GenerateResponse(ctx context.Context, prompt string) (st
 func (a *MachinesAgent) PlanDeployment(ctx context.Context, machines []string, deployMethod string) (string, error) {
 	a.context.DeployMethod = deployMethod
 	a.context.OperationType = "deployment_planning"
-	
+
 	prompt := a.buildPrompt("Plan and optimize deployment strategy for multiple machines", map[string]interface{}{
 		"target_machines": machines,
-		"deploy_method": deployMethod,
-		"operation": "deployment planning",
-		"include": "dependency order, rollback strategy, health checks, monitoring",
+		"deploy_method":   deployMethod,
+		"operation":       "deployment planning",
+		"include":         "dependency order, rollback strategy, health checks, monitoring",
 	})
-	
+
 	response, err := a.provider.GenerateResponse(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to plan deployment: %w", err)
 	}
-	
+
 	return a.formatMachineResponse(response, "Deployment Planning"), nil
 }
 
@@ -132,19 +132,19 @@ func (a *MachinesAgent) DiagnoseDeploymentIssues(ctx context.Context, machineNam
 	a.context.MachineName = machineName
 	a.context.Issues = issues
 	a.context.OperationType = "deployment_diagnosis"
-	
+
 	prompt := a.buildPrompt("Diagnose deployment issues and provide resolution strategies", map[string]interface{}{
 		"machine_name": machineName,
-		"issues": issues,
-		"operation": "deployment troubleshooting",
-		"include": "root cause analysis, fix strategies, prevention measures",
+		"issues":       issues,
+		"operation":    "deployment troubleshooting",
+		"include":      "root cause analysis, fix strategies, prevention measures",
 	})
-	
+
 	response, err := a.provider.GenerateResponse(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to diagnose deployment issues: %w", err)
 	}
-	
+
 	return a.formatMachineResponse(response, "Deployment Issue Diagnosis"), nil
 }
 
@@ -153,39 +153,39 @@ func (a *MachinesAgent) OptimizeMachineConfiguration(ctx context.Context, machin
 	a.context.MachineName = machineName
 	a.context.MachineRole = machineRole
 	a.context.OperationType = "configuration_optimization"
-	
+
 	prompt := a.buildPrompt("Optimize machine configuration for specific role and requirements", map[string]interface{}{
 		"machine_name": machineName,
 		"machine_role": machineRole,
 		"requirements": requirements,
-		"operation": "configuration optimization",
-		"include": "performance tuning, resource allocation, service configuration, security hardening",
+		"operation":    "configuration optimization",
+		"include":      "performance tuning, resource allocation, service configuration, security hardening",
 	})
-	
+
 	response, err := a.provider.GenerateResponse(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to optimize machine configuration: %w", err)
 	}
-	
+
 	return a.formatMachineResponse(response, "Machine Configuration Optimization"), nil
 }
 
 // MonitorMachineHealth provides health monitoring and alerting recommendations.
 func (a *MachinesAgent) MonitorMachineHealth(ctx context.Context, machines []string, healthMetrics []string) (string, error) {
 	a.context.OperationType = "health_monitoring"
-	
+
 	prompt := a.buildPrompt("Design health monitoring and alerting strategy for machine fleet", map[string]interface{}{
-		"machines": machines,
+		"machines":       machines,
 		"health_metrics": healthMetrics,
-		"operation": "health monitoring setup",
-		"include": "monitoring tools, alert thresholds, dashboards, automated responses",
+		"operation":      "health monitoring setup",
+		"include":        "monitoring tools, alert thresholds, dashboards, automated responses",
 	})
-	
+
 	response, err := a.provider.GenerateResponse(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to design health monitoring: %w", err)
 	}
-	
+
 	return a.formatMachineResponse(response, "Machine Health Monitoring"), nil
 }
 
@@ -193,19 +193,19 @@ func (a *MachinesAgent) MonitorMachineHealth(ctx context.Context, machines []str
 func (a *MachinesAgent) ManageFlakeMigration(ctx context.Context, flakePath string, machines []string) (string, error) {
 	a.context.FlakePath = flakePath
 	a.context.OperationType = "flake_migration"
-	
+
 	prompt := a.buildPrompt("Guide migration to flake-based multi-machine configuration", map[string]interface{}{
 		"flake_path": flakePath,
-		"machines": machines,
-		"operation": "flake migration planning",
-		"include": "flake structure, machine configurations, deployment setup, testing strategy",
+		"machines":   machines,
+		"operation":  "flake migration planning",
+		"include":    "flake structure, machine configurations, deployment setup, testing strategy",
 	})
-	
+
 	response, err := a.provider.GenerateResponse(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to plan flake migration: %w", err)
 	}
-	
+
 	return a.formatMachineResponse(response, "Flake Migration Planning"), nil
 }
 
@@ -213,19 +213,19 @@ func (a *MachinesAgent) ManageFlakeMigration(ctx context.Context, flakePath stri
 func (a *MachinesAgent) SetupDeployRs(ctx context.Context, hosts []string, interactive bool) (string, error) {
 	a.context.DeployMethod = "deploy-rs"
 	a.context.OperationType = "deploy_rs_setup"
-	
+
 	prompt := a.buildPrompt("Configure deploy-rs for multi-machine NixOS deployment", map[string]interface{}{
-		"hosts": hosts,
+		"hosts":       hosts,
 		"interactive": interactive,
-		"operation": "deploy-rs configuration",
-		"include": "flake integration, host configuration, SSH setup, deployment profiles",
+		"operation":   "deploy-rs configuration",
+		"include":     "flake integration, host configuration, SSH setup, deployment profiles",
 	})
-	
+
 	response, err := a.provider.GenerateResponse(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup deploy-rs: %w", err)
 	}
-	
+
 	return a.formatMachineResponse(response, "Deploy-rs Configuration"), nil
 }
 
@@ -290,16 +290,16 @@ func (a *MachinesAgent) formatMachineContext(ctx *MachineContext) string {
 // buildPrompt creates a specialized prompt for machine operations.
 func (a *MachinesAgent) buildPrompt(task string, details map[string]interface{}) string {
 	var prompt strings.Builder
-	
+
 	// Add role-specific context
 	if template, exists := roles.RolePromptTemplate[a.role]; exists {
 		prompt.WriteString(template)
 		prompt.WriteString("\n\n")
 	}
-	
+
 	// Add task description
 	prompt.WriteString(fmt.Sprintf("**Task**: %s\n\n", task))
-	
+
 	// Add machine context
 	prompt.WriteString("**Machine Context**:\n")
 	if a.context.MachineName != "" {
@@ -317,7 +317,7 @@ func (a *MachinesAgent) buildPrompt(task string, details map[string]interface{})
 	if len(a.context.Issues) > 0 {
 		prompt.WriteString(fmt.Sprintf("- Known Issues: %v\n", a.context.Issues))
 	}
-	
+
 	// Add specific task details
 	if len(details) > 0 {
 		prompt.WriteString("\n**Operation Details**:\n")
@@ -325,7 +325,7 @@ func (a *MachinesAgent) buildPrompt(task string, details map[string]interface{})
 			prompt.WriteString(fmt.Sprintf("- %s: %v\n", strings.Title(strings.ReplaceAll(key, "_", " ")), value))
 		}
 	}
-	
+
 	// Add requirements
 	prompt.WriteString("\n**Requirements**:\n")
 	prompt.WriteString("- Provide specific commands and configuration examples\n")
@@ -334,17 +334,17 @@ func (a *MachinesAgent) buildPrompt(task string, details map[string]interface{})
 	prompt.WriteString("- Plan for service dependencies and startup order\n")
 	prompt.WriteString("- Include monitoring and health check recommendations\n")
 	prompt.WriteString("- Ensure reproducible and declarative configurations\n")
-	
+
 	return prompt.String()
 }
 
 // formatMachineResponse formats the AI response for machine management operations.
 func (a *MachinesAgent) formatMachineResponse(response, operation string) string {
 	var formatted strings.Builder
-	
+
 	formatted.WriteString(fmt.Sprintf("# %s\n\n", operation))
 	formatted.WriteString(response)
-	
+
 	// Add context-specific footer
 	formatted.WriteString("\n\n---\n")
 	formatted.WriteString("**🔧 Machine Management Best Practices**:\n")
@@ -355,6 +355,6 @@ func (a *MachinesAgent) formatMachineResponse(response, operation string) string
 	formatted.WriteString("- Document machine roles and dependencies\n")
 	formatted.WriteString("- Use automated deployment tools for consistency\n")
 	formatted.WriteString("- Implement proper security and access controls\n")
-	
+
 	return formatted.String()
 }
