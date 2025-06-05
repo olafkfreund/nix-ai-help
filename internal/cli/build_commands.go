@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/config"
@@ -452,7 +454,8 @@ func analyzeCachePerformance() map[string]interface{} {
 
 func displayCacheStats(stats map[string]interface{}) {
 	for key, value := range stats {
-		fmt.Println(utils.FormatKeyValue(strings.Title(strings.ReplaceAll(key, "_", " ")), fmt.Sprintf("%v", value)))
+		caser := cases.Title(language.English)
+		fmt.Println(utils.FormatKeyValue(caser.String(strings.ReplaceAll(key, "_", " ")), fmt.Sprintf("%v", value)))
 	}
 }
 
@@ -468,7 +471,8 @@ func analyzeSandboxEnvironment() map[string]interface{} {
 
 func displaySandboxInfo(info map[string]interface{}) {
 	for key, value := range info {
-		fmt.Println(utils.FormatKeyValue(strings.Title(strings.ReplaceAll(key, "_", " ")), fmt.Sprintf("%v", value)))
+		caser := cases.Title(language.English)
+		fmt.Println(utils.FormatKeyValue(caser.String(strings.ReplaceAll(key, "_", " ")), fmt.Sprintf("%v", value)))
 	}
 }
 
@@ -486,7 +490,8 @@ func profileBuild(packageName string) map[string]interface{} {
 
 func displayProfileData(data map[string]interface{}) {
 	for key, value := range data {
-		fmt.Println(utils.FormatKeyValue(strings.Title(strings.ReplaceAll(key, "_", " ")), fmt.Sprintf("%v", value)))
+		caser := cases.Title(language.English)
+		fmt.Println(utils.FormatKeyValue(caser.String(strings.ReplaceAll(key, "_", " ")), fmt.Sprintf("%v", value)))
 	}
 }
 

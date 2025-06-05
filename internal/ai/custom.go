@@ -60,7 +60,9 @@ func (c *CustomProvider) Query(prompt string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("custom provider request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close() // Ignore close error
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("custom provider returned status %d", resp.StatusCode)

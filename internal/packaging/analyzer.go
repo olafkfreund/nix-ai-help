@@ -122,7 +122,7 @@ func (ra *RepositoryAnalyzer) detectBuildSystem(repoPath string) (BuildSystem, [
 		"pom.xml":        BuildSystemMaven,
 	}
 
-	var detectedSystem BuildSystem = BuildSystemUnknown
+	var detectedSystem = BuildSystemUnknown
 	priority := 0
 
 	// Priority order for build systems (higher number = higher priority)
@@ -300,7 +300,7 @@ func (ra *RepositoryAnalyzer) hasTests(repoPath string) bool {
 	}
 
 	hasTests := false
-	filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(repoPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil || hasTests {
 			return err
 		}

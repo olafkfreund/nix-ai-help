@@ -307,7 +307,7 @@ func (d *DiscourseClient) SearchPosts(ctx context.Context, query string, limit i
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -353,7 +353,7 @@ func (d *DiscourseClient) GetTopicsByCategory(ctx context.Context, categorySlug 
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -368,6 +368,11 @@ func (d *DiscourseClient) GetTopicsByCategory(ctx context.Context, categorySlug 
 	var result DiscourseTopicsResponse
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	// Apply limit to topics
+	if len(result.TopicList.Topics) > limit {
+		result.TopicList.Topics = result.TopicList.Topics[:limit]
 	}
 
 	return &result, nil
@@ -395,7 +400,7 @@ func (d *DiscourseClient) GetTopic(ctx context.Context, topicID int) (*Discourse
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -437,7 +442,7 @@ func (d *DiscourseClient) GetCategories(ctx context.Context) ([]DiscourseCategor
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -488,7 +493,7 @@ func (d *DiscourseClient) GetLatestTopics(ctx context.Context, limit int) (*Disc
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -503,6 +508,11 @@ func (d *DiscourseClient) GetLatestTopics(ctx context.Context, limit int) (*Disc
 	var result DiscourseTopicsResponse
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	// Apply limit to topics
+	if len(result.TopicList.Topics) > limit {
+		result.TopicList.Topics = result.TopicList.Topics[:limit]
 	}
 
 	return &result, nil
@@ -543,7 +553,7 @@ func (d *DiscourseClient) GetTopTopics(ctx context.Context, period string, limit
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -558,6 +568,11 @@ func (d *DiscourseClient) GetTopTopics(ctx context.Context, period string, limit
 	var result DiscourseTopicsResponse
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	// Apply limit to topics
+	if len(result.TopicList.Topics) > limit {
+		result.TopicList.Topics = result.TopicList.Topics[:limit]
 	}
 
 	return &result, nil

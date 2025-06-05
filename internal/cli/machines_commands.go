@@ -31,7 +31,7 @@ Examples:
   nixai machines deploy --method deploy-rs # Use deploy-rs if configured
 `,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
+			_ = cmd.Help()
 		},
 	}
 	cmd.AddCommand(createMachinesListCommand())

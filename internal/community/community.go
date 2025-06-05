@@ -9,6 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+
 	"nix-ai-help/internal/config"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
@@ -154,7 +157,7 @@ func (m *Manager) SearchConfigurations(query string, limit int) ([]Configuration
 	})
 
 	// Cache results
-	m.cache.Set(cacheKey, results, "search")
+	_ = m.cache.Set(cacheKey, results, "search")
 
 	return results, nil
 }
@@ -196,7 +199,7 @@ func (m *Manager) SearchByCategory(category string, query string, limit int) ([]
 	}
 
 	// Cache results
-	m.cache.Set(cacheKey, results, "category_search")
+	_ = m.cache.Set(cacheKey, results, "category_search")
 
 	return results, nil
 }
@@ -230,7 +233,7 @@ func (m *Manager) ShareConfiguration(config *Configuration) error {
 	// For now, we'll simulate success and cache the configuration
 	sharedConfigs := []Configuration{*config}
 	cacheKey := GetCacheKey("shared", config.Author)
-	m.cache.Set(cacheKey, sharedConfigs, "shared")
+	_ = m.cache.Set(cacheKey, sharedConfigs, "shared")
 
 	m.logger.Info("Configuration shared successfully with ID: " + config.ID)
 	return nil
@@ -309,7 +312,7 @@ func (m *Manager) GetTrends() (*TrendData, error) {
 	}
 
 	// Cache trends
-	m.cache.Set(cacheKey, trends, "trends")
+	_ = m.cache.Set(cacheKey, trends, "trends")
 
 	return trends, nil
 }
@@ -330,7 +333,7 @@ func (m *Manager) RateConfiguration(configName string, rating float64, comment s
 	}
 
 	cacheKey := GetCacheKey("rating", configName, fmt.Sprintf("%.1f", rating))
-	m.cache.Set(cacheKey, ratingData, "rating")
+	_ = m.cache.Set(cacheKey, ratingData, "rating")
 
 	return nil
 }
@@ -360,91 +363,6 @@ func (m *Manager) GetDiscourseStatus() map[string]interface{} {
 	}
 
 	return status
-}
-
-// searchWithFallback performs search with fallback mechanisms
-func (m *Manager) searchWithFallback(query string, limit int) ([]Configuration, error) {
-	var allResults []Configuration
-	var lastError error
-
-	// Try Discourse search first if available
-	if m.discourseClient != nil && m.config.Discourse.Enabled {
-		ctx := context.Background()
-		searchResp, err := m.discourseClient.SearchPosts(ctx, query, limit)
-		if err == nil && searchResp != nil {
-			// Convert posts to configurations
-			for _, post := range searchResp.Posts {
-				config := Configuration{
-					ID:          fmt.Sprintf("discourse-post-%d", post.ID),
-					Name:        fmt.Sprintf("Post #%d in topic %s", post.PostNumber, post.TopicSlug),
-					Author:      post.Username,
-					Description: m.extractDescription(post.Cooked, 200),
-					Tags:        []string{"discourse", "community", "post"},
-					Rating:      3.5,
-					URL:         fmt.Sprintf("%s/t/%s/%d/%d", m.config.Discourse.BaseURL, post.TopicSlug, post.TopicID, post.PostNumber),
-					CreatedAt:   post.CreatedAt,
-					UpdatedAt:   post.UpdatedAt,
-					Language:    "markdown",
-				}
-				allResults = append(allResults, config)
-			}
-			m.logger.Info(fmt.Sprintf("Found %d results from Discourse", len(allResults)))
-		} else {
-			lastError = err
-			m.logger.Warn("Discourse search failed, falling back to mock data: " + err.Error())
-		}
-	}
-
-	// Always add mock results as fallback
-	mockResults := m.generateMockSearchResults(query, limit)
-	allResults = append(allResults, mockResults...)
-
-	// If we have no results and there was an error, return the error
-	if len(allResults) == 0 && lastError != nil {
-		return nil, fmt.Errorf("all search methods failed, last error: %w", lastError)
-	}
-
-	return allResults, nil
-}
-
-// generateMockSearchResults generates mock search results for fallback
-func (m *Manager) generateMockSearchResults(query string, limit int) []Configuration {
-	// Create mock configurations based on common NixOS topics
-	mockConfigs := []Configuration{
-		{
-			ID:          utils.GenerateID(),
-			Name:        "NixOS Configuration for " + query,
-			Author:      "community-contributor",
-			Description: fmt.Sprintf("Sample NixOS configuration related to %s", query),
-			Tags:        []string{"nixos", "configuration", strings.ToLower(query)},
-			Rating:      4.2,
-			Downloads:   150,
-			Views:       500,
-			URL:         "https://example.com/config/sample",
-			CreatedAt:   time.Now().AddDate(0, -1, 0),
-			UpdatedAt:   time.Now().AddDate(0, 0, -5),
-			Language:    "nix",
-		},
-		{
-			ID:          utils.GenerateID(),
-			Name:        "Advanced " + query + " Setup",
-			Author:      "nixos-expert",
-			Description: fmt.Sprintf("Advanced configuration and tips for %s", query),
-			Tags:        []string{"advanced", "tips", strings.ToLower(query)},
-			Rating:      4.7,
-			Downloads:   89,
-			Views:       320,
-			URL:         "https://example.com/config/advanced",
-			CreatedAt:   time.Now().AddDate(0, -2, 0),
-			UpdatedAt:   time.Now().AddDate(0, 0, -10),
-			Language:    "nix",
-		},
-	}
-
-	if len(mockConfigs) > limit {
-		return mockConfigs[:limit]
-	}
-	return mockConfigs
 }
 
 // Helper methods
@@ -503,7 +421,7 @@ func (m *Manager) generateMockCategoryResults(category string, query string, lim
 	mockConfigs := []Configuration{
 		{
 			ID:          utils.GenerateID(),
-			Name:        fmt.Sprintf("%s Configuration for %s", strings.Title(category), query),
+			Name:        fmt.Sprintf("%s Configuration for %s", func(s string) string { caser := cases.Title(language.English); return caser.String(s) }(category), query),
 			Author:      "community-user",
 			Description: fmt.Sprintf("Sample %s configuration matching %s", category, query),
 			Tags:        []string{category, "mock", "example"},

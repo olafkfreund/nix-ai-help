@@ -20,7 +20,7 @@ func TestExplainOption_Integration(t *testing.T) {
 		t.Fatalf("command failed: %v\nOutput: %s", err, string(output))
 	}
 	outStr := string(output)
-	if !(strings.Contains(outStr, "nginx") || strings.Contains(outStr, "No relevant documentation found")) {
+	if !strings.Contains(outStr, "nginx") && !strings.Contains(outStr, "No relevant documentation found") {
 		t.Errorf("expected output to mention nginx or a not found message, got: %s", outStr)
 	}
 }

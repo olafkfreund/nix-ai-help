@@ -213,7 +213,7 @@ func getConfig(key string) {
 func resetConfig() {
 	fmt.Println(utils.FormatWarning("⚠️  This will reset all configuration to defaults. Continue? (y/N)"))
 	var response string
-	fmt.Scanln(&response)
+	_, _ = fmt.Scanln(&response)
 	if response != "y" && response != "Y" {
 		fmt.Println(utils.FormatInfo("Operation cancelled"))
 		return
@@ -479,77 +479,79 @@ var explainHomeOptionCmd = &cobra.Command{
 }
 
 // explainOptionCmd implements the explain-option command
-var explainOptionCmd = &cobra.Command{
-	Use:   "explain-option <option>",
-	Short: "Explain a NixOS option using AI and documentation",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		option := args[0]
-		format, _ := cmd.Flags().GetString("format")
-		providerFlag, _ := cmd.Flags().GetString("provider")
-		examplesOnly, _ := cmd.Flags().GetBool("examples-only")
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-			os.Exit(1)
-		}
-		mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
-		mcpClient := mcp.NewMCPClient(mcpURL)
-		fmt.Print(utils.FormatInfo("Querying documentation... "))
-		doc, docErr := mcpClient.QueryDocumentation(option)
-		fmt.Println(utils.FormatSuccess("done"))
-		if docErr != nil || doc == "" {
-			fmt.Fprintln(os.Stderr, utils.FormatError("No documentation found for option: "+option))
-			return
-		}
-		// Try to extract source/version if present in doc (simple heuristic)
-		var source, version string
-		if strings.Contains(doc, "option_source") {
-			parts := strings.Split(doc, "option_source")
-			if len(parts) > 1 {
-				source = strings.Split(parts[1], "\"")[1]
-			}
-		}
-		if strings.Contains(doc, "nixos-") {
-			idx := strings.Index(doc, "nixos-")
-			version = doc[idx : idx+12]
-		}
-		aiProviderName := providerFlag
-		if aiProviderName == "" {
-			aiProviderName = cfg.AIProvider
-		}
-		var aiProvider ai.AIProvider
-		switch aiProviderName {
-		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-		default:
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
-		}
-		var prompt string
-		if examplesOnly {
-			prompt = buildExamplesOnlyPrompt(option, doc, format, source, version)
-		} else {
-			prompt = buildEnhancedExplainOptionPrompt(option, doc, format, source, version)
-		}
-		fmt.Print(utils.FormatInfo("Querying AI provider... "))
-		aiResp, aiErr := aiProvider.Query(prompt)
-		fmt.Println(utils.FormatSuccess("done"))
-		if aiErr != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+aiErr.Error()))
-			os.Exit(1)
-		}
-		fmt.Println(utils.RenderMarkdown(aiResp))
-	},
-}
+var explainOptionCmd = NewExplainOptionCommand()
 
-func init() {
-	explainOptionCmd.Flags().String("format", "markdown", "Output format: markdown, plain, or table")
-	explainOptionCmd.Flags().String("provider", "", "AI provider to use for this query (ollama, openai, gemini)")
-	explainOptionCmd.Flags().Bool("examples-only", false, "Show only usage examples for the option")
+// NewExplainOptionCommand returns a fresh explain-option command
+func NewExplainOptionCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "explain-option <option>",
+		Short: "Explain a NixOS option using AI and documentation",
+		Args:  cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			option := args[0]
+			format, _ := cmd.Flags().GetString("format")
+			providerFlag, _ := cmd.Flags().GetString("provider")
+			examplesOnly, _ := cmd.Flags().GetBool("examples-only")
+			cfg, err := config.LoadUserConfig()
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
+				os.Exit(1)
+			}
+			mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
+			mcpClient := mcp.NewMCPClient(mcpURL)
+			fmt.Print(utils.FormatInfo("Querying documentation... "))
+			doc, docErr := mcpClient.QueryDocumentation(option)
+			fmt.Println(utils.FormatSuccess("done"))
+			if docErr != nil || doc == "" {
+				fmt.Fprintln(os.Stderr, utils.FormatError("No documentation found for option: "+option))
+				return
+			}
+			var source, version string
+			if strings.Contains(doc, "option_source") {
+				parts := strings.Split(doc, "option_source")
+				if len(parts) > 1 {
+					source = strings.Split(parts[1], "\"")[1]
+				}
+			}
+			if strings.Contains(doc, "nixos-") {
+				idx := strings.Index(doc, "nixos-")
+				version = doc[idx : idx+12]
+			}
+			aiProviderName := providerFlag
+			if aiProviderName == "" {
+				aiProviderName = cfg.AIProvider
+			}
+			var aiProvider ai.AIProvider
+			switch aiProviderName {
+			case "ollama":
+				aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			case "openai":
+				aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+			case "gemini":
+				aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
+			default:
+				aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			}
+			var prompt string
+			if examplesOnly {
+				prompt = buildExamplesOnlyPrompt(option, doc, format, source, version)
+			} else {
+				prompt = buildEnhancedExplainOptionPrompt(option, doc, format, source, version)
+			}
+			fmt.Print(utils.FormatInfo("Querying AI provider... "))
+			aiResp, aiErr := aiProvider.Query(prompt)
+			fmt.Println(utils.FormatSuccess("done"))
+			if aiErr != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+aiErr.Error()))
+				os.Exit(1)
+			}
+			fmt.Println(utils.RenderMarkdown(aiResp))
+		},
+	}
+	cmd.Flags().String("format", "markdown", "Output format: markdown, plain, or table")
+	cmd.Flags().String("provider", "", "AI provider to use for this query (ollama, openai, gemini)")
+	cmd.Flags().Bool("examples-only", false, "Show only usage examples for the option")
+	return cmd
 }
 
 // interactiveCmd implements the interactive CLI mode
@@ -758,7 +760,7 @@ Examples:
 		fmt.Println(utils.FormatInfo("Describe what you want to configure (e.g. desktop, web server, user, etc):"))
 		var input string
 		fmt.Print("> ")
-		fmt.Scanln(&input)
+		_, _ = fmt.Scanln(&input)
 		if input == "" {
 			fmt.Println(utils.FormatWarning("No input provided. Exiting."))
 			return
@@ -1232,7 +1234,7 @@ var mcpServerStopCmd = &cobra.Command{
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to stop MCP server: "+err.Error()))
 			os.Exit(1)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		fmt.Println(utils.FormatSuccess("✅ MCP server stop requested."))
 	},
 }
@@ -1252,7 +1254,7 @@ var mcpServerStatusCmd = &cobra.Command{
 			fmt.Println(utils.FormatWarning("MCP server is not running or unreachable."))
 			return
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 		fmt.Println(utils.FormatSuccess("✅ MCP server is running."))
 	},
 }
@@ -1366,7 +1368,9 @@ func initializeCommands() {
 func Execute() {
 	cobra.OnInitialize(func() {
 		if nixosPath != "" {
-			os.Setenv("NIXAI_NIXOS_PATH", nixosPath)
+			if err := os.Setenv("NIXAI_NIXOS_PATH", nixosPath); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to set NIXAI_NIXOS_PATH: %v\n", err)
+			}
 		}
 	})
 	initializeCommands()

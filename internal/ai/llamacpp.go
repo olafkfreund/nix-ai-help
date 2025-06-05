@@ -47,7 +47,7 @@ func (l *LlamaCppProvider) Query(prompt string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("llamacpp request failed: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	var result llamacppResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {

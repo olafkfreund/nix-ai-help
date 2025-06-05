@@ -209,15 +209,6 @@ func (ua *UpgradeAdvisor) getCurrentChannelInfo(ctx context.Context, info *Upgra
 	return nil
 }
 
-// getCurrentSystemInfo gets the current NixOS version and channel information (deprecated - use separate methods)
-func (ua *UpgradeAdvisor) getCurrentSystemInfo(ctx context.Context, info *UpgradeInfo) error {
-	if err := ua.getCurrentVersion(ctx, info); err != nil {
-		return err
-	}
-
-	return ua.getCurrentChannelInfo(ctx, info)
-}
-
 // getAvailableChannels retrieves information about available NixOS channels (for traditional configs only)
 func (ua *UpgradeAdvisor) getAvailableChannels(ctx context.Context, info *UpgradeInfo) error {
 	// Skip for flake-based configurations

@@ -33,7 +33,7 @@ func (c *MCPClient) QueryDocumentation(query string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		// Read the response body for debugging
@@ -68,7 +68,7 @@ func (c *MCPClient) OptionCompletion(prefix string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -84,11 +84,4 @@ func (c *MCPClient) OptionCompletion(prefix string) ([]string, error) {
 		return nil, err
 	}
 	return response.Result.Options, nil
-}
-
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

@@ -937,3 +937,22 @@ func init() {
 	gcSafeCleanCmd.Flags().IntP("keep-generations", "k", 5, "Number of recent generations to keep")
 	gcCompareGenerationsCmd.Flags().IntP("keep", "k", 5, "Number of generations to recommend keeping")
 }
+
+// NewGCCmd creates a new gc command with all subcommands and flags
+func NewGCCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   gcCmd.Use,
+		Short: gcCmd.Short,
+		Long:  gcCmd.Long,
+		Run:   gcCmd.Run,
+	}
+	// Add subcommands
+	cmd.AddCommand(gcAnalyzeCmd)
+	cmd.AddCommand(gcSafeCleanCmd)
+	cmd.AddCommand(gcCompareGenerationsCmd)
+	cmd.AddCommand(gcDiskUsageCmd)
+	// Add flags
+	cmd.PersistentFlags().AddFlagSet(gcCmd.PersistentFlags())
+	cmd.Flags().AddFlagSet(gcCmd.Flags())
+	return cmd
+}

@@ -5,12 +5,27 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
+
   outputs = {
     self,
     nixpkgs,
     flake-utils,
     ...
-  }:
+  }: let
+    # System-independent NixOS module
+    nixosModules = {
+      default = import ./modules/nixos.nix;
+    };
+    nixosModule = nixosModules.default;
+
+    # System-dependent Home Manager modules (using eachDefaultSystemPassThrough)
+    homeManagerModules = flake-utils.lib.eachDefaultSystemPassThrough (system: {
+      default = import ./modules/home-manager.nix {
+        nixaiPackage = self.packages.${system}.nixai;
+      };
+    });
+    homeManagerModule = homeManagerModules.default;
+  in
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {inherit system;};
     in {
@@ -53,12 +68,6 @@
         };
       };
       defaultApp = self.apps.${system}.nixai;
-      nixosModules.default = import ./modules/nixos.nix;
-      homeManagerModules.default = import ./modules/home-manager.nix {
-        nixaiPackage = self.packages.${system}.nixai;
-      };
-      nixosModule = self.nixosModules.default;
-      homeManagerModule = self.homeManagerModules.default;
       devShells.default = pkgs.mkShell {
         buildInputs = with pkgs; [
           go
@@ -112,9 +121,7 @@
           echo ""
         '';
       };
-      # Add a formatter output for Nix code
       formatter = pkgs.alejandra;
-      # Add a basic check (lint) for Go code
       checks.lint =
         pkgs.runCommand "golangci-lint" {
           buildInputs = [pkgs.golangci-lint pkgs.go];
@@ -125,6 +132,10 @@
         '';
     })
     // {
+      nixosModules = nixosModules;
+      nixosModule = nixosModule;
+      homeManagerModules = homeManagerModules;
+      homeManagerModule = homeManagerModule;
       # Flake-level metadata
       flakeMetadata = {
         maintainers = ["olafkfreund"];

@@ -33,7 +33,7 @@ func NewDepsCommand() *cobra.Command {
 		Long: `Provides tools to visualize and analyze NixOS configuration dependencies,
 helping to understand relationships, detect conflicts, and optimize configurations.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			cmd.Help()
+			_ = cmd.Help()
 		},
 	}
 
@@ -307,9 +307,9 @@ func runDepsWhy(packageName string) {
 			for j, pkg := range path {
 				indent := strings.Repeat("  ", j)
 				if j == len(path)-1 {
-					fmt.Println(fmt.Sprintf("%s└─ %s", indent, utils.FormatSuccess(pkg)))
+					fmt.Printf("%s└─ %s\n", indent, utils.FormatSuccess(pkg))
 				} else {
-					fmt.Println(fmt.Sprintf("%s├─ %s", indent, pkg))
+					fmt.Printf("%s├─ %s\n", indent, pkg)
 				}
 			}
 			fmt.Println()
@@ -397,7 +397,7 @@ func runDepsConflicts() {
 				arrow = "└─ "
 			}
 
-			fmt.Println(fmt.Sprintf("  %s%s (%s)", arrow, node.Name, versionStr))
+			fmt.Printf("  %s%s (%s)\n", arrow, node.Name, versionStr)
 		}
 		fmt.Println()
 	}
@@ -553,7 +553,7 @@ func runDepsGraph() {
 			// Ask if user wants to generate the visualization now
 			fmt.Print(utils.FormatInfo("Would you like to generate the visualization now? (y/n): "))
 			var answer string
-			fmt.Scanln(&answer)
+			_, _ = fmt.Scanln(&answer)
 
 			if strings.ToLower(answer) == "y" || strings.ToLower(answer) == "yes" {
 				outputPngPath := strings.TrimSuffix(depDotOutputPath, ".dot") + ".png"
@@ -763,7 +763,7 @@ func formatNodeForAI(nodes []*nixos.DependencyNode, sb *strings.Builder, prefix 
 			versionStr = fmt.Sprintf(" (v%s)", node.Version)
 		}
 
-		sb.WriteString(fmt.Sprintf("%s%s%s%s\n", prefix, connector, node.Name, versionStr))
+		_, _ = fmt.Fprintf(sb, "%s%s%s%s\n", prefix, connector, node.Name, versionStr)
 
 		if len(node.Dependencies) > 0 {
 			formatNodeForAI(node.Dependencies, sb, childPrefix)

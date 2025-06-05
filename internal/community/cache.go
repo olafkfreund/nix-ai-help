@@ -86,7 +86,7 @@ func (cm *CacheManager) Get(key string, result interface{}) (bool, error) {
 	// Check if expired
 	if time.Since(entry.Timestamp) > cm.maxAge {
 		// Clean up expired entry
-		os.Remove(filePath)
+		_ = os.Remove(filePath)
 		return false, nil
 	}
 

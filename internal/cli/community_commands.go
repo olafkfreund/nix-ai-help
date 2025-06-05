@@ -168,7 +168,7 @@ Examples:
 
 		rating, err := strconv.ParseFloat(ratingStr, 64)
 		if err != nil || rating < 1 || rating > 5 {
-			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Rating must be a number between 1 and 5"))
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Rating must be a number between 1 and 5"))
 			return
 		}
 
@@ -179,20 +179,20 @@ Examples:
 // Implementation functions
 
 func runCommunitySearch(query string, limit int, category string, cmd *cobra.Command) {
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("🔍 Community Search: "+query))
-	fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("🔍 Community Search: "+query))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 
 	// Load configuration
 	cfg, err := config.LoadUserConfig()
 	if err != nil {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Error loading config: "+err.Error()))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Error loading config: "+err.Error()))
 		return
 	}
 
 	// Create community manager
 	manager := community.NewManager(cfg)
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Searching community configurations..."))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Searching community configurations..."))
 
 	var results []community.Configuration
 	if category != "" {
@@ -202,89 +202,89 @@ func runCommunitySearch(query string, limit int, category string, cmd *cobra.Com
 	}
 
 	if err != nil {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Search failed: "+err.Error()))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Search failed: "+err.Error()))
 		return
 	}
 
 	if len(results) == 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("No configurations found matching: "+query))
-		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Try broader search terms or different category"))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("No configurations found matching: "+query))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout())
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Try broader search terms or different category"))
 		return
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess(fmt.Sprintf("Found %d configuration(s):", len(results))))
-	fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess(fmt.Sprintf("Found %d configuration(s):", len(results))))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 
 	for i, config := range results {
-		fmt.Fprintf(cmd.OutOrStdout(), "%s. %s\n",
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%s. %s\n",
 			utils.FormatNote(fmt.Sprintf("%d", i+1)),
 			utils.FormatKeyValue(config.Name, config.Description))
 
 		if config.Author != "" {
-			fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.FormatNote("Author: "+config.Author))
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.FormatNote("Author: "+config.Author))
 		}
 
 		if config.Rating > 0 {
 			stars := strings.Repeat("⭐", int(config.Rating))
-			fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.FormatNote(fmt.Sprintf("Rating: %s (%.1f/5)", stars, config.Rating)))
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.FormatNote(fmt.Sprintf("Rating: %s (%.1f/5)", stars, config.Rating)))
 		}
 
 		if len(config.Tags) > 0 {
-			fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.FormatNote("Tags: "+strings.Join(config.Tags, ", ")))
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.FormatNote("Tags: "+strings.Join(config.Tags, ", ")))
 		}
 
 		if config.URL != "" {
-			fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.FormatNote("🔗 "+config.URL))
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.FormatNote("🔗 "+config.URL))
 		}
 
-		fmt.Fprintln(cmd.OutOrStdout())
+		_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai community validate <file>' to check your configuration"))
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai community share <file>' to contribute your configuration"))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai community validate <file>' to check your configuration"))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai community share <file>' to contribute your configuration"))
 }
 
 func runCommunityShare(configFile, description, category string, tags []string, cmd *cobra.Command) {
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("📤 Sharing Configuration: "+filepath.Base(configFile)))
-	fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("📤 Sharing Configuration: "+filepath.Base(configFile)))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 
 	// Validate file exists
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Configuration file not found: "+configFile))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Configuration file not found: "+configFile))
 		return
 	}
 
 	// Load configuration
 	cfg, err := config.LoadUserConfig()
 	if err != nil {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Error loading config: "+err.Error()))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Error loading config: "+err.Error()))
 		return
 	}
 
 	// Create community manager
 	manager := community.NewManager(cfg)
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Validating configuration before sharing..."))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Validating configuration before sharing..."))
 
 	// Validate configuration first
 	validation, err := manager.ValidateConfiguration(configFile)
 	if err != nil {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Validation failed: "+err.Error()))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Validation failed: "+err.Error()))
 		return
 	}
 
 	if !validation.IsValid {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("Configuration has validation issues:"))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("Configuration has validation issues:"))
 		for _, issue := range validation.Issues {
-			fmt.Fprintln(cmd.OutOrStdout(), "  • "+issue)
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "  • "+issue)
 		}
-		fmt.Fprintln(cmd.OutOrStdout())
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai community validate "+configFile+"' for detailed analysis"))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout())
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai community validate "+configFile+"' for detailed analysis"))
 		return
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess("✅ Configuration validation passed"))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess("✅ Configuration validation passed"))
 
 	// Create configuration object
 	config := &community.Configuration{
@@ -296,99 +296,99 @@ func runCommunityShare(configFile, description, category string, tags []string, 
 		URL:         "", // Will be populated after sharing
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Sharing configuration with community..."))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Sharing configuration with community..."))
 
 	// Share configuration
 	err = manager.ShareConfiguration(config)
 	if err != nil {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Sharing failed: "+err.Error()))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Sharing failed: "+err.Error()))
 		return
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess("🎉 Configuration shared successfully!"))
-	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Name", config.Name))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess("🎉 Configuration shared successfully!"))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Name", config.Name))
 	if description != "" {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Description", description))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Description", description))
 	}
 	if category != "" {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Category", category))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Category", category))
 	}
 	if len(tags) > 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Tags", strings.Join(tags, ", ")))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Tags", strings.Join(tags, ", ")))
 	}
-	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Your configuration is now available for others to discover and use"))
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Check 'nixai community trends' to see how it's performing"))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Your configuration is now available for others to discover and use"))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Check 'nixai community trends' to see how it's performing"))
 }
 
 func runCommunityValidate(configFile string, detailed, fixSuggestions bool, cmd *cobra.Command) {
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("🔍 Validating Configuration: "+filepath.Base(configFile)))
-	fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("🔍 Validating Configuration: "+filepath.Base(configFile)))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 
 	// Validate file exists
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Configuration file not found: "+configFile))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Configuration file not found: "+configFile))
 		return
 	}
 
 	// Load configuration
 	cfg, err := config.LoadUserConfig()
 	if err != nil {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Error loading config: "+err.Error()))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Error loading config: "+err.Error()))
 		return
 	}
 
 	// Create community manager
 	manager := community.NewManager(cfg)
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Analyzing configuration against best practices..."))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Analyzing configuration against best practices..."))
 
 	// Validate configuration
 	result, err := manager.ValidateConfiguration(configFile)
 	if err != nil {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Validation failed: "+err.Error()))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Validation failed: "+err.Error()))
 		return
 	}
 
 	// Display results
 	if result.IsValid {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess("✅ Configuration validation passed"))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess("✅ Configuration validation passed"))
 	} else {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("⚠️  Configuration has issues"))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("⚠️  Configuration has issues"))
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Overall Score", fmt.Sprintf("%.1f/10", result.Score)))
-	fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Overall Score", fmt.Sprintf("%.1f/10", result.Score)))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 
 	if len(result.Issues) > 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("❌ Issues Found", ""))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("❌ Issues Found", ""))
 		for _, issue := range result.Issues {
-			fmt.Fprintln(cmd.OutOrStdout(), "  • "+issue)
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "  • "+issue)
 		}
-		fmt.Fprintln(cmd.OutOrStdout())
+		_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	}
 
 	if len(result.Suggestions) > 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("💡 Suggestions", ""))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("💡 Suggestions", ""))
 		for _, suggestion := range result.Suggestions {
-			fmt.Fprintln(cmd.OutOrStdout(), "  • "+suggestion)
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), "  • "+suggestion)
 		}
-		fmt.Fprintln(cmd.OutOrStdout())
+		_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	}
 
 	if detailed && len(result.BestPractices) > 0 {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("📋 Best Practices Applied", ""))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("📋 Best Practices Applied", ""))
 		for _, practice := range result.BestPractices {
 			status := "📋" // Show all practices without Applied field
-			fmt.Fprintf(cmd.OutOrStdout(), "  %s %s - %s\n", status, practice.Title, practice.Description)
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "  %s %s - %s\n", status, practice.Title, practice.Description)
 		}
-		fmt.Fprintln(cmd.OutOrStdout())
+		_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	}
 
 	if fixSuggestions {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("🔧 AI-Powered Fix Suggestions", ""))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("🔧 AI-Powered Fix Suggestions", ""))
 
 		// Get AI suggestions for fixes
 		aiProvider := initializeAIProvider(cfg)
@@ -396,118 +396,118 @@ func runCommunityValidate(configFile string, detailed, fixSuggestions bool, cmd 
 			prompt := buildValidationFixPrompt(configFile, result)
 			suggestions, aiErr := aiProvider.Query(prompt)
 			if aiErr != nil {
-				fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Failed to get AI suggestions: "+aiErr.Error()))
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Failed to get AI suggestions: "+aiErr.Error()))
 			} else {
-				fmt.Fprintln(cmd.OutOrStdout(), utils.RenderMarkdown(suggestions))
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.RenderMarkdown(suggestions))
 			}
 		}
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai community share "+configFile+"' to contribute after fixing issues"))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai community share "+configFile+"' to contribute after fixing issues"))
 }
 
 func runCommunityTrends(timeframe, category string, detailed bool, cmd *cobra.Command) {
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("📊 Community Trends"))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("📊 Community Trends"))
 	if timeframe != "" {
-		fmt.Fprintf(cmd.OutOrStdout(), " (%s)\n", timeframe)
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), " (%s)\n", timeframe)
 	}
-	fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 
 	// Load configuration
 	cfg, err := config.LoadUserConfig()
 	if err != nil {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Error loading config: "+err.Error()))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Error loading config: "+err.Error()))
 		return
 	}
 
 	// Create community manager
 	manager := community.NewManager(cfg)
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Fetching community trends data..."))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Fetching community trends data..."))
 
 	// Get trends
 	trends, err := manager.GetTrends()
 	if err != nil {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Failed to fetch trends: "+err.Error()))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Failed to fetch trends: "+err.Error()))
 		return
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("🔥 Popular Packages", ""))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("🔥 Popular Packages", ""))
 	for i, pkg := range trends.PopularPackages {
 		if i >= 10 { // Show top 10
 			break
 		}
 		stars := strings.Repeat("⭐", int(pkg.Rating))
-		fmt.Fprintf(cmd.OutOrStdout(), "%d. %s\n", i+1,
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%d. %s\n", i+1,
 			utils.FormatKeyValue(pkg.Name, pkg.Description),
 		)
-		fmt.Fprintf(cmd.OutOrStdout(), "   %s | %s downloads\n",
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "   %s | %s downloads\n",
 			stars, utils.FormatNote(fmt.Sprintf("%d", pkg.Downloads)))
 	}
-	fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("🚀 Trending Configurations", ""))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("🚀 Trending Configurations", ""))
 	for i, config := range trends.TrendingConfigs {
 		if i >= 8 { // Show top 8
 			break
 		}
-		fmt.Fprintf(cmd.OutOrStdout(), "%d. %s\n", i+1,
+		_, _ = fmt.Fprintf(cmd.OutOrStdout(), "%d. %s\n", i+1,
 			utils.FormatKeyValue(config.Name, config.Description))
 		if config.Author != "" {
-			fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.FormatNote("by "+config.Author))
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.FormatNote("by "+config.Author))
 		}
 		if len(config.Tags) > 0 {
-			fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.FormatNote("Tags: "+strings.Join(config.Tags, ", ")))
+			_, _ = fmt.Fprintf(cmd.OutOrStdout(), "   %s\n", utils.FormatNote("Tags: "+strings.Join(config.Tags, ", ")))
 		}
 	}
-	fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 
 	if detailed {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("📈 Community Statistics", ""))
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Total Configurations", fmt.Sprintf("%d", trends.TotalConfigurations)))
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Active Contributors", fmt.Sprintf("%d", trends.ActiveContributors)))
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Packages Tracked", fmt.Sprintf("%d", trends.PackagesTracked)))
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Last Updated", trends.LastUpdated.Format("2006-01-02 15:04:05")))
-		fmt.Fprintln(cmd.OutOrStdout())
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("📈 Community Statistics", ""))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Total Configurations", fmt.Sprintf("%d", trends.TotalConfigurations)))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Active Contributors", fmt.Sprintf("%d", trends.ActiveContributors)))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Packages Tracked", fmt.Sprintf("%d", trends.PackagesTracked)))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Last Updated", trends.LastUpdated.Format("2006-01-02 15:04:05")))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai community search <package>' to find configurations using trending packages"))
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai community validate <file>' to check your configuration against trends"))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai community search <package>' to find configurations using trending packages"))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai community validate <file>' to check your configuration against trends"))
 }
 
 func runCommunityRate(configName string, rating float64, comment string, cmd *cobra.Command) {
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("⭐ Rating Configuration: "+configName))
-	fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("⭐ Rating Configuration: "+configName))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 
 	// Load configuration
 	cfg, err := config.LoadUserConfig()
 	if err != nil {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Error loading config: "+err.Error()))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Error loading config: "+err.Error()))
 		return
 	}
 
 	// Create community manager
 	manager := community.NewManager(cfg)
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Submitting rating..."))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Submitting rating..."))
 
 	// Submit rating
 	err = manager.RateConfiguration(configName, rating, comment)
 	if err != nil {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Failed to submit rating: "+err.Error()))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Failed to submit rating: "+err.Error()))
 		return
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess("✅ Rating submitted successfully!"))
-	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Configuration", configName))
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Rating", fmt.Sprintf("%.1f/5 %s", rating, strings.Repeat("⭐", int(rating)))))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess("✅ Rating submitted successfully!"))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Configuration", configName))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Rating", fmt.Sprintf("%.1f/5 %s", rating, strings.Repeat("⭐", int(rating)))))
 	if comment != "" {
-		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Comment", comment))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Comment", comment))
 	}
-	fmt.Fprintln(cmd.OutOrStdout())
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Thank you for contributing to the community!"))
-	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Your feedback helps others find quality configurations"))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout())
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Thank you for contributing to the community!"))
+	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Your feedback helps others find quality configurations"))
 }
 
 // Helper functions

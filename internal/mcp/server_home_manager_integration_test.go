@@ -11,7 +11,7 @@ func TestHandleQuery_HomeManagerOptionAPI(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/options.json") {
 			w.Header().Set("Content-Type", "application/json")
-			w.Write([]byte(`{"options":[{"name":"programs.zsh.enable","description":"Enable the Zsh shell.","type":"boolean","default":"false","example":"true","readOnly":false,"loc":["programs.zsh"]}]}`))
+			_, _ = w.Write([]byte(`{"options":[{"name":"programs.zsh.enable","description":"Enable the Zsh shell.","type":"boolean","default":"false","example":"true","readOnly":false,"loc":["programs.zsh"]}]}`))
 			return
 		}
 		w.WriteHeader(404)

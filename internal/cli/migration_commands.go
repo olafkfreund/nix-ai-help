@@ -66,7 +66,7 @@ func NewMigrationManager(nixosPath string, log *logger.Logger, aiProvider ai.AIP
 	// Create backup directory
 	homeDir, _ := os.UserHomeDir()
 	backupDir := filepath.Join(homeDir, ".nixai", "migration-backups")
-	os.MkdirAll(backupDir, 0755)
+	_ = os.MkdirAll(backupDir, 0755)
 
 	return &MigrationManager{
 		nixosPath:  nixosPath,
@@ -227,13 +227,13 @@ func (mm *MigrationManager) copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	defer sourceFile.Close()
+	defer func() { _ = sourceFile.Close() }()
 
 	destFile, err := os.Create(dst)
 	if err != nil {
 		return err
 	}
-	defer destFile.Close()
+	defer func() { _ = destFile.Close() }()
 
 	_, err = io.Copy(destFile, sourceFile)
 	return err
@@ -822,4 +822,19 @@ func init() {
 	// Add subcommands
 	migrateCmd.AddCommand(migrateAnalyzeCmd)
 	migrateCmd.AddCommand(migrateToFlakesCmd)
+}
+
+// NewMigrateCmd creates a new migrate command
+func NewMigrateCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   migrateCmd.Use,
+		Short: migrateCmd.Short,
+		Long:  migrateCmd.Long,
+		Run:   migrateCmd.Run,
+	}
+	cmd.AddCommand(migrateAnalyzeCmd)
+	cmd.AddCommand(migrateToFlakesCmd)
+	cmd.PersistentFlags().AddFlagSet(migrateCmd.PersistentFlags())
+	cmd.Flags().AddFlagSet(migrateCmd.Flags())
+	return cmd
 }

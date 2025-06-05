@@ -108,9 +108,9 @@ func NewTemplateManager(configDir string, log *logger.Logger) *TemplateManager {
 	}
 
 	// Ensure config directory exists
-	os.MkdirAll(configDir, 0755)
-	os.MkdirAll(filepath.Join(configDir, "templates"), 0755)
-	os.MkdirAll(filepath.Join(configDir, "snippets"), 0755)
+	_ = os.MkdirAll(configDir, 0755)
+	_ = os.MkdirAll(filepath.Join(configDir, "templates"), 0755)
+	_ = os.MkdirAll(filepath.Join(configDir, "snippets"), 0755)
 
 	return &TemplateManager{
 		configDir: configDir,
@@ -296,7 +296,7 @@ func (tm *TemplateManager) fetchGitHubContent(url string) (content, repo, path s
 			if err != nil {
 				return "", "", "", err
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode != 200 {
 				return "", "", "", fmt.Errorf("failed to fetch content: HTTP %d", resp.StatusCode)
@@ -1383,7 +1383,7 @@ func (tm *TemplateManager) SearchGitHub(query string) (*GitHubSearchResponse, er
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Check status code
 	if resp.StatusCode != 200 {
