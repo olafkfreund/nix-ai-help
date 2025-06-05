@@ -17,16 +17,16 @@ type InteractiveAgent struct {
 
 // InteractiveContext contains structured information for interactive sessions.
 type InteractiveContext struct {
-	SessionID       string            // Unique session identifier
-	UserLevel       string            // Beginner, Intermediate, Advanced
-	CurrentTask     string            // What the user is trying to accomplish
-	SystemState     string            // Current system state information
-	PrevCommands    []string          // Previously executed commands
-	SessionHistory  []string          // Previous interactions in session
-	ErrorContext    string            // Any current errors or issues
-	StepNumber      int               // Current step in troubleshooting
-	Preferences     map[string]string // User preferences for interaction
-	Metadata        map[string]string // Additional session metadata
+	SessionID      string            // Unique session identifier
+	UserLevel      string            // Beginner, Intermediate, Advanced
+	CurrentTask    string            // What the user is trying to accomplish
+	SystemState    string            // Current system state information
+	PrevCommands   []string          // Previously executed commands
+	SessionHistory []string          // Previous interactions in session
+	ErrorContext   string            // Any current errors or issues
+	StepNumber     int               // Current step in troubleshooting
+	Preferences    map[string]string // User preferences for interaction
+	Metadata       map[string]string // Additional session metadata
 }
 
 // NewInteractiveAgent creates a new InteractiveAgent.
@@ -202,22 +202,22 @@ func (a *InteractiveAgent) buildInteractivePrompt(input string, interactiveCtx *
 // determineUserLevel attempts to determine user expertise level from input.
 func (a *InteractiveAgent) determineUserLevel(input string) string {
 	lowerInput := strings.ToLower(input)
-	
+
 	// Advanced indicators
-	if strings.Contains(lowerInput, "derivation") || 
-	   strings.Contains(lowerInput, "nix expression") ||
-	   strings.Contains(lowerInput, "overlay") ||
-	   strings.Contains(lowerInput, "flake.lock") {
+	if strings.Contains(lowerInput, "derivation") ||
+		strings.Contains(lowerInput, "nix expression") ||
+		strings.Contains(lowerInput, "overlay") ||
+		strings.Contains(lowerInput, "flake.lock") {
 		return "Advanced"
 	}
-	
+
 	// Intermediate indicators
 	if strings.Contains(lowerInput, "configuration.nix") ||
-	   strings.Contains(lowerInput, "home-manager") ||
-	   strings.Contains(lowerInput, "channel") {
+		strings.Contains(lowerInput, "home-manager") ||
+		strings.Contains(lowerInput, "channel") {
 		return "Intermediate"
 	}
-	
+
 	// Default to beginner for safety
 	return "Beginner"
 }
@@ -225,7 +225,7 @@ func (a *InteractiveAgent) determineUserLevel(input string) string {
 // extractCurrentTask tries to understand what the user is trying to accomplish.
 func (a *InteractiveAgent) extractCurrentTask(input string) string {
 	lowerInput := strings.ToLower(input)
-	
+
 	if strings.Contains(lowerInput, "install") {
 		return "Package Installation"
 	} else if strings.Contains(lowerInput, "config") {
@@ -237,7 +237,7 @@ func (a *InteractiveAgent) extractCurrentTask(input string) string {
 	} else if strings.Contains(lowerInput, "setup") {
 		return "System Setup"
 	}
-	
+
 	return "General Assistance"
 }
 
@@ -258,7 +258,7 @@ func (a *InteractiveAgent) extractErrorContext(input string) string {
 func (a *InteractiveAgent) addToHistory(input, response string) {
 	a.sessionHistory = append(a.sessionHistory, fmt.Sprintf("User: %s", input))
 	a.sessionHistory = append(a.sessionHistory, fmt.Sprintf("Assistant: %s", response))
-	
+
 	// Keep history manageable (last 20 interactions)
 	if len(a.sessionHistory) > 20 {
 		a.sessionHistory = a.sessionHistory[len(a.sessionHistory)-20:]
@@ -272,7 +272,7 @@ func (a *InteractiveAgent) enhanceResponseWithInteractiveGuidance(response strin
 		"- Use 'exit' or 'quit' to leave interactive mode\n" +
 		"- Ask follow-up questions for clarification\n" +
 		"- Request step-by-step guidance for complex tasks"
-	
+
 	return response + guidance
 }
 

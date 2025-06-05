@@ -375,7 +375,7 @@ func (a *ExplainHomeOptionAgent) findRelatedHomeOptions(optionPath string) []str
 	case "git":
 		related = append(related,
 			"programs.git.userName",
-			"programs.git.userEmail", 
+			"programs.git.userEmail",
 			"programs.git.aliases",
 		)
 	case "firefox":

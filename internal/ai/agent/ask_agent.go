@@ -140,7 +140,7 @@ func (a *AskAgent) buildAskPrompt(question string, askCtx *AskContext) string {
 	prompt.WriteString("### Instructions:\n")
 	prompt.WriteString("Please provide a comprehensive answer focusing on:\n")
 	prompt.WriteString("1. Direct, actionable solution to the question\n")
-	prompt.WriteString("2. Step-by-step instructions where applicable\n") 
+	prompt.WriteString("2. Step-by-step instructions where applicable\n")
 	prompt.WriteString("3. Code examples and configuration snippets\n")
 	prompt.WriteString("4. Common pitfalls and troubleshooting tips\n")
 	prompt.WriteString("5. Related topics and further reading\n\n")
@@ -173,11 +173,11 @@ func (a *AskAgent) categorizeQuestion(question string) string {
 func (a *AskAgent) determineUrgency(question string) string {
 	question = strings.ToLower(question)
 
-	if strings.Contains(question, "broken") || strings.Contains(question, "error") || 
-	   strings.Contains(question, "fail") || strings.Contains(question, "urgent") {
+	if strings.Contains(question, "broken") || strings.Contains(question, "error") ||
+		strings.Contains(question, "fail") || strings.Contains(question, "urgent") {
 		return "High - System Issue"
 	} else if strings.Contains(question, "how") || strings.Contains(question, "setup") ||
-	          strings.Contains(question, "configure") {
+		strings.Contains(question, "configure") {
 		return "Medium - Configuration"
 	}
 
