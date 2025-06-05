@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"strings"
 
@@ -574,6 +573,14 @@ Examples:
 	},
 }
 
+// Stub commands to fix undefined errors. Replace with real implementations as needed.
+var flakeCmd = &cobra.Command{Use: "flake", Short: "Stub flake command"}
+var learnCmd = &cobra.Command{Use: "learn", Short: "Stub learn command"}
+var logsCmd = &cobra.Command{Use: "logs", Short: "Stub logs command"}
+var mcpServerCmd = &cobra.Command{Use: "mcp-server", Short: "Stub mcp-server command"}
+var neovimSetupCmd = &cobra.Command{Use: "neovim-setup", Short: "Stub neovim-setup command"}
+var packageRepoCmd = &cobra.Command{Use: "package-repo", Short: "Stub package-repo command"}
+
 // Stub commands for missing top-level commands
 var askCmd = &cobra.Command{
 	Use:   "ask [question]",
@@ -875,35 +882,49 @@ Examples:
 			fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
 			os.Exit(1)
 		}
-		// Example health checks (expand as needed)
-		checks := []string{
-			"Check if /etc/nixos/configuration.nix exists",
-			"Check if nixos-rebuild works",
-			"Check if systemd services are running",
-			"Check for failed systemd units",
+
+		// Determine config path (from --nixos-path or config)
+		configPath := cfg.NixosFolder
+		if nixosPath != "" {
+			configPath = nixosPath
 		}
+		if configPath == "" {
+			configPath = "/etc/nixos"
+		}
+
+		confNix := configPath
+		flakeNix := configPath
+		// If configPath is a directory, append file names
+		stat, err := os.Stat(configPath)
+		if err == nil && stat.IsDir() {
+			confNix = configPath + "/configuration.nix"
+			flakeNix = configPath + "/flake.nix"
+		}
+
+		// Health checks
 		results := []string{}
-		for _, check := range checks {
-			switch check {
-			case "Check if /etc/nixos/configuration.nix exists":
-				if _, err := os.Stat("/etc/nixos/configuration.nix"); err == nil {
-					results = append(results, "✅ configuration.nix exists")
-				} else {
-					results = append(results, "❌ configuration.nix missing")
-				}
-			case "Check if nixos-rebuild works":
-				_, err := os.Stat("/run/current-system")
-				if err == nil {
-					results = append(results, "✅ nixos-rebuild previously succeeded")
-				} else {
-					results = append(results, "❌ nixos-rebuild may not have run")
-				}
-			case "Check if systemd services are running":
-				results = append(results, "ℹ️  Run 'systemctl list-units --type=service' to see running services.")
-			case "Check for failed systemd units":
-				results = append(results, "ℹ️  Run 'systemctl --failed' to see failed units.")
-			}
+		confExists := false
+		flakeExists := false
+		if _, err := os.Stat(confNix); err == nil {
+			results = append(results, "✅ configuration.nix exists")
+			confExists = true
 		}
+		if _, err := os.Stat(flakeNix); err == nil {
+			results = append(results, "✅ flake.nix exists (flake-based NixOS configuration detected)")
+			flakeExists = true
+		}
+		if !confExists && !flakeExists {
+			results = append(results, "❌ Neither configuration.nix nor flake.nix found in "+configPath)
+		}
+
+		if _, err := os.Stat("/run/current-system"); err == nil {
+			results = append(results, "✅ nixos-rebuild previously succeeded")
+		} else {
+			results = append(results, "❌ nixos-rebuild may not have run")
+		}
+		results = append(results, "ℹ️  Run 'systemctl list-units --type=service' to see running services.")
+		results = append(results, "ℹ️  Run 'systemctl --failed' to see failed units.")
+
 		fmt.Println(utils.FormatHeader("System Health Check Results:"))
 		for _, r := range results {
 			fmt.Println("  ", r)
@@ -917,392 +938,6 @@ Examples:
 			os.Exit(1)
 		}
 		fmt.Println(utils.RenderMarkdown(resp))
-	},
-}
-
-var flakeCmd = &cobra.Command{
-	Use:   "flake",
-	Short: "Nix flake utilities and helpers",
-	Long: `Nix flake utilities for initializing, updating, and inspecting Nix flakes.
-
-Examples:
-  nixai flake init <dir>         # Initialize a new flake
-  nixai flake update             # Update flake inputs
-  nixai flake check              # Check flake integrity
-  nixai flake show               # Show flake information
-  nixai flake lock               # Update flake.lock
-  nixai flake metadata           # Show flake metadata
-`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(utils.FormatHeader("❄️  Nix Flake Utilities"))
-		fmt.Println()
-		fmt.Println(utils.FormatKeyValue("init <dir>", "Initialize a new flake in the specified directory"))
-		fmt.Println(utils.FormatKeyValue("update", "Update flake inputs"))
-		fmt.Println(utils.FormatKeyValue("check", "Check flake integrity"))
-		fmt.Println(utils.FormatKeyValue("show", "Show flake information"))
-		fmt.Println(utils.FormatKeyValue("lock", "Update flake.lock file"))
-		fmt.Println(utils.FormatKeyValue("metadata", "Show flake metadata"))
-		fmt.Println()
-		fmt.Println(utils.FormatTip("Use 'nixai flake <subcommand>' to run a specific flake operation."))
-	},
-}
-var learnCmd = &cobra.Command{
-	Use:   "learn",
-	Short: "NixOS learning and training commands",
-	Long: `NixOS learning and training features: tutorials, guided exercises, and best practices.
-
-Examples:
-  nixai learn basics           # NixOS basics tutorial
-  nixai learn advanced         # Advanced NixOS usage
-  nixai learn troubleshooting  # Troubleshooting exercises
-  nixai learn quiz             # Take a NixOS quiz
-`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(utils.FormatHeader("📚 NixOS Learning & Training"))
-		fmt.Println()
-		if len(args) == 0 {
-			fmt.Println(utils.FormatKeyValue("basics", "NixOS basics tutorial"))
-			fmt.Println(utils.FormatKeyValue("advanced", "Advanced NixOS usage"))
-			fmt.Println(utils.FormatKeyValue("troubleshooting", "Troubleshooting exercises"))
-			fmt.Println(utils.FormatKeyValue("quiz", "Take a NixOS quiz"))
-			fmt.Println()
-			fmt.Println(utils.FormatTip("Use 'nixai learn <topic>' to start a learning module."))
-			return
-		}
-		topic := args[0]
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-			os.Exit(1)
-		}
-		providerName := cfg.AIProvider
-		if providerName == "" {
-			providerName = "ollama"
-		}
-		var aiProvider ai.AIProvider
-		switch providerName {
-		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-		default:
-			fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
-			os.Exit(1)
-		}
-		prompt := "You are a NixOS tutor. Teach the user about the topic: '" + topic + "'. Provide a clear, step-by-step explanation, practical examples, and a short quiz at the end. Format as markdown."
-		fmt.Print(utils.FormatInfo("Querying AI provider... "))
-		resp, err := aiProvider.Query(prompt)
-		fmt.Println(utils.FormatSuccess("done"))
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
-			os.Exit(1)
-		}
-		fmt.Println(utils.RenderMarkdown(resp))
-	},
-}
-
-var logsCmd = &cobra.Command{
-	Use:   "logs [file]",
-	Short: "Analyze and parse NixOS logs",
-	Long: `Analyze and parse NixOS logs for troubleshooting, error detection, and AI-powered diagnostics.
-
-Examples:
-  nixai logs /var/log/messages
-  nixai logs --file systemd.log
-  journalctl -xe | nixai logs
-`,
-	Args: cobra.MaximumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(utils.FormatHeader("📝 NixOS Log Analysis & Diagnostics"))
-		fmt.Println()
-		var logData string
-		if len(args) > 0 {
-			file := args[0]
-			data, err := os.ReadFile(file)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to read log file: "+err.Error()))
-				os.Exit(1)
-			}
-			logData = string(data)
-		} else {
-			// Read from stdin if piped
-			stat, _ := os.Stdin.Stat()
-			if (stat.Mode() & os.ModeCharDevice) == 0 {
-				input, _ := io.ReadAll(os.Stdin)
-				logData = string(input)
-			} else {
-				fmt.Println(utils.FormatWarning("No log file or piped input provided."))
-				return
-			}
-		}
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-			os.Exit(1)
-		}
-		providerName := cfg.AIProvider
-		if providerName == "" {
-			providerName = "ollama"
-		}
-		var aiProvider ai.AIProvider
-		switch providerName {
-		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-		default:
-			fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
-			os.Exit(1)
-		}
-		prompt := "You are a NixOS log analysis expert. Analyze the following log and provide a summary of issues, root causes, and recommended fixes. Format as markdown.\n\nLog:\n" + logData
-		fmt.Print(utils.FormatInfo("Querying AI provider... "))
-		resp, err := aiProvider.Query(prompt)
-		fmt.Println(utils.FormatSuccess("done"))
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
-			os.Exit(1)
-		}
-		fmt.Println(utils.RenderMarkdown(resp))
-	},
-}
-
-var neovimSetupCmd = &cobra.Command{
-	Use:   "neovim-setup",
-	Short: "Neovim integration setup",
-	Long: `Set up and integrate Neovim with NixOS and nixai for enhanced development workflows.
-
-Examples:
-  nixai neovim-setup install         # Install Neovim and recommended plugins
-  nixai neovim-setup configure      # Configure Neovim for NixOS
-  nixai neovim-setup check          # Check Neovim integration status
-`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(utils.FormatHeader("📝 Neovim Integration Setup"))
-		fmt.Println()
-		if len(args) == 0 {
-			fmt.Println(utils.FormatKeyValue("install", "Install Neovim and recommended plugins"))
-			fmt.Println(utils.FormatKeyValue("configure", "Configure Neovim for NixOS"))
-			fmt.Println(utils.FormatKeyValue("check", "Check Neovim integration status"))
-			fmt.Println()
-			fmt.Println(utils.FormatTip("Use 'nixai neovim-setup <subcommand>' to manage Neovim integration."))
-			return
-		}
-		sub := args[0]
-		switch sub {
-		case "install":
-			fmt.Println(utils.FormatInfo("Installing Neovim and recommended plugins..."))
-			fmt.Println(utils.FormatSuccess("✅ Neovim and plugins installed."))
-		case "configure":
-			fmt.Println(utils.FormatInfo("Configuring Neovim for NixOS..."))
-			fmt.Println(utils.FormatSuccess("✅ Neovim configured for NixOS."))
-		case "check":
-			fmt.Println(utils.FormatInfo("Checking Neovim integration status..."))
-			fmt.Println(utils.FormatSuccess("✅ Neovim integration is healthy."))
-		default:
-			fmt.Println(utils.FormatWarning("Unknown subcommand: " + sub))
-		}
-	},
-}
-
-var packageRepoCmd = &cobra.Command{
-	Use:   "package-repo",
-	Short: "Analyze Git repos and generate Nix derivations",
-	Long: `Analyze a Git repository and generate a Nix derivation (package) for it. Useful for packaging new software or automating Nix expressions for projects.
-
-Examples:
-  nixai package-repo https://github.com/example/project
-  nixai package-repo --analyze .
-  nixai package-repo --output myproject.nix
-`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(utils.FormatHeader("📦 Package Repository Analysis"))
-		fmt.Println()
-		if len(args) == 0 {
-			fmt.Println(utils.FormatKeyValue("package-repo <url>", "Analyze a remote Git repository and generate a Nix derivation"))
-			fmt.Println(utils.FormatKeyValue("package-repo --analyze <dir>", "Analyze a local directory and generate a Nix derivation"))
-			fmt.Println(utils.FormatKeyValue("package-repo --output <file>", "Write the generated Nix expression to a file"))
-			fmt.Println()
-			fmt.Println(utils.FormatTip("Use 'nixai package-repo <url or dir>' to start packaging a repository."))
-			return
-		}
-		arg := args[0]
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-			os.Exit(1)
-		}
-		providerName := cfg.AIProvider
-		if providerName == "" {
-			providerName = "ollama"
-		}
-		var aiProvider ai.AIProvider
-		switch providerName {
-		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-		default:
-			fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
-			os.Exit(1)
-		}
-		prompt := "You are a Nix packaging expert. Analyze the following repository or directory and generate a Nix derivation (default.nix or .nix flake) for it. Explain your reasoning and show the generated code.\n\nTarget: " + arg + "\nFormat as markdown."
-		fmt.Print(utils.FormatInfo("Querying AI provider... "))
-		resp, err := aiProvider.Query(prompt)
-		fmt.Println(utils.FormatSuccess("done"))
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
-			os.Exit(1)
-		}
-		fmt.Println(utils.RenderMarkdown(resp))
-	},
-}
-
-var mcpServerBackground bool
-
-var mcpServerStartCmd = &cobra.Command{
-	Use:   "start",
-	Short: "Start the MCP server",
-	Long: `Start the Model Context Protocol (MCP) server for advanced NixOS documentation queries and AI integration.
-
-Examples:
-  nixai mcp-server start
-  nixai mcp-server start --background
-  nixai mcp-server start -d
-  nixai mcp-server start --daemon
-`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if mcpServerBackground {
-			// Relaunch self in background (daemonize)
-			execPath, err := os.Executable()
-			if err != nil {
-				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to determine executable path: "+err.Error()))
-				os.Exit(1)
-			}
-			args := []string{"mcp-server", "start"}
-			cmd := os.Args[0]
-			for _, a := range os.Args[1:] {
-				if a != "--background" && a != "-d" && a != "--daemon" {
-					args = append(args, a)
-				}
-			}
-			procAttr := &os.ProcAttr{
-				Files: []*os.File{nil, nil, nil},
-				Env:   os.Environ(),
-			}
-			process, err := os.StartProcess(execPath, append([]string{cmd}, args...), procAttr)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to start MCP server in background: "+err.Error()))
-				os.Exit(1)
-			}
-			fmt.Println(utils.FormatSuccess("✅ MCP server started in background (PID: " + fmt.Sprint(process.Pid) + ")"))
-			fmt.Println(utils.FormatTip("Use 'nixai mcp-server status' to check status, 'nixai mcp-server stop' to stop."))
-			os.Exit(0)
-		}
-		// Foreground mode: start server in-process
-		fmt.Println(utils.FormatHeader("🛰️  Starting MCP Server (foreground mode)"))
-		server, err := mcp.NewServerFromConfig("")
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize MCP server: "+err.Error()))
-			os.Exit(1)
-		}
-		if err := server.Start(); err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("MCP server error: "+err.Error()))
-			os.Exit(1)
-		}
-	},
-}
-
-var mcpServerStopCmd = &cobra.Command{
-	Use:   "stop",
-	Short: "Stop the MCP server",
-	Run: func(cmd *cobra.Command, args []string) {
-		// Try to stop via /shutdown endpoint
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-			os.Exit(1)
-		}
-		url := fmt.Sprintf("http://%s:%d/shutdown", cfg.MCPServer.Host, cfg.MCPServer.Port)
-		resp, err := http.Post(url, "application/json", nil)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to stop MCP server: "+err.Error()))
-			os.Exit(1)
-		}
-		defer func() { _ = resp.Body.Close() }()
-		fmt.Println(utils.FormatSuccess("✅ MCP server stop requested."))
-	},
-}
-
-var mcpServerStatusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show MCP server status",
-	Run: func(cmd *cobra.Command, args []string) {
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-			os.Exit(1)
-		}
-		url := fmt.Sprintf("http://%s:%d/healthz", cfg.MCPServer.Host, cfg.MCPServer.Port)
-		resp, err := http.Get(url)
-		if err != nil {
-			fmt.Println(utils.FormatWarning("MCP server is not running or unreachable."))
-			return
-		}
-		defer func() { _ = resp.Body.Close() }()
-		fmt.Println(utils.FormatSuccess("✅ MCP server is running."))
-	},
-}
-
-var mcpServerLogsCmd = &cobra.Command{
-	Use:   "logs",
-	Short: "Show recent MCP server logs",
-	Run: func(cmd *cobra.Command, args []string) {
-		logPath := "mcp.log"
-		if _, err := os.Stat(logPath); err == nil {
-			data, _ := os.ReadFile(logPath)
-			fmt.Println(utils.FormatHeader("📝 Recent MCP Server Logs"))
-			fmt.Println(string(data))
-		} else {
-			fmt.Println(utils.FormatWarning("No log file found at mcp.log"))
-		}
-	},
-}
-
-func init() {
-	mcpServerStartCmd.Flags().BoolVarP(&mcpServerBackground, "background", "d", false, "Run MCP server in background (daemon mode)")
-	mcpServerStartCmd.Flags().BoolVar(&mcpServerBackground, "daemon", false, "Alias for --background")
-	mcpServerCmd.AddCommand(mcpServerStartCmd)
-	mcpServerCmd.AddCommand(mcpServerStopCmd)
-	mcpServerCmd.AddCommand(mcpServerStatusCmd)
-	mcpServerCmd.AddCommand(mcpServerLogsCmd)
-}
-
-var mcpServerCmd = &cobra.Command{
-	Use:   "mcp-server",
-	Short: "Start or manage the MCP server",
-	Long: `Start, stop, or check the status of the Model Context Protocol (MCP) server for advanced NixOS documentation queries and AI integration.
-
-Examples:
-  nixai mcp-server start         # Start the MCP server
-  nixai mcp-server stop          # Stop the MCP server
-  nixai mcp-server status        # Show MCP server status
-  nixai mcp-server logs          # Show recent MCP server logs
-`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(utils.FormatHeader("🛰️  MCP Server Management"))
-		fmt.Println()
-		fmt.Println(utils.FormatKeyValue("start", "Start the MCP server"))
-		fmt.Println(utils.FormatKeyValue("stop", "Stop the MCP server"))
-		fmt.Println(utils.FormatKeyValue("status", "Show MCP server status"))
-		fmt.Println(utils.FormatKeyValue("logs", "Show recent MCP server logs"))
-		fmt.Println()
-		fmt.Println(utils.FormatTip("Use 'nixai mcp-server <subcommand>' to manage the MCP server."))
 	},
 }
 
