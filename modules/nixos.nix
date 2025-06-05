@@ -1,4 +1,6 @@
-# NixOS module for nixai
+# nixai NixOS Module
+# Provides systemd services and configuration for the nixai application.
+# This module enables system-wide nixai installation with MCP server support.
 {
   config,
   lib,

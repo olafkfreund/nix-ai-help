@@ -1,4 +1,6 @@
-# Home Manager module for nixai
+# nixai Home Manager Module
+# Provides user-level nixai configuration and services for Home Manager.
+# This module enables per-user nixai installation with optional editor integrations.
 {nixaiPackage ? null}:
 # Accept optional nixai package parameter
 {
