@@ -10,7 +10,17 @@ import (
 	"nix-ai-help/internal/mcp"
 	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/utils"
+
+	"github.com/spf13/cobra"
 )
+
+// Helper to run a cobra.Command and capture its output to io.Writer
+func runCobraCommand(cmd *cobra.Command, args []string, out io.Writer) {
+	cmd.SetOut(out)
+	cmd.SetErr(out)
+	cmd.SetArgs(args)
+	_ = cmd.Execute()
+}
 
 // Helper functions for running commands directly in interactive mode
 
@@ -578,44 +588,303 @@ func runCompletionCmd(args []string, out io.Writer) {
 
 // Deps command
 func runDepsCmd(args []string, out io.Writer) {
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("🔗 NixOS Dependency Analysis"))
-	_, _ = fmt.Fprintln(out, "Analyze NixOS configuration dependencies and imports. (Stub)")
+	runCobraCommand(NewDepsCommand(), args, out)
 }
 
 // Devenv command
 func runDevenvCmd(args []string, out io.Writer) {
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("🧪 Development Environments"))
-	_, _ = fmt.Fprintln(out, "Create and manage development environments with devenv. (Stub)")
+	// Show help if no args (for interactive parity)
+	if len(args) == 0 {
+		_ = NewDevenvCommand().Help()
+		return
+	}
+	runCobraCommand(NewDevenvCommand(), args, out)
+}
+
+// NewDevenvCommand returns a fresh devenv command with all subcommands
+func NewDevenvCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   devenvCmd.Use,
+		Short: devenvCmd.Short,
+		Long:  devenvCmd.Long,
+	}
+	// Add subcommands as fresh instances
+	cmd.AddCommand(NewDevenvListCmd())
+	cmd.AddCommand(NewDevenvCreateCmd())
+	cmd.AddCommand(NewDevenvSuggestCmd())
+	cmd.PersistentFlags().AddFlagSet(devenvCmd.PersistentFlags())
+	cmd.Flags().AddFlagSet(devenvCmd.Flags())
+	return cmd
 }
 
 // Explain-option command
 func runExplainOptionCmd(args []string, out io.Writer) {
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("🖥️ Explain NixOS Option"))
-	_, _ = fmt.Fprintln(out, "Explain a NixOS option using AI and documentation. (Stub)")
+	runCobraCommand(NewExplainOptionCommand(), args, out)
 }
 
 // GC command
 func runGCCmd(args []string, out io.Writer) {
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("🧹 Garbage Collection"))
-	_, _ = fmt.Fprintln(out, "AI-powered garbage collection analysis and cleanup. (Stub)")
+	runCobraCommand(NewGCCmd(), args, out)
 }
 
 // Hardware command
 func runHardwareCmd(args []string, out io.Writer) {
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("💻 Hardware Optimizer"))
-	_, _ = fmt.Fprintln(out, "AI-powered hardware configuration optimizer. (Stub)")
-}
-
-// Interactive command
-func runInteractiveCmd(args []string, out io.Writer) {
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("💬 Interactive Mode"))
-	_, _ = fmt.Fprintln(out, "You are already in interactive mode!")
+	runCobraCommand(NewHardwareCmd(), args, out)
 }
 
 // Migrate command
 func runMigrateCmd(args []string, out io.Writer) {
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("🔀 Migration Assistant"))
-	_, _ = fmt.Fprintln(out, "AI-powered migration assistant for channels and flakes. (Stub)")
+	runCobraCommand(NewMigrateCmd(), args, out)
+}
+
+// Snippets command
+func runSnippetsCmd(args []string, out io.Writer) {
+	runCobraCommand(NewSnippetsCmd(), args, out)
+}
+
+// Templates command
+func runTemplatesCmd(args []string, out io.Writer) {
+	runCobraCommand(NewTemplatesCmd(), args, out)
+}
+
+// NewSnippetsCmd returns a cobra.Command for the 'snippets' command.
+func NewSnippetsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "snippets",
+		Short: "Show, add, or manage code snippets for NixOS, Home Manager, and related workflows.",
+		Long: `Manage and view reusable code snippets for NixOS, Home Manager, and related workflows.
+
+Examples:
+  nixai snippets list
+  nixai snippets add --name my-snippet --file ./snippet.nix
+  nixai snippets show my-snippet
+  nixai snippets remove my-snippet
+`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// For now, just list available snippets from a default directory
+			snippetDir := utils.GetSnippetsDir()
+			snippets, err := utils.ListSnippets(snippetDir)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to list snippets: %v\n", err)
+				return err
+			}
+			if len(snippets) == 0 {
+				cmd.Println(utils.FormatHeader("No snippets found."))
+				return nil
+			}
+			cmd.Println(utils.FormatHeader("Available Snippets:"))
+			for _, s := range snippets {
+				cmd.Println(utils.FormatKeyValue(s.Name, s.Description))
+			}
+			return nil
+		},
+	}
+	cmd.AddCommand(NewSnippetsListCmd())
+	cmd.AddCommand(NewSnippetsAddCmd())
+	cmd.AddCommand(NewSnippetsShowCmd())
+	cmd.AddCommand(NewSnippetsRemoveCmd())
+	return cmd
+}
+
+// NewSnippetsListCmd returns a cobra.Command for the 'list' subcommand of 'snippets'.
+func NewSnippetsListCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "List all available code snippets",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dir := utils.GetSnippetsDir()
+			snippets, err := utils.ListSnippets(dir)
+			if err != nil {
+				cmd.Println(utils.FormatError("Failed to list snippets: " + err.Error()))
+				return err
+			}
+			if len(snippets) == 0 {
+				cmd.Println(utils.FormatHeader("No snippets found."))
+				return nil
+			}
+			cmd.Println(utils.FormatHeader("Available Snippets:"))
+			for _, s := range snippets {
+				cmd.Println(utils.FormatKeyValue(s.Name, s.Description))
+			}
+			return nil
+		},
+	}
+}
+
+// NewSnippetsAddCmd returns a cobra.Command for the 'add' subcommand of 'snippets'.
+func NewSnippetsAddCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "add",
+		Short: "Add a new code snippet",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.Println(utils.FormatHeader("Add snippet: Not yet implemented."))
+			return nil
+		},
+	}
+}
+
+// NewSnippetsShowCmd returns a cobra.Command for the 'show' subcommand of 'snippets'.
+func NewSnippetsShowCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "show",
+		Short: "Show a code snippet by name",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				cmd.Println(utils.FormatError("Usage: snippets show <name>"))
+				return nil
+			}
+			dir := utils.GetSnippetsDir()
+			snippets, err := utils.ListSnippets(dir)
+			if err != nil {
+				cmd.Println(utils.FormatError("Failed to list snippets: " + err.Error()))
+				return err
+			}
+			for _, s := range snippets {
+				if s.Name == args[0] {
+					cmd.Println(utils.FormatHeader(s.Name))
+					content, _ := os.ReadFile(s.Path)
+					cmd.Println(string(content))
+					return nil
+				}
+			}
+			cmd.Println(utils.FormatError("Snippet not found: " + args[0]))
+			return nil
+		},
+	}
+}
+
+// NewSnippetsRemoveCmd returns a cobra.Command for the 'remove' subcommand of 'snippets'.
+func NewSnippetsRemoveCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "remove",
+		Short: "Remove a code snippet by name",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.Println(utils.FormatHeader("Remove snippet: Not yet implemented."))
+			return nil
+		},
+	}
+}
+
+// NewTemplatesCmd returns a cobra.Command for the 'templates' command.
+func NewTemplatesCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "templates",
+		Short: "List and manage project templates for NixOS, Home Manager, and related setups.",
+		Long: `Browse, add, or use project templates for NixOS, Home Manager, and related workflows.
+
+Examples:
+  nixai templates list
+  nixai templates show minimal-nixos
+  nixai templates use minimal-nixos --output ./my-nixos
+`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			templates, err := utils.ListTemplates()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Failed to list templates: %v\n", err)
+				return err
+			}
+			if len(templates) == 0 {
+				cmd.Println(utils.FormatHeader("No templates found."))
+				return nil
+			}
+			cmd.Println(utils.FormatHeader("Available Templates:"))
+			for _, t := range templates {
+				cmd.Println(utils.FormatKeyValue(t.Name, t.Description))
+			}
+			return nil
+		},
+	}
+	cmd.AddCommand(NewTemplatesListCmd())
+	cmd.AddCommand(NewTemplatesShowCmd())
+	cmd.AddCommand(NewTemplatesUseCmd())
+	return cmd
+}
+
+// NewTemplatesListCmd returns a cobra.Command for the 'list' subcommand of 'templates'.
+func NewTemplatesListCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "list",
+		Short: "List all available templates",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			templates, err := utils.ListTemplates()
+			if err != nil {
+				cmd.Println(utils.FormatError("Failed to list templates: " + err.Error()))
+				return err
+			}
+			if len(templates) == 0 {
+				cmd.Println(utils.FormatHeader("No templates found."))
+				return nil
+			}
+			cmd.Println(utils.FormatHeader("Available Templates:"))
+			for _, t := range templates {
+				cmd.Println(utils.FormatKeyValue(t.Name, t.Description))
+			}
+			return nil
+		},
+	}
+}
+
+// NewTemplatesShowCmd returns a cobra.Command for the 'show' subcommand of 'templates'.
+func NewTemplatesShowCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "show",
+		Short: "Show a template by name",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				cmd.Println(utils.FormatError("Usage: templates show <name>"))
+				return nil
+			}
+			templates, err := utils.ListTemplates()
+			if err != nil {
+				cmd.Println(utils.FormatError("Failed to list templates: " + err.Error()))
+				return err
+			}
+			for _, t := range templates {
+				if t.Name == args[0] {
+					cmd.Println(utils.FormatHeader(t.Name))
+					content, _ := os.ReadFile(t.Path)
+					cmd.Println(string(content))
+					return nil
+				}
+			}
+			cmd.Println(utils.FormatError("Template not found: " + args[0]))
+			return nil
+		},
+	}
+}
+
+// NewTemplatesUseCmd returns a cobra.Command for the 'use' subcommand of 'templates'.
+func NewTemplatesUseCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "use",
+		Short: "Copy a template to a target directory",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.Println(utils.FormatHeader("Use template: Not yet implemented."))
+			return nil
+		},
+	}
+}
+
+// Store command
+func runStoreCmd(args []string, out io.Writer) {
+	runCobraCommand(NewStoreCommand(), args, out)
+}
+
+// NewStoreCommand returns a fresh store command with all subcommands
+func NewStoreCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   storeCmd.Use,
+		Short: storeCmd.Short,
+		Long:  storeCmd.Long,
+	}
+	// Add subcommands (fresh instances)
+	cmd.AddCommand(storeBackupCmd)
+	cmd.AddCommand(storeRestoreCmd)
+	cmd.AddCommand(storeIntegrityCmd)
+	cmd.AddCommand(storePerformanceCmd)
+	cmd.PersistentFlags().AddFlagSet(storeCmd.PersistentFlags())
+	cmd.Flags().AddFlagSet(storeCmd.Flags())
+	return cmd
 }
 
 // Search command
@@ -629,6 +898,7 @@ func runSearchCmd(args []string, out io.Writer) {
 	query := args[0]
 	if len(args) > 1 {
 		query = fmt.Sprintf("%s %s", args[0], args[1])
+
 	}
 
 	cfg, err := config.LoadUserConfig()
@@ -715,22 +985,55 @@ func runSearchCmd(args []string, out io.Writer) {
 	}
 }
 
-// Snippets command
-func runSnippetsCmd(args []string, out io.Writer) {
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("🔖 Configuration Snippets"))
-	_, _ = fmt.Fprintln(out, "Manage NixOS configuration snippets. (Stub)")
-}
-
-// Store command
-func runStoreCmd(args []string, out io.Writer) {
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("💾 Nix Store Management"))
-	_, _ = fmt.Fprintln(out, "Manage, backup, and analyze the Nix store. (Stub)")
-}
-
-// Templates command
-func runTemplatesCmd(args []string, out io.Writer) {
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("📄 Configuration Templates"))
-	_, _ = fmt.Fprintln(out, "Manage NixOS configuration templates and snippets. (Stub)")
+// Ask command
+func runAskCmd(args []string, out io.Writer) {
+	if len(args) == 0 {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Usage: ask <question>"))
+		_, _ = fmt.Fprintln(out, utils.FormatTip("Example: ask How do I enable nginx?"))
+		return
+	}
+	question := ""
+	if len(args) == 1 {
+		question = args[0]
+	} else {
+		question = ""
+		for i, s := range args {
+			if i > 0 {
+				question += " "
+			}
+			question += s
+		}
+	}
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("🤖 AI Answer to your question:"))
+	cfg, err := config.LoadUserConfig()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to load config: "+err.Error()))
+		return
+	}
+	providerName := cfg.AIProvider
+	if providerName == "" {
+		providerName = "ollama"
+	}
+	var aiProvider ai.AIProvider
+	switch providerName {
+	case "ollama":
+		aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+	case "openai":
+		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+	case "gemini":
+		aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
+	default:
+		_, _ = fmt.Fprintln(out, utils.FormatError("Unknown AI provider: "+providerName))
+		return
+	}
+	_, _ = fmt.Fprint(out, utils.FormatInfo("Querying AI provider... "))
+	resp, err := aiProvider.Query(question)
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("done"))
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("AI error: "+err.Error()))
+		return
+	}
+	_, _ = fmt.Fprintln(out, utils.RenderMarkdown(resp))
 }
 
 // RunDirectCommand executes commands directly from interactive mode
@@ -794,7 +1097,7 @@ func RunDirectCommand(cmdName string, args []string, out io.Writer) (bool, error
 		runHardwareCmd(args, out)
 		return true, nil
 	case "interactive":
-		runInteractiveCmd(args, out)
+		_, _ = fmt.Fprintln(out, utils.FormatTip("You are already in interactive mode!"))
 		return true, nil
 	case "migrate":
 		runMigrateCmd(args, out)
@@ -810,6 +1113,16 @@ func RunDirectCommand(cmdName string, args []string, out io.Writer) (bool, error
 		return true, nil
 	case "templates":
 		runTemplatesCmd(args, out)
+		return true, nil
+	case "ask":
+		runAskCmd(args, out)
+		return true, nil
+	case "help":
+		_, _ = fmt.Fprintln(out, utils.FormatHeader("❓ Help: Available Commands"))
+		_, _ = fmt.Fprintln(out, `🤖 ask <question>: Ask any NixOS question\n🛠️ build: Enhanced build troubleshooting and optimization\n🌐 community: Community resources and support\n🔄 completion: Generate the autocompletion script for the specified shell\n⚙️ config: Manage nixai configuration\n🧑‍💻 configure: Configure NixOS interactively\n🔗 deps: Analyze NixOS configuration dependencies and imports\n🧪 devenv: Create and manage development environments with devenv\n🩺 diagnose: Diagnose NixOS issues\n🩻 doctor: Run NixOS health checks\n🖥️ explain-option <option>: Explain a NixOS option\n🧊 flake: Nix flake utilities\n🧹 gc: AI-powered garbage collection analysis and cleanup\n💻 hardware: AI-powered hardware configuration optimizer\n❓ help: Help about any command\n💬 interactive: Launch interactive AI-powered NixOS assistant shell\n📚 learn: NixOS learning and training commands\n📝 logs: Analyze and parse NixOS logs\n🖧 machines: Manage and synchronize NixOS configurations across multiple machines\n🛰️ mcp-server: Start or manage the MCP server\n🔀 migrate: AI-powered migration assistant for channels and flakes\n📝 neovim-setup: Neovim integration setup\n📦 package-repo <url>: Analyze Git repos and generate Nix derivations\n🔍 search <package>: Search for NixOS packages/services and get config/AI tips\n🔖 snippets: Manage NixOS configuration snippets\n💾 store: Manage, backup, and analyze the Nix store\n📄 templates: Manage NixOS configuration templates and snippets\n❌ exit: Exit interactive mode`)
+		return true, nil
+	case "exit":
+		_, _ = fmt.Fprintln(out, utils.FormatTip("Type Ctrl+D or 'exit' to leave interactive mode."))
 		return true, nil
 	default:
 		return false, nil

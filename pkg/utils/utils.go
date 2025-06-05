@@ -489,3 +489,100 @@ func GetFlakeHosts(flakePath string, debug ...bool) ([]string, error) {
 
 	return hosts, nil
 }
+
+// --- Snippets/Template helpers ---
+// Minimal snippet/template types and utils for listing
+
+type Snippet struct {
+	Name        string
+	Description string
+	Path        string
+}
+
+type Template struct {
+	Name        string
+	Description string
+	Path        string
+}
+
+// GetSnippetsDir returns the default snippets directory (e.g. ~/.config/nixai/snippets)
+func GetSnippetsDir() string {
+	dir, err := GetConfigDir()
+	if err != nil {
+		return "./snippets"
+	}
+	return filepath.Join(dir, "snippets")
+}
+
+// ListSnippets returns a list of snippets in the snippets directory
+func ListSnippets(snippetDir string) ([]Snippet, error) {
+	files, err := os.ReadDir(snippetDir)
+	if err != nil {
+		return nil, err
+	}
+	var snippets []Snippet
+	for _, f := range files {
+		if f.IsDir() || !strings.HasSuffix(f.Name(), ".nix") {
+			continue
+		}
+		path := filepath.Join(snippetDir, f.Name())
+		desc := ""
+		file, err := os.Open(path)
+		if err == nil {
+			scanner := bufio.NewScanner(file)
+			if scanner.Scan() {
+				line := scanner.Text()
+				if strings.HasPrefix(line, "#") {
+					desc = strings.TrimPrefix(line, "#")
+					desc = strings.TrimSpace(desc)
+				}
+			}
+			file.Close()
+		}
+		snippets = append(snippets, Snippet{
+			Name:        strings.TrimSuffix(f.Name(), ".nix"),
+			Description: desc,
+			Path:        path,
+		})
+	}
+	return snippets, nil
+}
+
+// ListTemplates returns a list of templates in the templates directory
+func ListTemplates() ([]Template, error) {
+	dir, err := GetConfigDir()
+	if err != nil {
+		return nil, err
+	}
+	templateDir := filepath.Join(dir, "templates")
+	files, err := os.ReadDir(templateDir)
+	if err != nil {
+		return nil, err
+	}
+	var templates []Template
+	for _, f := range files {
+		if f.IsDir() {
+			continue
+		}
+		path := filepath.Join(templateDir, f.Name())
+		desc := ""
+		file, err := os.Open(path)
+		if err == nil {
+			scanner := bufio.NewScanner(file)
+			if scanner.Scan() {
+				line := scanner.Text()
+				if strings.HasPrefix(line, "#") {
+					desc = strings.TrimPrefix(line, "#")
+					desc = strings.TrimSpace(desc)
+				}
+			}
+			file.Close()
+		}
+		templates = append(templates, Template{
+			Name:        f.Name(),
+			Description: desc,
+			Path:        path,
+		})
+	}
+	return templates, nil
+}

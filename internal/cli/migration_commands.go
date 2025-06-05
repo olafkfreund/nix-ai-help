@@ -823,3 +823,18 @@ func init() {
 	migrateCmd.AddCommand(migrateAnalyzeCmd)
 	migrateCmd.AddCommand(migrateToFlakesCmd)
 }
+
+// NewMigrateCmd creates a new migrate command
+func NewMigrateCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   migrateCmd.Use,
+		Short: migrateCmd.Short,
+		Long:  migrateCmd.Long,
+		Run:   migrateCmd.Run,
+	}
+	cmd.AddCommand(migrateAnalyzeCmd)
+	cmd.AddCommand(migrateToFlakesCmd)
+	cmd.PersistentFlags().AddFlagSet(migrateCmd.PersistentFlags())
+	cmd.Flags().AddFlagSet(migrateCmd.Flags())
+	return cmd
+}

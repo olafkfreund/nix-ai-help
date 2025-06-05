@@ -461,3 +461,21 @@ func init() {
 	hardwareLaptopCmd.Flags().Bool("power-save", false, "Optimize for maximum battery life")
 	hardwareLaptopCmd.Flags().Bool("performance", false, "Optimize for maximum performance")
 }
+
+// NewHardwareCmd constructor
+func NewHardwareCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   hardwareCmd.Use,
+		Short: hardwareCmd.Short,
+		Long:  hardwareCmd.Long,
+		Run:   hardwareCmd.Run,
+	}
+	cmd.AddCommand(hardwareDetectCmd)
+	cmd.AddCommand(hardwareOptimizeCmd)
+	cmd.AddCommand(hardwareDriversCmd)
+	cmd.AddCommand(hardwareCompareCmd)
+	cmd.AddCommand(hardwareLaptopCmd)
+	cmd.PersistentFlags().AddFlagSet(hardwareCmd.PersistentFlags())
+	cmd.Flags().AddFlagSet(hardwareCmd.Flags())
+	return cmd
+}
