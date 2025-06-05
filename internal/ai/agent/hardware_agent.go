@@ -15,32 +15,32 @@ type HardwareAgent struct {
 
 // HardwareContext contains hardware-specific context information
 type HardwareContext struct {
-	SystemInfo       string            `json:"system_info,omitempty"`       // System hardware overview
-	CPUInfo          string            `json:"cpu_info,omitempty"`          // CPU details and specifications
-	GPUInfo          string            `json:"gpu_info,omitempty"`          // Graphics card information
-	MemoryInfo       string            `json:"memory_info,omitempty"`       // RAM and memory details
-	StorageInfo      string            `json:"storage_info,omitempty"`      // Storage devices and configuration
-	NetworkInfo      string            `json:"network_info,omitempty"`      // Network interfaces and adapters
-	AudioInfo        string            `json:"audio_info,omitempty"`        // Audio hardware and configuration
-	USBDevices       []string          `json:"usb_devices,omitempty"`       // Connected USB devices
-	PCIDevices       []string          `json:"pci_devices,omitempty"`       // PCI devices and controllers
-	KernelModules    []string          `json:"kernel_modules,omitempty"`    // Loaded kernel modules
-	LoadedDrivers    []string          `json:"loaded_drivers,omitempty"`    // Currently loaded drivers
-	MissingDrivers   []string          `json:"missing_drivers,omitempty"`   // Missing or problematic drivers
-	HardwareIssues   []string          `json:"hardware_issues,omitempty"`   // Known hardware problems
-	PowerManagement  string            `json:"power_management,omitempty"`  // Power management configuration
-	ThermalInfo      string            `json:"thermal_info,omitempty"`      // Temperature and thermal management
-	BIOS_UEFI        string            `json:"bios_uefi,omitempty"`         // BIOS/UEFI information
-	SecureBoot       bool              `json:"secure_boot,omitempty"`       // Secure boot status
-	VirtualizationInfo string          `json:"virtualization_info,omitempty"` // Virtualization support
-	Architecture     string            `json:"architecture,omitempty"`      // System architecture
-	Microcode        string            `json:"microcode,omitempty"`         // CPU microcode information
-	Firmware         []string          `json:"firmware,omitempty"`          // Firmware packages and versions
-	HardwareConfig   map[string]string `json:"hardware_config,omitempty"`   // Current hardware configuration
-	OptimizationGoals []string         `json:"optimization_goals,omitempty"` // Performance optimization targets
-	CompatibilityIssues []string       `json:"compatibility_issues,omitempty"` // Known compatibility problems
-	RecommendedPackages []string       `json:"recommended_packages,omitempty"` // Suggested hardware packages
-	ConfigOptions    map[string]string `json:"config_options,omitempty"`    // Suggested NixOS configuration options
+	SystemInfo          string            `json:"system_info,omitempty"`          // System hardware overview
+	CPUInfo             string            `json:"cpu_info,omitempty"`             // CPU details and specifications
+	GPUInfo             string            `json:"gpu_info,omitempty"`             // Graphics card information
+	MemoryInfo          string            `json:"memory_info,omitempty"`          // RAM and memory details
+	StorageInfo         string            `json:"storage_info,omitempty"`         // Storage devices and configuration
+	NetworkInfo         string            `json:"network_info,omitempty"`         // Network interfaces and adapters
+	AudioInfo           string            `json:"audio_info,omitempty"`           // Audio hardware and configuration
+	USBDevices          []string          `json:"usb_devices,omitempty"`          // Connected USB devices
+	PCIDevices          []string          `json:"pci_devices,omitempty"`          // PCI devices and controllers
+	KernelModules       []string          `json:"kernel_modules,omitempty"`       // Loaded kernel modules
+	LoadedDrivers       []string          `json:"loaded_drivers,omitempty"`       // Currently loaded drivers
+	MissingDrivers      []string          `json:"missing_drivers,omitempty"`      // Missing or problematic drivers
+	HardwareIssues      []string          `json:"hardware_issues,omitempty"`      // Known hardware problems
+	PowerManagement     string            `json:"power_management,omitempty"`     // Power management configuration
+	ThermalInfo         string            `json:"thermal_info,omitempty"`         // Temperature and thermal management
+	BIOS_UEFI           string            `json:"bios_uefi,omitempty"`            // BIOS/UEFI information
+	SecureBoot          bool              `json:"secure_boot,omitempty"`          // Secure boot status
+	VirtualizationInfo  string            `json:"virtualization_info,omitempty"`  // Virtualization support
+	Architecture        string            `json:"architecture,omitempty"`         // System architecture
+	Microcode           string            `json:"microcode,omitempty"`            // CPU microcode information
+	Firmware            []string          `json:"firmware,omitempty"`             // Firmware packages and versions
+	HardwareConfig      map[string]string `json:"hardware_config,omitempty"`      // Current hardware configuration
+	OptimizationGoals   []string          `json:"optimization_goals,omitempty"`   // Performance optimization targets
+	CompatibilityIssues []string          `json:"compatibility_issues,omitempty"` // Known compatibility problems
+	RecommendedPackages []string          `json:"recommended_packages,omitempty"` // Suggested hardware packages
+	ConfigOptions       map[string]string `json:"config_options,omitempty"`       // Suggested NixOS configuration options
 }
 
 // NewHardwareAgent creates a new hardware agent with the specified provider.

@@ -15,32 +15,32 @@ type LogsAgent struct {
 
 // LogsContext contains log analysis and monitoring context information
 type LogsContext struct {
-	LogSources       []string          `json:"log_sources,omitempty"`       // Available log sources
-	LogFiles         []string          `json:"log_files,omitempty"`         // Specific log files to analyze
-	LogContent       string            `json:"log_content,omitempty"`       // Raw log content
-	SystemdJournal   string            `json:"systemd_journal,omitempty"`   // Systemd journal entries
-	ServiceLogs      map[string]string `json:"service_logs,omitempty"`      // Service-specific logs
-	ErrorMessages    []string          `json:"error_messages,omitempty"`    // Extracted error messages
-	WarningMessages  []string          `json:"warning_messages,omitempty"`  // Warning messages
-	CriticalMessages []string          `json:"critical_messages,omitempty"` // Critical system messages
-	LogLevel         string            `json:"log_level,omitempty"`         // Current log level filter
-	TimeRange        string            `json:"time_range,omitempty"`        // Time range for log analysis
-	ServiceNames     []string          `json:"service_names,omitempty"`     // Services to monitor
-	LogPatterns      []string          `json:"log_patterns,omitempty"`      // Patterns to search for
-	KernelMessages   string            `json:"kernel_messages,omitempty"`   // Kernel log messages
-	BootMessages     string            `json:"boot_messages,omitempty"`     // Boot-time log messages
-	NetworkLogs      string            `json:"network_logs,omitempty"`      // Network-related logs
-	AuthLogs         string            `json:"auth_logs,omitempty"`         // Authentication logs
-	SystemErrors     []string          `json:"system_errors,omitempty"`     // System-level errors
-	PerformanceIssues []string         `json:"performance_issues,omitempty"` // Performance-related log entries
-	SecurityEvents   []string          `json:"security_events,omitempty"`   // Security-related events
-	LogRotation      string            `json:"log_rotation,omitempty"`      // Log rotation configuration
-	LogSize          string            `json:"log_size,omitempty"`          // Current log size
-	LogRetention     string            `json:"log_retention,omitempty"`     // Log retention policy
-	MonitoringAlerts []string          `json:"monitoring_alerts,omitempty"` // Active monitoring alerts
-	LogAnalysisGoals []string          `json:"log_analysis_goals,omitempty"` // Analysis objectives
-	FilterCriteria   map[string]string `json:"filter_criteria,omitempty"`   // Log filtering criteria
-	OutputFormat     string            `json:"output_format,omitempty"`     // Desired output format
+	LogSources        []string          `json:"log_sources,omitempty"`        // Available log sources
+	LogFiles          []string          `json:"log_files,omitempty"`          // Specific log files to analyze
+	LogContent        string            `json:"log_content,omitempty"`        // Raw log content
+	SystemdJournal    string            `json:"systemd_journal,omitempty"`    // Systemd journal entries
+	ServiceLogs       map[string]string `json:"service_logs,omitempty"`       // Service-specific logs
+	ErrorMessages     []string          `json:"error_messages,omitempty"`     // Extracted error messages
+	WarningMessages   []string          `json:"warning_messages,omitempty"`   // Warning messages
+	CriticalMessages  []string          `json:"critical_messages,omitempty"`  // Critical system messages
+	LogLevel          string            `json:"log_level,omitempty"`          // Current log level filter
+	TimeRange         string            `json:"time_range,omitempty"`         // Time range for log analysis
+	ServiceNames      []string          `json:"service_names,omitempty"`      // Services to monitor
+	LogPatterns       []string          `json:"log_patterns,omitempty"`       // Patterns to search for
+	KernelMessages    string            `json:"kernel_messages,omitempty"`    // Kernel log messages
+	BootMessages      string            `json:"boot_messages,omitempty"`      // Boot-time log messages
+	NetworkLogs       string            `json:"network_logs,omitempty"`       // Network-related logs
+	AuthLogs          string            `json:"auth_logs,omitempty"`          // Authentication logs
+	SystemErrors      []string          `json:"system_errors,omitempty"`      // System-level errors
+	PerformanceIssues []string          `json:"performance_issues,omitempty"` // Performance-related log entries
+	SecurityEvents    []string          `json:"security_events,omitempty"`    // Security-related events
+	LogRotation       string            `json:"log_rotation,omitempty"`       // Log rotation configuration
+	LogSize           string            `json:"log_size,omitempty"`           // Current log size
+	LogRetention      string            `json:"log_retention,omitempty"`      // Log retention policy
+	MonitoringAlerts  []string          `json:"monitoring_alerts,omitempty"`  // Active monitoring alerts
+	LogAnalysisGoals  []string          `json:"log_analysis_goals,omitempty"` // Analysis objectives
+	FilterCriteria    map[string]string `json:"filter_criteria,omitempty"`    // Log filtering criteria
+	OutputFormat      string            `json:"output_format,omitempty"`      // Desired output format
 }
 
 // NewLogsAgent creates a new logs agent with the specified provider.
