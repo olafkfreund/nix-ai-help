@@ -14,54 +14,23 @@
   }: let
     # System-dependent NixOS modules (using eachDefaultSystemPassThrough)
     nixosModules = flake-utils.lib.eachDefaultSystemPassThrough (system: {
-      default = import ./modules/nixos.nix {
-        nixaiPackage = self.packages.${system}.nixai;
-      };
+      default = import ./modules/nixos.nix;
     });
     nixosModule = nixosModules.default;
 
     # System-dependent Home Manager modules (using eachDefaultSystemPassThrough)
     homeManagerModules = flake-utils.lib.eachDefaultSystemPassThrough (system: {
-      default = import ./modules/home-manager.nix {
-        nixaiPackage = self.packages.${system}.nixai;
-      };
+      default = import ./modules/home-manager.nix;
     });
     homeManagerModule = homeManagerModules.default;
   in
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {inherit system;};
+      nixai = pkgs.callPackage ./package.nix { inherit (pkgs) lib buildGoModule; inherit (self) rev; };
     in {
-      packages.nixai = pkgs.buildGoModule {
-        pname = "nixai";
-        version = "0.1.0";
-        src = ./.;
-        vendorHash = null;
-        modVendor = true;
-        proxyVendor = true;
-        doCheck = false;
-        subPackages = ["cmd/nixai"];
-        ldflags = let
-          version =
-            if (self ? rev)
-            then self.rev
-            else "dirty";
-          gitCommit =
-            if (self ? rev)
-            then builtins.substring 0 7 self.rev
-            else "unknown";
-          buildDate = "1970-01-01T00:00:00Z";
-        in [
-          "-X nix-ai-help/pkg/version.Version=${version}"
-          "-X nix-ai-help/pkg/version.GitCommit=${gitCommit}"
-          "-X nix-ai-help/pkg/version.BuildDate=${buildDate}"
-        ];
-        meta = {
-          description = "A tool for diagnosing and configuring NixOS using AI.";
-          license = pkgs.lib.licenses.mit;
-          maintainers = ["olafkfreund"];
-        };
-      };
+      packages = { inherit nixai; };
       defaultPackage = self.packages.${system}.nixai;
+      overlays.default = final: prev: { inherit nixai; };
       apps.nixai = {
         type = "app";
         program = "${self.packages.${system}.nixai}/bin/nixai";
