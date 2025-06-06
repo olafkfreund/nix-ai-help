@@ -413,7 +413,7 @@ func (df *DiagnoseFunction) analyzeLogData(logData string) []nixos.Diagnostic {
 	for _, line := range lines {
 		lowerLine := strings.ToLower(line)
 
-		if strings.Contains(lowerLine, "error") && !strings.Contains(lowerLine, "error:") {
+		if strings.Contains(lowerLine, "error") {
 			diagnostics = append(diagnostics, nixos.Diagnostic{
 				ErrorType: "error",
 				Issue:     "Error found in logs",
