@@ -13,6 +13,7 @@ import (
 	"nix-ai-help/pkg/logger"
 	"os"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -166,7 +167,17 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 		switch params.Name {
 		case "query_nixos_docs":
 			if query, ok := params.Arguments["query"].(string); ok {
-				result := m.handleDocQuery(query)
+				// Extract sources if provided
+				var sources []string
+				if sourcesArg, ok := params.Arguments["sources"].([]interface{}); ok {
+					for _, src := range sourcesArg {
+						if srcStr, ok := src.(string); ok {
+							sources = append(sources, srcStr)
+						}
+					}
+				}
+
+				result := m.handleDocQuery(query, sources...)
 				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
 					"content": []map[string]interface{}{
 						{
@@ -517,21 +528,132 @@ func (m *MCPServer) Stop() {
 }
 
 // handleDocQuery processes documentation queries
-func (m *MCPServer) handleDocQuery(query string) string {
-	// Use existing QueryDocumentation logic with the configured server
-	client := NewMCPClient("http://localhost:8081") // Use correct port
-	result, err := client.QueryDocumentation(query)
-	if err != nil {
-		return fmt.Sprintf("Error querying documentation: %v", err)
+func (m *MCPServer) handleDocQuery(query string, sources ...string) string {
+	// Add debug header to identify this method is being called
+	var debugOutput strings.Builder
+	debugOutput.WriteString("==== USING MCP SERVER HANDLE_DOC_QUERY ====\n")
+	debugOutput.WriteString(fmt.Sprintf("Query: %s\n", query))
+	debugOutput.WriteString(fmt.Sprintf("Sources: %v\n", sources))
+	debugOutput.WriteString("===================================\n\n")
+
+	// Create request to process internally
+	var requestSources []string
+	if len(sources) > 0 {
+		requestSources = sources
+		if m != nil {
+			m.logger.Debug(fmt.Sprintf("handleDocQuery: using provided sources: %v", requestSources))
+		}
+	} else {
+		// Get default sources from the server (by looking at the server field)
+		server := findServerInstance()
+		if server != nil {
+			requestSources = server.documentationSources
+			if m != nil {
+				m.logger.Debug(fmt.Sprintf("handleDocQuery: using server default sources: %v", requestSources))
+			}
+		} else {
+			// Fallback to well-known sources
+			requestSources = []string{
+				"nixos-options-es://",
+				"https://home-manager-options.extranix.com/options.json",
+				"https://wiki.nixos.org/wiki/NixOS_Wiki",
+				"https://nix.dev/manual/nix",
+			}
+			if m != nil {
+				m.logger.Debug(fmt.Sprintf("handleDocQuery: using fallback sources: %v", requestSources))
+			}
+		}
 	}
-	return result
+
+	// Use a buffer to capture output that would normally go to the ResponseWriter
+	var buf bytes.Buffer
+
+	// Process each source manually
+	for _, src := range requestSources {
+		var body string
+		var err error
+
+		if m != nil {
+			m.logger.Debug(fmt.Sprintf("handleDocQuery: processing source: %s", src))
+		}
+
+		if strings.HasPrefix(src, "nixos-options-es://") {
+			body, err = fetchNixOSOptionsAPI(src, query)
+			if err == nil && !strings.Contains(body, "No documentation found") {
+				if m != nil {
+					m.logger.Debug(fmt.Sprintf("handleDocQuery: found result in NixOS options API: %s", src))
+				}
+				return debugOutput.String() + body // Return first good result with debug header
+			}
+		} else if strings.HasSuffix(src, "/options") {
+			body, err = fetchNixOSOptionsAPI(src, query)
+			if err == nil && !strings.Contains(body, "No documentation found") {
+				if m != nil {
+					m.logger.Debug(fmt.Sprintf("handleDocQuery: found result in NixOS options endpoint: %s", src))
+				}
+				return debugOutput.String() + body // Return first good result with debug header
+			}
+		} else if strings.HasSuffix(src, "/options.json") {
+			body, err = fetchHomeManagerOptionsAPI(src, query)
+			if err == nil && !strings.Contains(body, "No documentation found") {
+				if m != nil {
+					m.logger.Debug(fmt.Sprintf("handleDocQuery: found result in Home Manager options: %s", src))
+				}
+				return debugOutput.String() + body // Return first good result with debug header
+			}
+		} else if strings.Contains(src, "nix.dev") {
+			body, err = fetchMySTContent(src, query)
+			if err == nil && len(body) > 0 {
+				if m != nil {
+					m.logger.Debug(fmt.Sprintf("handleDocQuery: found result in nix.dev: %s", src))
+				}
+				return debugOutput.String() + body // Return first good result with debug header
+			}
+		} else {
+			body, err = fetchDocSource(src, query)
+			if err == nil && len(body) > 0 {
+				if m != nil {
+					m.logger.Debug(fmt.Sprintf("handleDocQuery: found partial result in: %s", src))
+				}
+				buf.WriteString(fmt.Sprintf("%s: %s\n", src, body))
+			}
+		}
+
+		if err != nil && m != nil {
+			m.logger.Debug(fmt.Sprintf("handleDocQuery: error processing source %s: %v", src, err))
+		}
+	}
+
+	if buf.Len() > 0 {
+		if m != nil {
+			m.logger.Debug("handleDocQuery: returning combined results")
+		}
+		return debugOutput.String() + buf.String() // Return combined results with debug header
+	}
+
+	if m != nil {
+		m.logger.Debug("handleDocQuery: no relevant documentation found")
+	}
+	return debugOutput.String() + "No relevant documentation found." // Return no results found with debug header
+}
+
+// Package-level variable to hold the server instance
+var globalServerInstance *Server
+
+// findServerInstance helps locate the server instance for accessing config
+func findServerInstance() *Server {
+	// Return the global server instance that we track
+	if globalServerInstance == nil {
+		// Log this issue in a way that doesn't cause further errors if logger is unavailable
+		fmt.Fprintf(os.Stderr, "Warning: globalServerInstance is nil in findServerInstance()\n")
+	}
+	return globalServerInstance
 }
 
 // handleOptionExplain processes NixOS option explanations
 func (m *MCPServer) handleOptionExplain(option string) string {
-	// Use the same logic as the HTTP server
-	client := NewMCPClient("http://localhost:8081")
-	result, err := client.QueryDocumentation(option)
+	// Directly call fetchNixOSOptionsAPI instead of making a recursive HTTP call
+	result, err := fetchNixOSOptionsAPI("nixos-options-es://", option)
 	if err != nil {
 		return fmt.Sprintf("Error explaining option %s: %v", option, err)
 	}
@@ -540,9 +662,8 @@ func (m *MCPServer) handleOptionExplain(option string) string {
 
 // handleHomeManagerOptionExplain processes Home Manager option explanations
 func (m *MCPServer) handleHomeManagerOptionExplain(option string) string {
-	// Use the same logic as the HTTP server for Home Manager options
-	client := NewMCPClient("http://localhost:8081")
-	result, err := client.QueryDocumentation(option)
+	// Directly call fetchHomeManagerOptionsAPI instead of making a recursive HTTP call
+	result, err := fetchHomeManagerOptionsAPI("https://home-manager-options.extranix.com/options.json", option)
 	if err != nil {
 		return fmt.Sprintf("Error explaining Home Manager option %s: %v", option, err)
 	}
@@ -598,7 +719,7 @@ func NewServer(addr string, documentationSources []string) *Server {
 		log.Error(fmt.Sprintf("Failed to load NixOS options for LSP: %v", err))
 	}
 
-	return &Server{
+	server := &Server{
 		addr:                 addr,
 		socketPath:           "/tmp/nixai-mcp.sock", // Default socket path
 		documentationSources: documentationSources,
@@ -606,6 +727,11 @@ func NewServer(addr string, documentationSources []string) *Server {
 		debugLogging:         false,
 		mcpServer:            &MCPServer{logger: *log, lspProvider: lspProvider},
 	}
+
+	// Set the global server instance for cross-referencing
+	globalServerInstance = server
+
+	return server
 }
 
 // NewServerWithDebug creates a new MCP server instance with debug logging enabled.
@@ -619,7 +745,7 @@ func NewServerWithDebug(addr string, documentationSources []string) *Server {
 		log.Error(fmt.Sprintf("Failed to load NixOS options for LSP: %v", err))
 	}
 
-	return &Server{
+	server := &Server{
 		addr:                 addr,
 		socketPath:           "/tmp/nixai-mcp.sock", // Default socket path
 		documentationSources: documentationSources,
@@ -627,6 +753,11 @@ func NewServerWithDebug(addr string, documentationSources []string) *Server {
 		debugLogging:         true,
 		mcpServer:            &MCPServer{logger: *log, lspProvider: lspProvider},
 	}
+	
+	// Set the global server instance for cross-referencing
+	globalServerInstance = server
+	
+	return server
 }
 
 // NewServerFromConfig creates a new MCP server from a YAML config file.
@@ -673,6 +804,9 @@ func NewServerFromConfig(configPath string) (*Server, error) {
 		mcpServer:            &MCPServer{logger: *log, lspProvider: lspProvider},
 		configPath:           configPath,
 	}
+	
+	// Set the global server instance for cross-referencing
+	globalServerInstance = srv
 
 	// Set up config watcher for hot-reload
 	watcher, err := fsnotify.NewWatcher()
@@ -857,6 +991,7 @@ func min(a, b, c int) int {
 // handleQuery processes incoming requests for NixOS documentation.
 func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	var query string
+	var sources []string
 
 	// Handle both GET requests with 'q' parameter and POST requests with JSON body
 	switch r.Method {
@@ -867,10 +1002,21 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 			_, _ = fmt.Fprintln(w, "Missing 'q' query parameter.")
 			return
 		}
+		// Use default sources for GET requests
+		sources = s.documentationSources
 	case "POST":
 		var requestBody struct {
-			Query string `json:"query"`
+			Query   string   `json:"query"`
+			Sources []string `json:"sources,omitempty"`
 		}
+
+		// Read the raw request body for debugging
+		bodyBytes, _ := io.ReadAll(r.Body)
+		s.logger.Info(fmt.Sprintf("Raw request body: %s", string(bodyBytes)))
+
+		// Replace the body for further processing
+		r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
 		if err := json.NewDecoder(r.Body).Decode(&requestBody); err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = fmt.Fprintln(w, "Invalid JSON body.")
@@ -882,6 +1028,15 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 			_, _ = fmt.Fprintln(w, "Missing 'query' field in JSON body.")
 			return
 		}
+
+		// Use sources from request if provided, otherwise use default sources
+		if len(requestBody.Sources) > 0 {
+			sources = requestBody.Sources
+			s.logger.Info(fmt.Sprintf("Using sources from POST request: %v", sources))
+		} else {
+			sources = s.documentationSources
+			s.logger.Info(fmt.Sprintf("Using default sources: %v", s.documentationSources))
+		}
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		_, _ = fmt.Fprintln(w, "Method not allowed. Use GET or POST.")
@@ -889,7 +1044,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if s.debugLogging {
-		s.logger.Debug(fmt.Sprintf("handleQuery: received query | query=%s", query))
+		s.logger.Debug(fmt.Sprintf("handleQuery: received query | query=%s sources=%v", query, sources))
 	}
 
 	// Helper to write JSON response
@@ -898,138 +1053,71 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"result": result})
 	}
 
+	// Create a cache key that includes both query and sources
+	cacheKey := fmt.Sprintf("%s|%s", query, strings.Join(sources, ","))
+
 	// Check cache first
 	cacheMutex.RLock()
-	if cached, ok := cache[query]; ok {
+	if cached, ok := cache[cacheKey]; ok {
 		cacheMutex.RUnlock()
 		writeJSON(cached)
 		return
 	}
 	cacheMutex.RUnlock()
-
-	type result struct {
-		line   string
-		source string
-		score  int // lower is better
-	}
-	var results []result
-	var structuredNoDoc bool
-	for _, src := range s.documentationSources {
-		if s.debugLogging {
-			s.logger.Debug(fmt.Sprintf("Querying documentation source | source=%s option=%s", src, query))
-		}
-		var body string
-		var err error
-		isStructured := false
-		if strings.HasPrefix(src, "nixos-options-es://") {
-			body, err = fetchNixOSOptionsAPI(src, query)
-			isStructured = true
-		} else if strings.HasSuffix(src, "/options") {
-			body, err = fetchNixOSOptionsAPI(src, query)
-			isStructured = true
-		} else if strings.HasSuffix(src, "/options.json") {
-			body, err = fetchHomeManagerOptionsAPI(src, query)
-			isStructured = true
+	// Use the mcpServer's handleDocQuery method for consistency
+	s.logger.Debug(fmt.Sprintf("handleQuery: calling handleDocQuery with query=%s and sources=%v", query, sources))
+	
+	// Debug check if globalServerInstance is set correctly
+	if s.debugLogging {
+		if globalServerInstance == nil {
+			s.logger.Debug("handleQuery: WARNING - globalServerInstance is nil")
 		} else {
-			body, err = fetchDocSource(src)
-		}
-		if err != nil {
-			if s.debugLogging {
-				s.logger.Debug(fmt.Sprintf("Error querying source | source=%s error=%v", src, err))
-			}
-			continue
-		}
-		if isStructured {
-			clean := strings.TrimSpace(body)
-			if clean != "" && !strings.HasPrefix(clean, "No documentation found") {
-				if s.debugLogging {
-					s.logger.Debug(fmt.Sprintf("Structured doc found | source=%s doc=%s", src, clean))
-				}
-				// Return immediately if a structured doc is found
-				cacheMutex.Lock()
-				cache[query] = clean
-				cacheMutex.Unlock()
-				writeJSON(clean)
-				return
-			} else if strings.HasPrefix(clean, "No documentation found") {
-				if s.debugLogging {
-					s.logger.Debug(fmt.Sprintf("No documentation found | query=%s source=%s", query, src))
-				}
-				structuredNoDoc = true
-			}
-			continue
-		}
-		for _, line := range strings.Split(body, "\n") {
-			clean := strings.TrimSpace(line)
-			if clean == "" {
-				continue
-			}
-			// Fuzzy match: score by Levenshtein distance to query, prefer substring matches
-			lowerLine := strings.ToLower(clean)
-			lowerQuery := strings.ToLower(query)
-			score := levenshtein(lowerLine, lowerQuery)
-			if strings.Contains(lowerLine, lowerQuery) {
-				score -= 5 // prefer direct substring matches
-			}
-			if score < 20 { // only keep reasonably close matches
-				results = append(results, result{line: clean, source: src, score: score})
-			}
+			s.logger.Debug(fmt.Sprintf("handleQuery: globalServerInstance has %d documentation sources", 
+				len(globalServerInstance.documentationSources)))
 		}
 	}
-
-	if len(results) == 0 {
-		if structuredNoDoc {
-			writeJSON("No documentation found for this option in the official NixOS/Home Manager option databases.")
-			return
-		}
-		writeJSON("No relevant documentation found.")
-		return
-	}
-
-	// If any structured doc (score==0, isStructured) exists, return only those as the response
-	var structuredResults []result
-	for _, r := range results {
-		if r.score == 0 && strings.HasPrefix(r.source, "https://search.nixos.org/options") {
-			structuredResults = append(structuredResults, r)
-		}
-	}
-	if len(structuredResults) > 0 {
-		// Always return the first structured doc block as the response
-		response := structuredResults[0].line
-		cacheMutex.Lock()
-		cache[query] = response
-		cacheMutex.Unlock()
-		writeJSON(response)
-		return
-	}
-
-	// Show top 10 ranked results
-	maxResults := 10
-	if len(results) < maxResults {
-		maxResults = len(results)
-	}
-	var out []string
-	for i := 0; i < maxResults; i++ {
-		out = append(out, fmt.Sprintf("%s: %s", results[i].source, results[i].line))
-	}
-	response := strings.Join(out, "\n---\n")
-
-	// Cache result
+	
+	result := s.mcpServer.handleDocQuery(query, sources...)
+	
+	// Cache the result
 	cacheMutex.Lock()
-	cache[query] = response
+	cache[cacheKey] = result
 	cacheMutex.Unlock()
 
-	writeJSON(response)
+	// Return the result
+	writeJSON(result)
 }
 
-func fetchDocSource(urlStr string) (string, error) {
+func fetchDocSource(urlStr string, queryTerm string) (string, error) {
 	if strings.HasSuffix(urlStr, "/options") {
-		return fetchNixOSOptionsAPI(urlStr, "")
+		return fetchNixOSOptionsAPI(urlStr, queryTerm)
 	}
 	if strings.HasSuffix(urlStr, "/options.json") {
-		return fetchHomeManagerOptionsAPI(urlStr, "")
+		return fetchHomeManagerOptionsAPI(urlStr, queryTerm)
 	}
+
+	// Special handler for MediaWiki sites like wiki.nixos.org
+	if strings.Contains(urlStr, "wiki.nixos.org") {
+		return fetchMediaWikiContent(urlStr, queryTerm)
+	}
+
+	// Special handler for nix.dev documentation that uses MyST
+	if strings.Contains(urlStr, "nix.dev") {
+		return fetchMySTContent(urlStr, queryTerm)
+	}
+
 	client := &http.Client{Timeout: 10 * time.Second}
+	// For regular URLs, if we have a query term, try to append it as a search parameter
+	if queryTerm != "" {
+		parsedURL, err := url.Parse(urlStr)
+		if err == nil {
+			q := parsedURL.Query()
+			q.Set("q", queryTerm)
+			parsedURL.RawQuery = q.Encode()
+			urlStr = parsedURL.String()
+		}
+	}
+
 	// #nosec G107 -- urlStr is from trusted config/documentation sources only
 	resp, err := client.Get(urlStr)
 	if err != nil {
@@ -1044,6 +1132,84 @@ func fetchDocSource(urlStr string) (string, error) {
 		return "", err
 	}
 	return string(data), nil
+}
+
+// fetchMediaWikiContent uses the MediaWiki API to search for content on wiki.nixos.org
+func fetchMediaWikiContent(wikiURL string, query string) (string, error) {
+	if query == "" {
+		return "", fmt.Errorf("query term required for MediaWiki search")
+	}
+
+	// Parse the base URL to extract the domain
+	parsedURL, err := url.Parse(wikiURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid wiki URL: %v", err)
+	}
+
+	// Construct the API URL for searching
+	apiURL := fmt.Sprintf("%s://%s/w/api.php", parsedURL.Scheme, parsedURL.Host)
+
+	// Create the request URL with query parameters
+	reqURL, err := url.Parse(apiURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse API URL: %v", err)
+	}
+
+	q := reqURL.Query()
+	q.Set("action", "query")
+	q.Set("list", "search")
+	q.Set("srsearch", query)
+	q.Set("format", "json")
+	q.Set("srlimit", "5") // Limit to 5 results for conciseness
+	reqURL.RawQuery = q.Encode()
+
+	// Make the API request
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(reqURL.String())
+	if err != nil {
+		return "", fmt.Errorf("failed to query MediaWiki API: %v", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("MediaWiki API returned status %d", resp.StatusCode)
+	}
+
+	// Parse the JSON response
+	var apiResp struct {
+		Query struct {
+			Search []struct {
+				Title   string `json:"title"`
+				Snippet string `json:"snippet"`
+				PageID  int    `json:"pageid"`
+			} `json:"search"`
+		} `json:"query"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return "", fmt.Errorf("failed to parse MediaWiki API response: %v", err)
+	}
+
+	// Format the search results
+	var result strings.Builder
+	if len(apiResp.Query.Search) == 0 {
+		return "No MediaWiki search results found for: " + query, nil
+	}
+
+	result.WriteString("MediaWiki search results for: " + query + "\n\n")
+
+	for _, page := range apiResp.Query.Search {
+		// Clean up HTML in snippet
+		snippet := stripHTMLTags(page.Snippet)
+		snippet = strings.ReplaceAll(snippet, "&quot;", "\"")
+		snippet = strings.ReplaceAll(snippet, "&amp;", "&")
+
+		result.WriteString("Title: " + page.Title + "\n")
+		result.WriteString("Snippet: " + snippet + "\n")
+		result.WriteString("URL: " + fmt.Sprintf("%s://%s/wiki/%s", parsedURL.Scheme, parsedURL.Host, url.PathEscape(page.Title)) + "\n\n")
+	}
+
+	return result.String(), nil
 }
 
 // Helper to strip HTML tags from ES description fields
@@ -1149,11 +1315,16 @@ func fetchNixOSOptionsAPI(_ string, option string) (string, error) {
 }
 
 // fetchHomeManagerOptionsAPI fetches and parses option docs from home-manager-options.extranix.com or a compatible endpoint
+// It's optimized for js-search which powers the search functionality on the home-manager-options site
 func fetchHomeManagerOptionsAPI(baseURL, option string) (string, error) {
 	if strings.TrimSpace(option) == "" {
 		return "", fmt.Errorf("option name required")
 	}
+
+	// Prepare query for js-search - handle both exact and partial searches
+	// js-search performs both prefix and infix matching by default
 	apiURL := baseURL + "?query=" + url.QueryEscape(option)
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(apiURL)
 	if err != nil {
@@ -1163,6 +1334,7 @@ func fetchHomeManagerOptionsAPI(baseURL, option string) (string, error) {
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("failed to fetch %s: %s", apiURL, resp.Status)
 	}
+
 	var result struct {
 		Options []struct {
 			Name        string   `json:"name"`
@@ -1174,6 +1346,7 @@ func fetchHomeManagerOptionsAPI(baseURL, option string) (string, error) {
 			Loc         []string `json:"loc"`
 		} `json:"options"`
 	}
+
 	dec := json.NewDecoder(resp.Body)
 	if err := dec.Decode(&result); err != nil {
 		return "", err
@@ -1181,31 +1354,351 @@ func fetchHomeManagerOptionsAPI(baseURL, option string) (string, error) {
 	if len(result.Options) == 0 {
 		return "No documentation found for option.", nil
 	}
-	// Prefer exact match, else first result
-	chosen := result.Options[0]
+
+	// Define option type for ranking
+	type optionType struct {
+		Name        string
+		Description string
+		Type        string
+		Default     string
+		Example     string
+		ReadOnly    bool
+		Loc         []string
+	}
+
+	// Rank the options by relevance to the query
+	type rankedOption struct {
+		option optionType
+		score  int
+	}
+
+	var rankedOptions []rankedOption
 	for _, opt := range result.Options {
+		// Calculate score (lower is better)
+		score := 100 // Base score
+
+		// Exact match is best
 		if opt.Name == option {
-			chosen = opt
-			break
+			score = 0
+		} else if strings.Contains(opt.Name, option) {
+			// Partial match in name is good
+			score = 10
+		} else if strings.Contains(strings.ToLower(opt.Name), strings.ToLower(option)) {
+			// Case-insensitive match is slightly worse
+			score = 20
+		} else if opt.Description != "" && strings.Contains(strings.ToLower(opt.Description), strings.ToLower(option)) {
+			// Match in description is okay
+			score = 30
+		}
+
+		rankedOptions = append(rankedOptions, rankedOption{
+			option: optionType{
+				Name:        opt.Name,
+				Description: opt.Description,
+				Type:        opt.Type,
+				Default:     opt.Default,
+				Example:     opt.Example,
+				ReadOnly:    opt.ReadOnly,
+				Loc:         opt.Loc,
+			},
+			score: score,
+		})
+	}
+
+	// Sort by score
+	sort.Slice(rankedOptions, func(i, j int) bool {
+		return rankedOptions[i].score < rankedOptions[j].score
+	})
+
+	// If we have multiple results, format them differently
+	var b strings.Builder
+
+	if len(rankedOptions) == 1 || rankedOptions[0].score < 10 {
+		// Single result or exact match - detailed format
+		chosen := rankedOptions[0].option
+		b.WriteString("Option: " + chosen.Name + "\n")
+		b.WriteString("Type: " + chosen.Type + "\n")
+		if chosen.Default != "" {
+			b.WriteString("Default: " + chosen.Default + "\n")
+		}
+		if chosen.Example != "" {
+			b.WriteString("Example: " + chosen.Example + "\n")
+		}
+		if chosen.Description != "" {
+			b.WriteString("Description: " + chosen.Description + "\n")
+		}
+		if len(chosen.Loc) > 0 {
+			b.WriteString("Location: " + strings.Join(chosen.Loc, ", ") + "\n")
+		}
+		if chosen.ReadOnly {
+			b.WriteString("(Read-only option)\n")
+		}
+	} else {
+		// Multiple results - summarized format
+		b.WriteString(fmt.Sprintf("Found %d Home Manager options matching '%s':\n\n",
+			len(rankedOptions), option))
+
+		// Show top 5 results
+		limit := 5
+		if len(rankedOptions) < limit {
+			limit = len(rankedOptions)
+		}
+
+		for i := 0; i < limit; i++ {
+			opt := rankedOptions[i].option
+			b.WriteString(fmt.Sprintf("%d. %s\n", i+1, opt.Name))
+			b.WriteString(fmt.Sprintf("   Type: %s\n", opt.Type))
+			if opt.Description != "" {
+				desc := opt.Description
+				if len(desc) > 80 {
+					desc = desc[:77] + "..."
+				}
+				b.WriteString(fmt.Sprintf("   %s\n", desc))
+			}
+			b.WriteString("\n")
 		}
 	}
-	var b strings.Builder
-	b.WriteString("Option: " + chosen.Name + "\n")
-	b.WriteString("Type: " + chosen.Type + "\n")
-	if chosen.Default != "" {
-		b.WriteString("Default: " + chosen.Default + "\n")
-	}
-	if chosen.Example != "" {
-		b.WriteString("Example: " + chosen.Example + "\n")
-	}
-	if chosen.Description != "" {
-		b.WriteString("Description: " + chosen.Description + "\n")
-	}
-	if len(chosen.Loc) > 0 {
-		b.WriteString("Location: " + strings.Join(chosen.Loc, ", ") + "\n")
-	}
-	if chosen.ReadOnly {
-		b.WriteString("(Read-only option)\n")
-	}
+
 	return b.String(), nil
+}
+
+// fetchMySTContent handles documentation pages using MyST format like nix.dev
+func fetchMySTContent(docURL string, query string) (string, error) {
+	if query == "" {
+		return "", fmt.Errorf("query term required for MyST documentation search")
+	}
+
+	// First try to find a specific page that might be related to the query
+	// by using URL path components derived from the query terms
+	parsedURL, err := url.Parse(docURL)
+	if err != nil {
+		return "", fmt.Errorf("invalid documentation URL: %v", err)
+	}
+
+	// Clean up query to create possible URL paths
+	normalizedQuery := strings.ToLower(strings.TrimSpace(query))
+	normalizedQuery = strings.ReplaceAll(normalizedQuery, " ", "-")
+
+	// Try several possible paths based on query terms
+	possiblePaths := []string{
+		normalizedQuery,
+		"manual/" + normalizedQuery,
+		"tutorials/" + normalizedQuery,
+		"concepts/" + normalizedQuery,
+		"language/" + normalizedQuery,
+		"reference/" + normalizedQuery,
+	}
+
+	// Results to accumulate relevant content
+	var results []struct {
+		Title   string
+		URL     string
+		Content string
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	// Check each possible path
+	for _, path := range possiblePaths {
+		// Create URL for this potential path
+		pageURL := fmt.Sprintf("%s://%s/%s",
+			parsedURL.Scheme,
+			parsedURL.Host,
+			strings.TrimPrefix(path, "/"))
+
+		// Attempt to fetch this specific page
+		resp, err := client.Get(pageURL)
+		if err != nil || resp.StatusCode != http.StatusOK {
+			if resp != nil {
+				resp.Body.Close()
+			}
+			continue // Try next path
+		}
+
+		// Successfully found a page, now extract content
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			continue
+		}
+
+		// Extract title and main content from the HTML
+		title := extractHtmlTitle(string(body))
+		content := extractMainContent(string(body))
+
+		// If we found content, add it to results
+		if content != "" {
+			results = append(results, struct {
+				Title   string
+				URL     string
+				Content string
+			}{
+				Title:   title,
+				URL:     pageURL,
+				Content: content,
+			})
+		}
+	}
+
+	// If we didn't find any specific pages, try a site-wide search
+	if len(results) == 0 {
+		// Some documentation sites have a search.json file
+		searchURL := fmt.Sprintf("%s://%s/search.json", parsedURL.Scheme, parsedURL.Host)
+		resp, err := client.Get(searchURL)
+
+		// If search.json is available, use it
+		if err == nil && resp.StatusCode == http.StatusOK {
+			var searchIndex struct {
+				Documents []struct {
+					Location string `json:"location"`
+					Title    string `json:"title"`
+					Text     string `json:"text"`
+				} `json:"documents"`
+			}
+
+			if err := json.NewDecoder(resp.Body).Decode(&searchIndex); err == nil {
+				// Search through the documents for our query
+				for _, doc := range searchIndex.Documents {
+					if strings.Contains(strings.ToLower(doc.Text), strings.ToLower(query)) ||
+						strings.Contains(strings.ToLower(doc.Title), strings.ToLower(query)) {
+
+						results = append(results, struct {
+							Title   string
+							URL     string
+							Content string
+						}{
+							Title:   doc.Title,
+							URL:     fmt.Sprintf("%s://%s%s", parsedURL.Scheme, parsedURL.Host, doc.Location),
+							Content: extractRelevantSnippet(doc.Text, query),
+						})
+
+						// Limit results to top 5
+						if len(results) >= 5 {
+							break
+						}
+					}
+				}
+			}
+			resp.Body.Close()
+		}
+	}
+
+	// Format the results
+	var result strings.Builder
+	if len(results) == 0 {
+		result.WriteString(fmt.Sprintf("No relevant documentation found for '%s' on %s\n", query, parsedURL.Host))
+		result.WriteString(fmt.Sprintf("Try browsing the documentation directly at %s\n", docURL))
+		return result.String(), nil
+	}
+
+	result.WriteString(fmt.Sprintf("Documentation results for '%s':\n\n", query))
+
+	for i, entry := range results {
+		result.WriteString(fmt.Sprintf("%d. %s\n", i+1, entry.Title))
+		result.WriteString(fmt.Sprintf("   URL: %s\n", entry.URL))
+		result.WriteString(fmt.Sprintf("   %s\n\n", entry.Content))
+	}
+
+	return result.String(), nil
+}
+
+// Helper functions for HTML/content extraction
+func extractHtmlTitle(html string) string {
+	titleRegex := regexp.MustCompile(`<title[^>]*>(.*?)</title>`)
+	matches := titleRegex.FindStringSubmatch(html)
+	if len(matches) > 1 {
+		return strings.TrimSpace(matches[1])
+	}
+	return "Documentation Page" // Default title if not found
+}
+
+func extractMainContent(html string) string {
+	// Try to find main content section
+	// This is a simplified approach - for production use, consider a proper HTML parser
+	mainContentRegex := regexp.MustCompile(`<main[^>]*>([\s\S]*?)</main>`)
+	matches := mainContentRegex.FindStringSubmatch(html)
+	if len(matches) > 1 {
+		// Clean up HTML tags and normalize whitespace
+		content := stripHTMLTags(matches[1])
+		content = strings.Join(strings.Fields(content), " ")
+		if len(content) > 500 {
+			return content[:500] + "..." // Return just the first 500 chars
+		}
+		return content
+	}
+
+	// If no main tag, try article or div with content/main class
+	articleRegex := regexp.MustCompile(`<article[^>]*>([\s\S]*?)</article>`)
+	matches = articleRegex.FindStringSubmatch(html)
+	if len(matches) > 1 {
+		content := stripHTMLTags(matches[1])
+		content = strings.Join(strings.Fields(content), " ")
+		if len(content) > 500 {
+			return content[:500] + "..."
+		}
+		return content
+	}
+
+	// Try content divs as last resort
+	contentDivRegex := regexp.MustCompile(`<div[^>]*class="[^"]*content[^"]*"[^>]*>([\s\S]*?)</div>`)
+	matches = contentDivRegex.FindStringSubmatch(html)
+	if len(matches) > 1 {
+		content := stripHTMLTags(matches[1])
+		content = strings.Join(strings.Fields(content), " ")
+		if len(content) > 500 {
+			return content[:500] + "..."
+		}
+		return content
+	}
+
+	return "Content extraction failed. Please visit the page directly."
+}
+
+func extractRelevantSnippet(text, query string) string {
+	lowerText := strings.ToLower(text)
+	lowerQuery := strings.ToLower(query)
+
+	// Find position of query in text
+	pos := strings.Index(lowerText, lowerQuery)
+	if pos < 0 {
+		// If exact query not found, try each word
+		queryWords := strings.Fields(lowerQuery)
+		for _, word := range queryWords {
+			if pos = strings.Index(lowerText, word); pos >= 0 {
+				break
+			}
+		}
+	}
+
+	// If still not found, just return beginning of text
+	if pos < 0 {
+		if len(text) > 300 {
+			return text[:300] + "..."
+		}
+		return text
+	}
+
+	// Extract snippet around the match
+	start := pos - 150
+	if start < 0 {
+		start = 0
+	}
+
+	end := pos + len(query) + 150
+	if end > len(text) {
+		end = len(text)
+	}
+
+	// Add ellipsis if we're not at the beginning/end
+	prefix := ""
+	if start > 0 {
+		prefix = "..."
+	}
+
+	suffix := ""
+	if end < len(text) {
+		suffix = "..."
+	}
+
+	return prefix + text[start:end] + suffix
 }

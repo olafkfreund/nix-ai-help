@@ -1137,8 +1137,26 @@ func handleMCPServerCommand(args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("query command requires a query string")
 		}
-		query := strings.Join(args[1:], " ")
-		return handleMCPServerQuery(cfg, query)
+
+		var query string
+		var sources []string
+		var inSourcesMode bool
+
+		for i := 1; i < len(args); i++ {
+			if args[i] == "--source" || args[i] == "-s" {
+				inSourcesMode = true
+			} else if inSourcesMode {
+				sources = append(sources, args[i])
+				inSourcesMode = false
+			} else {
+				if query != "" {
+					query += " "
+				}
+				query += args[i]
+			}
+		}
+
+		return handleMCPServerQuery(cfg, query, sources...)
 	default:
 		return fmt.Errorf("unknown subcommand: %s. Available: start, stop, status, restart, query", subcommand)
 	}
@@ -1297,10 +1315,13 @@ func handleMCPServerRestart(cfg *config.UserConfig) error {
 }
 
 // handleMCPServerQuery queries the MCP server directly
-func handleMCPServerQuery(cfg *config.UserConfig, query string) error {
+func handleMCPServerQuery(cfg *config.UserConfig, query string, sources ...string) error {
 	fmt.Println(utils.FormatHeader("🔍 MCP Server Query"))
 	fmt.Println()
 	fmt.Println(utils.FormatKeyValue("Query", query))
+	if len(sources) > 0 {
+		fmt.Println(utils.FormatKeyValue("Sources", strings.Join(sources, ", ")))
+	}
 	fmt.Println()
 
 	// Create MCP client
@@ -1309,7 +1330,7 @@ func handleMCPServerQuery(cfg *config.UserConfig, query string) error {
 
 	fmt.Print(utils.FormatInfo("Querying documentation... "))
 
-	result, err := client.QueryDocumentation(query)
+	result, err := client.QueryDocumentation(query, sources...)
 	if err != nil {
 		fmt.Println(utils.FormatError("failed"))
 		return fmt.Errorf("query failed: %v", err)

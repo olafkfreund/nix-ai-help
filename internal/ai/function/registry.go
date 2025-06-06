@@ -5,13 +5,18 @@ import (
 	"sync"
 
 	"nix-ai-help/internal/ai/function/ask"
+	"nix-ai-help/internal/ai/function/build"
 	"nix-ai-help/internal/ai/function/community"
+	configfunction "nix-ai-help/internal/ai/function/config"
 	"nix-ai-help/internal/ai/function/diagnose"
 	explainHomeoption "nix-ai-help/internal/ai/function/explain-home-option"
 	explainoption "nix-ai-help/internal/ai/function/explain-option"
 	"nix-ai-help/internal/ai/function/flakes"
 	"nix-ai-help/internal/ai/function/learning"
+	"nix-ai-help/internal/ai/function/logs"
+	"nix-ai-help/internal/ai/function/machines"
 	mcpserver "nix-ai-help/internal/ai/function/mcp-server"
+	"nix-ai-help/internal/ai/function/neovim"
 	packagerepo "nix-ai-help/internal/ai/function/package-repo"
 	"nix-ai-help/internal/ai/function/packages"
 	"nix-ai-help/internal/ai/functionbase"
@@ -34,7 +39,7 @@ func GetGlobalRegistry() *FunctionManager {
 
 // registerAllFunctions registers all available AI functions
 func registerAllFunctions() {
-	logger := logger.NewLogger()
+	log := logger.NewLogger()
 
 	// Register all implemented functions
 	functions := []struct {
@@ -42,13 +47,20 @@ func registerAllFunctions() {
 		fn   functionbase.FunctionInterface
 	}{
 		{"ask", ask.NewAskFunction()},
+		{"build", build.NewBuildFunction()},
 		{"community", community.NewCommunityFunction()},
+		{"config", configfunction.NewConfigFunction()},
+		// {"devenv", devenv.NewDevenvFunction()}, // Requires agent and logger
 		{"diagnose", diagnose.NewDiagnoseFunction()},
 		{"explain-home-option", explainHomeoption.NewExplainHomeOptionFunction()},
 		{"explain-option", explainoption.NewExplainOptionFunction()},
 		{"flakes", flakes.NewFlakesFunction()},
+		// {"help", help.NewHelpFunction()}, // Requires config and logger
 		{"learning", learning.NewLearningFunction()},
+		{"logs", logs.NewLogsFunction()},
+		{"machines", machines.NewMachinesFunction()},
 		{"mcp-server", mcpserver.NewMcpServerFunction()},
+		{"neovim", neovim.NewNeovimFunction()},
 		{"packages", packages.NewPackagesFunction()},
 		{"package-repo", packagerepo.NewPackageRepoFunction()},
 	}
@@ -56,14 +68,14 @@ func registerAllFunctions() {
 	successCount := 0
 	for _, f := range functions {
 		if err := globalRegistry.Register(f.fn); err != nil {
-			logger.Error(fmt.Sprintf("Failed to register %s function: %v", f.name, err))
+			log.Error(fmt.Sprintf("Failed to register function %s: %v", f.name, err))
 		} else {
-			logger.Info(fmt.Sprintf("Registered %s function successfully", f.name))
+			log.Info(fmt.Sprintf("Registered function successfully: %s", f.name))
 			successCount++
 		}
 	}
 
-	logger.Info(fmt.Sprintf("Function registry initialized with %d/%d functions", successCount, len(functions)))
+	log.Info(fmt.Sprintf("Function registry initialized: %d/%d functions registered", successCount, len(functions)))
 }
 
 // ListAvailableFunctions returns a map of function names to their descriptions
