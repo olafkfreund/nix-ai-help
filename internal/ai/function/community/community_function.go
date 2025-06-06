@@ -12,7 +12,7 @@ import (
 // CommunityFunction provides access to NixOS community resources and discussions
 type CommunityFunction struct {
 	*functionbase.BaseFunction
-	logger logger.Logger
+	logger *logger.Logger
 }
 
 // CommunityRequest represents the input parameters for community resource access

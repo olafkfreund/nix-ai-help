@@ -194,11 +194,14 @@ func (eof *ExplainOptionFunction) Execute(ctx context.Context, params map[string
 
 	eof.logger.Debug("Explain-option function execution completed successfully")
 
-	return &functionbase.FunctionResult{
+	result := &functionbase.FunctionResult{
 		Success: true,
 		Data:    response,
-		Message: "Option explained successfully",
-	}, nil
+		Metadata: map[string]interface{}{
+			"message": "Option explained successfully",
+		},
+	}
+	return result, nil
 }
 
 // parseRequest converts raw parameters to structured ExplainOptionRequest
@@ -293,6 +296,7 @@ func (eof *ExplainOptionFunction) queryDocumentation(ctx context.Context, option
 
 	// Try to get documentation from various sources
 	// This would be implemented based on the actual MCP client interface
+	eof.logger.Debug(fmt.Sprintf("Querying documentation for option %s with query: %s", optionPath, query))
 	eof.logger.Debug(fmt.Sprintf("Querying documentation for option: %s", optionPath))
 
 	return docInfo
@@ -422,6 +426,9 @@ func (eof *ExplainOptionFunction) findRelatedOptions(optionPath string) []string
 	if len(parts) >= 2 {
 		// Find options in the same category
 		prefix := strings.Join(parts[:2], ".")
+
+		// Add prefix-related options
+		related = append(related, prefix+".enable")
 
 		// Common related patterns
 		if strings.HasSuffix(optionPath, ".enable") {

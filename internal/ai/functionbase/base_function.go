@@ -55,7 +55,7 @@ func (bf *BaseFunction) Schema() FunctionSchema {
 	return bf.schema
 }
 
-// SetSchema sets the function schema (for functions that need to modify their schema)
+// SetSchema updates the function schema
 func (bf *BaseFunction) SetSchema(schema FunctionSchema) {
 	bf.schema = schema
 }
@@ -297,13 +297,17 @@ func (bf *BaseFunction) validateNumericRange(param FunctionParameter, value inte
 // Helper functions for creating common parameter types
 
 // StringParam creates a string parameter
-func StringParam(name, description string, required bool) FunctionParameter {
-	return FunctionParameter{
+func StringParam(name, description string, required bool, defaultValue ...string) FunctionParameter {
+	param := FunctionParameter{
 		Name:        name,
 		Type:        "string",
 		Description: description,
 		Required:    required,
 	}
+	if len(defaultValue) > 0 {
+		param.Default = defaultValue[0]
+	}
+	return param
 }
 
 // StringParamWithEnum creates a string parameter with enum values
@@ -330,11 +334,53 @@ func StringParamWithOptions(name, description string, required bool, enum []stri
 	}
 }
 
+// IntParam creates an integer parameter
+func IntParam(name, description string, required bool, defaultValue ...int) FunctionParameter {
+	param := FunctionParameter{
+		Name:        name,
+		Type:        "integer",
+		Description: description,
+		Required:    required,
+	}
+	if len(defaultValue) > 0 {
+		param.Default = defaultValue[0]
+	}
+	return param
+}
+
+// ArrayParam creates an array parameter
+func ArrayParam(name, description string, required bool, defaultValue ...[]interface{}) FunctionParameter {
+	param := FunctionParameter{
+		Name:        name,
+		Type:        "array",
+		Description: description,
+		Required:    required,
+	}
+	if len(defaultValue) > 0 {
+		param.Default = defaultValue[0]
+	}
+	return param
+}
+
 // BoolParam creates a boolean parameter
 func BoolParam(name, description string, required bool, defaultValue ...bool) FunctionParameter {
 	param := FunctionParameter{
 		Name:        name,
 		Type:        "boolean",
+		Description: description,
+		Required:    required,
+	}
+	if len(defaultValue) > 0 {
+		param.Default = defaultValue[0]
+	}
+	return param
+}
+
+// FloatParam creates a float parameter
+func FloatParam(name, description string, required bool, defaultValue ...float64) FunctionParameter {
+	param := FunctionParameter{
+		Name:        name,
+		Type:        "number",
 		Description: description,
 		Required:    required,
 	}

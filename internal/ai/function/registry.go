@@ -4,7 +4,14 @@ import (
 	"fmt"
 	"sync"
 
+	"nix-ai-help/internal/ai/function/ask"
+	"nix-ai-help/internal/ai/function/community"
 	"nix-ai-help/internal/ai/function/diagnose"
+	explainHomeoption "nix-ai-help/internal/ai/function/explain-home-option"
+	explainoption "nix-ai-help/internal/ai/function/explain-option"
+	"nix-ai-help/internal/ai/function/learning"
+	packagerepo "nix-ai-help/internal/ai/function/package-repo"
+	"nix-ai-help/internal/ai/functionbase"
 	"nix-ai-help/pkg/logger"
 )
 
@@ -26,22 +33,31 @@ func GetGlobalRegistry() *FunctionManager {
 func registerAllFunctions() {
 	logger := logger.NewLogger()
 
-	// Register diagnose function
-	diagnoseFunc := diagnose.NewDiagnoseFunction()
-	if err := globalRegistry.Register(diagnoseFunc); err != nil {
-		logger.Error(fmt.Sprintf("Failed to register diagnose function: %v", err))
-	} else {
-		logger.Info("Registered diagnose function successfully")
+	// Register all implemented functions
+	functions := []struct {
+		name string
+		fn   functionbase.FunctionInterface
+	}{
+		{"ask", ask.NewAskFunction()},
+		{"community", community.NewCommunityFunction()},
+		{"diagnose", diagnose.NewDiagnoseFunction()},
+		{"explain-home-option", explainHomeoption.NewExplainHomeOptionFunction()},
+		{"explain-option", explainoption.NewExplainOptionFunction()},
+		{"learning", learning.NewLearningFunction()},
+		{"package-repo", packagerepo.NewPackageRepoFunction()},
 	}
 
-	// TODO: Add more functions here as they are implemented
-	// buildFunc := build.NewBuildFunction()
-	// globalRegistry.Register(buildFunc)
+	successCount := 0
+	for _, f := range functions {
+		if err := globalRegistry.Register(f.fn); err != nil {
+			logger.Error(fmt.Sprintf("Failed to register %s function: %v", f.name, err))
+		} else {
+			logger.Info(fmt.Sprintf("Registered %s function successfully", f.name))
+			successCount++
+		}
+	}
 
-	// communityFunc := community.NewCommunityFunction()
-	// globalRegistry.Register(communityFunc)
-
-	logger.Info(fmt.Sprintf("Function registry initialized with %d functions", globalRegistry.Count()))
+	logger.Info(fmt.Sprintf("Function registry initialized with %d/%d functions", successCount, len(functions)))
 }
 
 // ListAvailableFunctions returns a map of function names to their descriptions

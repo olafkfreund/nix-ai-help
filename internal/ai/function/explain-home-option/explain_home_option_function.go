@@ -12,7 +12,7 @@ import (
 // ExplainHomeOptionFunction provides explanations for Home Manager options
 type ExplainHomeOptionFunction struct {
 	*functionbase.BaseFunction
-	logger logger.Logger
+	logger *logger.Logger
 }
 
 // ExplainHomeOptionRequest represents the input parameters for explain-home-option

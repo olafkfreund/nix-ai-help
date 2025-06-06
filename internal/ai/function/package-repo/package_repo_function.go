@@ -15,7 +15,7 @@ import (
 // PackageRepoFunction analyzes Git repositories and generates Nix derivations
 type PackageRepoFunction struct {
 	*functionbase.BaseFunction
-	logger logger.Logger
+	logger *logger.Logger
 }
 
 // PackageRepoRequest represents the input parameters for package-repo analysis
