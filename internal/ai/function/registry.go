@@ -9,7 +9,9 @@ import (
 	"nix-ai-help/internal/ai/function/diagnose"
 	explainHomeoption "nix-ai-help/internal/ai/function/explain-home-option"
 	explainoption "nix-ai-help/internal/ai/function/explain-option"
+	"nix-ai-help/internal/ai/function/flakes"
 	"nix-ai-help/internal/ai/function/learning"
+	"nix-ai-help/internal/ai/function/packages"
 	packagerepo "nix-ai-help/internal/ai/function/package-repo"
 	"nix-ai-help/internal/ai/functionbase"
 	"nix-ai-help/pkg/logger"
@@ -43,7 +45,9 @@ func registerAllFunctions() {
 		{"diagnose", diagnose.NewDiagnoseFunction()},
 		{"explain-home-option", explainHomeoption.NewExplainHomeOptionFunction()},
 		{"explain-option", explainoption.NewExplainOptionFunction()},
+		{"flakes", flakes.NewFlakesFunction()},
 		{"learning", learning.NewLearningFunction()},
+		{"packages", packages.NewPackagesFunction()},
 		{"package-repo", packagerepo.NewPackageRepoFunction()},
 	}
 
