@@ -172,19 +172,28 @@ This project introduces an "agent" abstraction layer for AI providers in nixai, 
 
 ## 🚨 Current Issues & Blockers
 
-### Critical Issues (Must fix immediately)
+### ✅ Recently Resolved Critical Issues
 
-1. **Import Cycle in Function Tests** 
+1. **✅ Import Cycle in Function Tests - RESOLVED** 
    - **Issue**: `package nix-ai-help/internal/ai/function/diagnose imports nix-ai-help/internal/ai/function from diagnose_function_test.go imports nix-ai-help/internal/ai/function/diagnose from registry.go: import cycle not allowed in test`
-   - **Impact**: Blocking all function development and testing
-   - **Priority**: P0 - Critical
-   - **Action needed**: Refactor import dependencies in function test structure
+   - **Status**: ✅ **RESOLVED** - All functions now compile and test successfully
+   - **Action taken**: Refactored import dependencies in function test structure
 
-2. **Function Test Coverage**
-   - **Issue**: No function tests are currently passing due to import cycle
-   - **Impact**: Cannot validate function implementations
-   - **Priority**: P0 - Critical
-   - **Action needed**: Fix test structure after resolving import cycles
+2. **✅ Function Test Coverage - RESOLVED**
+   - **Issue**: No function tests were passing due to import cycle
+   - **Status**: ✅ **RESOLVED** - All 9 implemented functions have comprehensive tests that pass
+   - **Action taken**: Fixed test structure and validated all function implementations
+
+### 📋 Current Priority Items
+
+1. **Continue Function Implementation**
+   - **Goal**: Implement remaining 20/29 functions (69% remaining)
+   - **Next targets**: build, config, devenv, help functions
+   - **Priority**: P1 - High priority for completing function system
+
+2. **CLI Integration**
+   - **Goal**: Integrate agent/role selection with CLI flags
+   - **Priority**: P2 - Important for user experience
 
 ### Development Status Summary
 
@@ -196,12 +205,13 @@ This project introduces an "agent" abstraction layer for AI providers in nixai, 
 - All agent tests passing (450+ tests)
 
 **🔄 IN PROGRESS:**
-- Function calling system (1/29 functions implemented)
-- CLI integration for agent/role selection
+- Function calling system (**9/29 functions implemented** - 31% complete ✅)
+- CLI integration for agent/role selection (next priority)
 
-**❌ BLOCKED:**
-- Function testing (import cycle issues)
-- Function implementation progress (dependent on fixed tests)
+**✅ RECENT ACHIEVEMENTS:**
+- ✅ **Import cycle issues resolved** - All functions compile and test successfully
+- ✅ **Function registry working** - All 9 functions properly registered and operational
+- ✅ **Test coverage improved** - All implemented functions have comprehensive tests
 
 ---
 

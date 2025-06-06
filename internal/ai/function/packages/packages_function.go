@@ -19,36 +19,36 @@ type PackagesFunction struct {
 
 // PackagesRequest represents the input parameters for the packages function
 type PackagesRequest struct {
-	Operation      string            `json:"operation"`
-	PackageName    string            `json:"package_name,omitempty"`
-	SearchQuery    string            `json:"search_query,omitempty"`
-	Channel        string            `json:"channel,omitempty"`
-	SystemArch     string            `json:"system_arch,omitempty"`
-	IncludeUnfree  bool              `json:"include_unfree,omitempty"`
-	ShowDetails    bool              `json:"show_details,omitempty"`
-	Limit          int               `json:"limit,omitempty"`
-	SortBy         string            `json:"sort_by,omitempty"`
-	Filters        map[string]string `json:"filters,omitempty"`
-	InstallMethod  string            `json:"install_method,omitempty"`
-	ConfigType     string            `json:"config_type,omitempty"`
-	ShowVersions   bool              `json:"show_versions,omitempty"`
-	Dependencies   bool              `json:"dependencies,omitempty"`
-	Sources        []string          `json:"sources,omitempty"`
+	Operation     string            `json:"operation"`
+	PackageName   string            `json:"package_name,omitempty"`
+	SearchQuery   string            `json:"search_query,omitempty"`
+	Channel       string            `json:"channel,omitempty"`
+	SystemArch    string            `json:"system_arch,omitempty"`
+	IncludeUnfree bool              `json:"include_unfree,omitempty"`
+	ShowDetails   bool              `json:"show_details,omitempty"`
+	Limit         int               `json:"limit,omitempty"`
+	SortBy        string            `json:"sort_by,omitempty"`
+	Filters       map[string]string `json:"filters,omitempty"`
+	InstallMethod string            `json:"install_method,omitempty"`
+	ConfigType    string            `json:"config_type,omitempty"`
+	ShowVersions  bool              `json:"show_versions,omitempty"`
+	Dependencies  bool              `json:"dependencies,omitempty"`
+	Sources       []string          `json:"sources,omitempty"`
 }
 
 // PackagesResponse represents the output of the packages function
 type PackagesResponse struct {
-	Success          bool                   `json:"success"`
-	Message          string                 `json:"message"`
-	Output           string                 `json:"output,omitempty"`
-	Error            string                 `json:"error,omitempty"`
+	Success          bool                     `json:"success"`
+	Message          string                   `json:"message"`
+	Output           string                   `json:"output,omitempty"`
+	Error            string                   `json:"error,omitempty"`
 	Packages         []map[string]interface{} `json:"packages,omitempty"`
-	InstallCommands  []string               `json:"install_commands,omitempty"`
-	ConfigSnippets   []string               `json:"config_snippets,omitempty"`
-	Suggestions      []string               `json:"suggestions,omitempty"`
-	NextSteps        []string               `json:"next_steps,omitempty"`
-	Documentation    []string               `json:"documentation,omitempty"`
-	AlternativeNames []string               `json:"alternative_names,omitempty"`
+	InstallCommands  []string                 `json:"install_commands,omitempty"`
+	ConfigSnippets   []string                 `json:"config_snippets,omitempty"`
+	Suggestions      []string                 `json:"suggestions,omitempty"`
+	NextSteps        []string                 `json:"next_steps,omitempty"`
+	Documentation    []string                 `json:"documentation,omitempty"`
+	AlternativeNames []string                 `json:"alternative_names,omitempty"`
 }
 
 // NewPackagesFunction creates a new packages function
@@ -122,7 +122,7 @@ func (f *PackagesFunction) Execute(ctx context.Context, params map[string]interf
 // parseRequest converts the parameters map into a PackagesRequest struct
 func (f *PackagesFunction) parseRequest(params map[string]interface{}) (*PackagesRequest, error) {
 	request := &PackagesRequest{
-		Limit:  10, // Default limit
+		Limit:  10,          // Default limit
 		SortBy: "relevance", // Default sort
 	}
 
@@ -271,7 +271,7 @@ func (f *PackagesFunction) executePackageOperation(ctx context.Context, request 
 		},
 		NextSteps: []string{
 			"Review the provided package information",
-			"Test installation in a safe environment first", 
+			"Test installation in a safe environment first",
 			"Update your configuration as needed",
 		},
 		Documentation: []string{
