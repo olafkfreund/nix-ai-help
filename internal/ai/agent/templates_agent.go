@@ -382,11 +382,11 @@ func (a *TemplatesAgent) addTemplateContext(builder *strings.Builder, templateCt
 
 // getTemplateContextFromData extracts template context from stored data.
 func (a *TemplatesAgent) getTemplateContextFromData() *TemplateContext {
-	if a.context == nil {
+	if a.contextData == nil {
 		return &TemplateContext{}
 	}
 
-	if templateCtx, ok := a.context.(*TemplateContext); ok {
+	if templateCtx, ok := a.contextData.(*TemplateContext); ok {
 		return templateCtx
 	}
 
@@ -434,4 +434,12 @@ func (a *TemplatesAgent) formatTemplateOutput(response string, templateCtx *Temp
 	formatted.WriteString("4. Use `nixos-rebuild switch` or appropriate commands to apply\n")
 
 	return formatted.String()
+}
+
+// enhancePromptWithRole adds role-specific instructions to a generic prompt.
+func (a *TemplatesAgent) enhancePromptWithRole(prompt string) string {
+	if template, exists := roles.RolePromptTemplate[a.role]; exists {
+		return fmt.Sprintf("%s\n\n%s", template, prompt)
+	}
+	return prompt
 }
