@@ -46,7 +46,12 @@ func NewAskFunction() *AskFunction {
 		functionbase.StringParam("context", "Additional context for the question", false),
 		functionbase.StringParamWithOptions("urgency", "Urgency level of the question", false,
 			[]string{"low", "normal", "high", "urgent"}, nil, nil),
-		functionbase.ArrayParam("related_topics", "Related topics to consider", false),
+		{
+			Name:        "related_topics",
+			Type:        "array",
+			Description: "Related topics to consider",
+			Required:    false,
+		},
 	}
 
 	baseFunc := functionbase.NewBaseFunction(
@@ -70,10 +75,10 @@ func NewAskFunction() *AskFunction {
 		{
 			Description: "Ask about Home Manager configuration",
 			Parameters: map[string]interface{}{
-				"question":        "How do I configure Git with Home Manager?",
-				"category":        "home-manager",
-				"context":         "I want to set up my development environment",
-				"related_topics":  []string{"git", "development", "dotfiles"},
+				"question":       "How do I configure Git with Home Manager?",
+				"category":       "home-manager",
+				"context":        "I want to set up my development environment",
+				"related_topics": []string{"git", "development", "dotfiles"},
 			},
 			Expected: "Home Manager configuration examples and best practices",
 		},
@@ -163,7 +168,6 @@ func (af *AskFunction) Execute(ctx context.Context, params map[string]interface{
 	return &functionbase.FunctionResult{
 		Success: true,
 		Data:    response,
-		Message: "Question answered successfully",
 	}, nil
 }
 
@@ -255,31 +259,31 @@ func (af *AskFunction) buildResponse(request *AskRequest, answer string) *AskRes
 
 // determineConfidence analyzes the request and response to determine confidence level
 func (af *AskFunction) determineConfidence(request *AskRequest, answer string) string {
-	// Simple heuristic based on question characteristics
-	confidence := "medium"
+	lowerQuestion := strings.ToLower(request.Question)
 
-	// High confidence for well-defined questions
-	if strings.Contains(strings.ToLower(request.Question), "how to") ||
-		strings.Contains(strings.ToLower(request.Question), "enable") ||
-		strings.Contains(strings.ToLower(request.Question), "configure") {
-		confidence = "high"
+	// High confidence for well-defined questions (highest priority)
+	if strings.Contains(lowerQuestion, "how to") ||
+		strings.Contains(lowerQuestion, "enable") ||
+		strings.Contains(lowerQuestion, "configure") {
+		return "high"
 	}
 
-	// Lower confidence for very broad questions
-	if strings.Contains(strings.ToLower(request.Question), "best") ||
-		strings.Contains(strings.ToLower(request.Question), "recommend") ||
-		strings.Contains(strings.ToLower(request.Question), "should I") {
-		confidence = "medium"
+	// Medium confidence for recommendation/opinion questions
+	if strings.Contains(lowerQuestion, "best") ||
+		strings.Contains(lowerQuestion, "recommend") ||
+		strings.Contains(lowerQuestion, "should i") {
+		return "medium"
 	}
 
-	// Very broad or vague questions
+	// Very broad or vague questions (check for simple patterns)
 	if len(strings.Fields(request.Question)) < 4 ||
-		strings.Contains(strings.ToLower(request.Question), "help") ||
-		strings.Contains(strings.ToLower(request.Question), "what is") {
-		confidence = "low"
+		strings.Contains(lowerQuestion, "help") ||
+		(strings.Contains(lowerQuestion, "what is") && len(strings.Fields(request.Question)) <= 4) {
+		return "low"
 	}
 
-	return confidence
+	// Default to medium confidence for other questions
+	return "medium"
 }
 
 // generateSuggestedActions provides actionable next steps based on the question

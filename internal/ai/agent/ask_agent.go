@@ -37,6 +37,10 @@ func NewAskAgent(provider ai.Provider) *AskAgent {
 
 // Query handles direct questions with enhanced context.
 func (a *AskAgent) Query(ctx context.Context, question string) (string, error) {
+	if a.provider == nil {
+		return "", fmt.Errorf("AI provider not configured")
+	}
+
 	if err := a.validateRole(); err != nil {
 		return "", err
 	}
@@ -59,6 +63,10 @@ func (a *AskAgent) Query(ctx context.Context, question string) (string, error) {
 
 // GenerateResponse generates a response using the provider's GenerateResponse method.
 func (a *AskAgent) GenerateResponse(ctx context.Context, prompt string) (string, error) {
+	if a.provider == nil {
+		return "", fmt.Errorf("AI provider not configured")
+	}
+
 	if err := a.validateRole(); err != nil {
 		return "", err
 	}

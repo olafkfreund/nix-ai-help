@@ -103,7 +103,7 @@ func NewExplainOptionFunction() *ExplainOptionFunction {
 	return &ExplainOptionFunction{
 		BaseFunction: baseFunc,
 		explainAgent: agent.NewExplainOptionAgent(nil, nil), // Provider and MCP client set later
-		mcpClient:    nil, // Will be initialized when needed
+		mcpClient:    nil,                                   // Will be initialized when needed
 		logger:       logger.NewLogger(),
 	}
 }
@@ -290,7 +290,7 @@ func (eof *ExplainOptionFunction) queryDocumentation(ctx context.Context, option
 
 	// Query documentation sources for the option
 	query := fmt.Sprintf("NixOS option %s", optionPath)
-	
+
 	// Try to get documentation from various sources
 	// This would be implemented based on the actual MCP client interface
 	eof.logger.Debug(fmt.Sprintf("Querying documentation for option: %s", optionPath))
@@ -418,17 +418,17 @@ func (eof *ExplainOptionFunction) findRelatedOptions(optionPath string) []string
 	var related []string
 
 	parts := strings.Split(optionPath, ".")
-	
+
 	if len(parts) >= 2 {
 		// Find options in the same category
 		prefix := strings.Join(parts[:2], ".")
-		
+
 		// Common related patterns
 		if strings.HasSuffix(optionPath, ".enable") {
 			basePrefix := strings.TrimSuffix(optionPath, ".enable")
-			related = append(related, 
+			related = append(related,
 				basePrefix+".package",
-				basePrefix+".config", 
+				basePrefix+".config",
 				basePrefix+".extraConfig",
 			)
 		}
