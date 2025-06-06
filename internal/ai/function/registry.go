@@ -11,6 +11,7 @@ import (
 	explainoption "nix-ai-help/internal/ai/function/explain-option"
 	"nix-ai-help/internal/ai/function/flakes"
 	"nix-ai-help/internal/ai/function/learning"
+	mcpserver "nix-ai-help/internal/ai/function/mcp-server"
 	packagerepo "nix-ai-help/internal/ai/function/package-repo"
 	"nix-ai-help/internal/ai/function/packages"
 	"nix-ai-help/internal/ai/functionbase"
@@ -47,6 +48,7 @@ func registerAllFunctions() {
 		{"explain-option", explainoption.NewExplainOptionFunction()},
 		{"flakes", flakes.NewFlakesFunction()},
 		{"learning", learning.NewLearningFunction()},
+		{"mcp-server", mcpserver.NewMcpServerFunction()},
 		{"packages", packages.NewPackagesFunction()},
 		{"package-repo", packagerepo.NewPackageRepoFunction()},
 	}

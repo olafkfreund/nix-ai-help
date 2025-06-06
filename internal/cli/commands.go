@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -103,10 +104,12 @@ Usage:
 
 var askQuestion string
 var nixosPath string
+var daemonMode bool
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&askQuestion, "ask", "a", "", "Ask a question about NixOS configuration")
 	rootCmd.PersistentFlags().StringVarP(&nixosPath, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
+	mcpServerCmd.Flags().BoolVarP(&daemonMode, "daemon", "d", false, "Run MCP server in background/daemon mode")
 }
 
 // Configuration management functions
@@ -699,10 +702,11 @@ var mcpServerCmd = &cobra.Command{
 The MCP server provides VS Code integration and documentation querying capabilities.
 
 Examples:
-  nixai mcp-server start     # Start the MCP server
-  nixai mcp-server stop      # Stop the MCP server  
-  nixai mcp-server status    # Check server status
-  nixai mcp-server restart   # Restart the MCP server`,
+  nixai mcp-server start        # Start the MCP server
+  nixai mcp-server start -d     # Start the MCP server in daemon mode
+  nixai mcp-server stop         # Stop the MCP server  
+  nixai mcp-server status       # Check server status
+  nixai mcp-server restart      # Restart the MCP server`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return handleMCPServerCommand(args)
 	},
@@ -1109,6 +1113,7 @@ func handleMCPServerCommand(args []string) error {
 		fmt.Println()
 		fmt.Println(utils.FormatSubsection("Available Commands", ""))
 		fmt.Println("  start         - Start the MCP server")
+		fmt.Println("  start -d      - Start the MCP server in daemon mode")
 		fmt.Println("  stop          - Stop the MCP server")
 		fmt.Println("  status        - Check server status")
 		fmt.Println("  restart       - Restart the MCP server")
@@ -1121,7 +1126,7 @@ func handleMCPServerCommand(args []string) error {
 	subcommand := args[0]
 	switch subcommand {
 	case "start":
-		return handleMCPServerStart(cfg)
+		return handleMCPServerStart(cfg, daemonMode)
 	case "stop":
 		return handleMCPServerStop(cfg)
 	case "status":
@@ -1140,9 +1145,36 @@ func handleMCPServerCommand(args []string) error {
 }
 
 // handleMCPServerStart starts the MCP server
-func handleMCPServerStart(cfg *config.UserConfig) error {
+func handleMCPServerStart(cfg *config.UserConfig, daemon bool) error {
 	fmt.Println(utils.FormatHeader("🚀 Starting MCP Server"))
 	fmt.Println()
+
+	// If daemon mode is requested, fork the process
+	if daemon {
+		// Create a command to start the server without daemon flag
+		cmd := exec.Command(os.Args[0], "mcp-server", "start")
+
+		// Start the background process without complex process group management
+		err := cmd.Start()
+		if err != nil {
+			return fmt.Errorf("failed to start daemon process: %v", err)
+		}
+
+		// Don't wait for the process - let it run in background
+		go func() {
+			cmd.Wait() // Clean up when process exits
+		}()
+
+		fmt.Println(utils.FormatSuccess("MCP server started in daemon mode"))
+		fmt.Println(utils.FormatKeyValue("Process ID", fmt.Sprintf("%d", cmd.Process.Pid)))
+		fmt.Println(utils.FormatKeyValue("HTTP Server", fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)))
+		fmt.Println(utils.FormatKeyValue("Unix Socket", cfg.MCPServer.SocketPath))
+		fmt.Println()
+		fmt.Println(utils.FormatTip("Use 'nixai mcp-server status' to check server health"))
+		fmt.Println(utils.FormatTip("Use 'nixai mcp-server stop' to stop the server"))
+
+		return nil
+	}
 
 	// Create MCP server from config
 	configPath, _ := config.ConfigFilePath()
@@ -1261,7 +1293,7 @@ func handleMCPServerRestart(cfg *config.UserConfig) error {
 	fmt.Println(utils.FormatSuccess("done"))
 
 	// Start again
-	return handleMCPServerStart(cfg)
+	return handleMCPServerStart(cfg, false)
 }
 
 // handleMCPServerQuery queries the MCP server directly

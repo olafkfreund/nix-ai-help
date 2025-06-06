@@ -53,9 +53,10 @@ type ESResponse struct {
 
 // MCPServer represents the MCP protocol server
 type MCPServer struct {
-	logger   logger.Logger
-	listener net.Listener
-	mu       sync.Mutex
+	logger      logger.Logger
+	listener    net.Listener
+	mu          sync.Mutex
+	lspProvider *NixLSPProvider
 }
 
 // MCPRequest represents an MCP protocol request
@@ -128,6 +129,22 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 			{
 				Name:        "complete_nixos_option",
 				Description: "Autocomplete NixOS option names for a given prefix",
+			},
+			{
+				Name:        "nix_lsp_completion",
+				Description: "Provide LSP-like completion suggestions for Nix files",
+			},
+			{
+				Name:        "nix_lsp_diagnostics",
+				Description: "Provide real-time diagnostics and error checking for Nix files",
+			},
+			{
+				Name:        "nix_lsp_hover",
+				Description: "Provide hover information and documentation for Nix symbols",
+			},
+			{
+				Name:        "nix_lsp_definition",
+				Description: "Provide go-to-definition functionality for Nix symbols",
 			},
 		}
 		_ = conn.Reply(ctx, req.ID, map[string]interface{}{"tools": tools})
@@ -231,6 +248,202 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 					Message: "Missing prefix parameter",
 				})
 			}
+
+		case "nix_lsp_completion":
+			if m.lspProvider == nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: "LSP provider not initialized",
+				})
+				return
+			}
+
+			fileContent, ok1 := params.Arguments["fileContent"].(string)
+			line, ok2 := params.Arguments["line"].(float64)
+			character, ok3 := params.Arguments["character"].(float64)
+
+			if !ok1 || !ok2 || !ok3 {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInvalidParams,
+					Message: "Missing required parameters: fileContent, line, character",
+				})
+				return
+			}
+
+			position := LSPPosition{Line: int(line), Character: int(character)}
+			completions, err := m.lspProvider.ProvideCompletion(fileContent, position)
+			if err != nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: "Failed to provide completions: " + err.Error(),
+				})
+				return
+			}
+
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": m.lspProvider.FormatCompletions(completions),
+					},
+				},
+				"completions": completions,
+			})
+
+		case "nix_lsp_diagnostics":
+			if m.lspProvider == nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: "LSP provider not initialized",
+				})
+				return
+			}
+
+			fileContent, ok1 := params.Arguments["fileContent"].(string)
+			filePath, ok2 := params.Arguments["filePath"].(string)
+
+			if !ok1 {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInvalidParams,
+					Message: "Missing required parameter: fileContent",
+				})
+				return
+			}
+
+			if !ok2 {
+				filePath = "untitled.nix" // Default filename
+			}
+
+			diagnostics, err := m.lspProvider.ProvideDiagnostics(filePath, fileContent)
+			if err != nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: "Failed to provide diagnostics: " + err.Error(),
+				})
+				return
+			}
+
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": m.lspProvider.FormatDiagnostics(diagnostics),
+					},
+				},
+				"diagnostics": diagnostics,
+			})
+
+		case "nix_lsp_hover":
+			if m.lspProvider == nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: "LSP provider not initialized",
+				})
+				return
+			}
+
+			fileContent, ok1 := params.Arguments["fileContent"].(string)
+			line, ok2 := params.Arguments["line"].(float64)
+			character, ok3 := params.Arguments["character"].(float64)
+
+			if !ok1 || !ok2 || !ok3 {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInvalidParams,
+					Message: "Missing required parameters: fileContent, line, character",
+				})
+				return
+			}
+
+			position := LSPPosition{Line: int(line), Character: int(character)}
+			hover, err := m.lspProvider.ProvideHover(fileContent, position)
+			if err != nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: "Failed to provide hover information: " + err.Error(),
+				})
+				return
+			}
+
+			if hover == nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"content": []map[string]interface{}{
+						{
+							"type": "text",
+							"text": "No hover information available",
+						},
+					},
+				})
+				return
+			}
+
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": strings.Join(hover.Contents, "\n"),
+					},
+				},
+				"hover": hover,
+			})
+
+		case "nix_lsp_definition":
+			if m.lspProvider == nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: "LSP provider not initialized",
+				})
+				return
+			}
+
+			fileContent, ok1 := params.Arguments["fileContent"].(string)
+			line, ok2 := params.Arguments["line"].(float64)
+			character, ok3 := params.Arguments["character"].(float64)
+
+			if !ok1 || !ok2 || !ok3 {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInvalidParams,
+					Message: "Missing required parameters: fileContent, line, character",
+				})
+				return
+			}
+
+			position := LSPPosition{Line: int(line), Character: int(character)}
+			locations, err := m.lspProvider.ProvideDefinition(fileContent, position)
+			if err != nil {
+				_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
+					Code:    jsonrpc2.CodeInternalError,
+					Message: "Failed to provide definition: " + err.Error(),
+				})
+				return
+			}
+
+			if len(locations) == 0 {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"content": []map[string]interface{}{
+						{
+							"type": "text",
+							"text": "No definition found",
+						},
+					},
+				})
+				return
+			}
+
+			var result strings.Builder
+			result.WriteString("Found definition(s):\n\n")
+			for i, loc := range locations {
+				result.WriteString(fmt.Sprintf("%d. %s\n", i+1, loc.URI))
+			}
+
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result.String(),
+					},
+				},
+				"locations": locations,
+			})
 
 		default:
 			_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
@@ -377,26 +590,42 @@ var (
 
 // NewServer creates a new MCP server instance with documentation sources.
 func NewServer(addr string, documentationSources []string) *Server {
+	log := logger.NewLoggerWithLevel("info")
+
+	// Create and initialize LSP provider
+	lspProvider := NewNixLSPProvider(*log)
+	if err := lspProvider.LoadNixOSOptions(); err != nil {
+		log.Error(fmt.Sprintf("Failed to load NixOS options for LSP: %v", err))
+	}
+
 	return &Server{
 		addr:                 addr,
 		socketPath:           "/tmp/nixai-mcp.sock", // Default socket path
 		documentationSources: documentationSources,
-		logger:               logger.NewLoggerWithLevel("info"), // Default to info level
+		logger:               log,
 		debugLogging:         false,
-		mcpServer:            &MCPServer{logger: *logger.NewLoggerWithLevel("info")},
+		mcpServer:            &MCPServer{logger: *log, lspProvider: lspProvider},
 	}
 }
 
 // NewServerWithDebug creates a new MCP server instance with debug logging enabled.
 // This is primarily intended for testing purposes.
 func NewServerWithDebug(addr string, documentationSources []string) *Server {
+	log := logger.NewLoggerWithLevel("debug")
+
+	// Create and initialize LSP provider
+	lspProvider := NewNixLSPProvider(*log)
+	if err := lspProvider.LoadNixOSOptions(); err != nil {
+		log.Error(fmt.Sprintf("Failed to load NixOS options for LSP: %v", err))
+	}
+
 	return &Server{
 		addr:                 addr,
 		socketPath:           "/tmp/nixai-mcp.sock", // Default socket path
 		documentationSources: documentationSources,
-		logger:               logger.NewLoggerWithLevel("debug"), // Enable debug level
+		logger:               log,
 		debugLogging:         true,
-		mcpServer:            &MCPServer{logger: *logger.NewLoggerWithLevel("debug")},
+		mcpServer:            &MCPServer{logger: *log, lspProvider: lspProvider},
 	}
 }
 
@@ -427,13 +656,21 @@ func NewServerFromConfig(configPath string) (*Server, error) {
 		socketPath = userCfg.MCPServer.SocketPath
 	}
 
+	log := logger.NewLoggerWithLevel(userCfg.LogLevel)
+
+	// Create and initialize LSP provider
+	lspProvider := NewNixLSPProvider(*log)
+	if err := lspProvider.LoadNixOSOptions(); err != nil {
+		log.Error(fmt.Sprintf("Failed to load NixOS options for LSP: %v", err))
+	}
+
 	srv := &Server{
 		addr:                 addr,
 		socketPath:           socketPath,
 		documentationSources: userCfg.MCPServer.DocumentationSources,
-		logger:               logger.NewLoggerWithLevel(userCfg.LogLevel),
+		logger:               log,
 		debugLogging:         strings.ToLower(userCfg.LogLevel) == "debug",
-		mcpServer:            &MCPServer{logger: *logger.NewLoggerWithLevel(userCfg.LogLevel)},
+		mcpServer:            &MCPServer{logger: *log, lspProvider: lspProvider},
 		configPath:           configPath,
 	}
 
