@@ -126,15 +126,17 @@ This project introduces an "agent" abstraction layer for AI providers in nixai, 
 
 ### 🔄 IN PROGRESS
 
+- [ ] AI Function Calling implementation for all nixai commands
+- [ ] Function calling interface and base implementation
 - [ ] CLI integration for agent/role selection (--role, --agent, --context-file flags)
-- [ ] Provider refactor (Ollama, OpenAI, Gemini, etc.) to use agents consistently
 
 ### 📋 TODO
 
-- [ ] CLI integration for agent/role selection (--role, --agent, --context-file flags)
-- [ ] Config updates for agent/role defaults
+- [ ] Function calling implementations for all 26 commands
+- [ ] Function calling tests and validation
 - [ ] Provider refactor (Ollama, OpenAI, Gemini, etc.) to use agents consistently
-- [ ] Build and lint scripts for agents and roles
+- [ ] Config updates for agent/role defaults and function calling
+- [ ] Build and lint scripts for agents, roles, and functions
 - [ ] Documentation and help menu updates
 - [ ] Migration and release notes
 
@@ -204,13 +206,113 @@ Below is the tracking table for agent/role implementation for each nixai command
 - Mark each as DONE when prompt, agent, and tests are complete.
 - Add new commands/roles as needed.
 
-*Last updated: 2025-01-10*
+---
 
-**Current Status:**
+## Function Calling Implementation Tracking
 
-- ✅ **All 26 agents fully implemented and tested** (AskAgent, BuildAgent, CommunityAgent, CompletionAgent, ConfigAgent, ConfigureAgent, DevenvAgent, DiagnoseAgent, DoctorAgent, ExplainOptionAgent, ExplainHomeOptionAgent, FlakeAgent, GCAgent, HardwareAgent, HelpAgent, InteractiveAgent, LearnAgent, LogsAgent, MachinesAgent, McpServerAgent, MigrateAgent, NeovimSetupAgent, PackageRepoAgent, SearchAgent, SnippetsAgent, StoreAgent, TemplatesAgent)
-- ✅ **All agent tests passing** with full project test suite (450+ tests)
-- ✅ **Agent system architecture complete** with role validation, context management, and provider integration
-- ✅ **All role templates implemented** for every agent
-- ✅ **Comprehensive context management** with specialized context types for each agent
-- 📋 **CLI integration and provider refactoring** ready to begin for full deployment
+### Function Calling Architecture
+
+The AI function calling system extends the agent/role abstraction to provide structured tool execution for each nixai command. Functions are organized by command and provide the AI with structured interfaces to execute nixai operations.
+
+**Directory Structure:**
+```
+internal/ai/function/
+├── base_function.go           # Base function interface and shared utilities
+├── function_manager.go        # Function registry and execution management
+├── types.go                   # Shared types and structures
+├── ask/                       # Direct question asking functions
+│   ├── ask_function.go
+│   └── ask_function_test.go
+├── diagnose/                  # Log and config diagnostic functions
+│   ├── diagnose_function.go
+│   └── diagnose_function_test.go
+├── explain/                   # NixOS option explanation functions
+│   ├── explain_function.go
+│   └── explain_function_test.go
+... (one directory per command)
+```
+
+### Function Calling Implementation Status
+
+| Command | Function Interface | Implementation | Tests | Status |
+|---------|-------------------|----------------|-------|--------|
+| ask | IFunctionAsk | ❌ | ❌ | TODO |
+| diagnose | IFunctionDiagnose | ❌ | ❌ | TODO |
+| explain-option | IFunctionExplain | ❌ | ❌ | TODO |
+| explain-home-option | IFunctionExplainHome | ❌ | ❌ | TODO |
+| help | IFunctionHelp | ❌ | ❌ | TODO |
+| install-package | IFunctionInstallPackage | ❌ | ❌ | TODO |
+| package-repo | IFunctionPackageRepo | ❌ | ❌ | TODO |
+| search-packages | IFunctionSearchPackages | ❌ | ❌ | TODO |
+| update-system | IFunctionUpdateSystem | ❌ | ❌ | TODO |
+| community | IFunctionCommunity | ❌ | ❌ | TODO |
+| community forums | IFunctionCommunityForums | ❌ | ❌ | TODO |
+| community packages | IFunctionCommunityPackages | ❌ | ❌ | TODO |
+| community docs | IFunctionCommunityDocs | ❌ | ❌ | TODO |
+| community help | IFunctionCommunityHelp | ❌ | ❌ | TODO |
+| devenv | IFunctionDevenv | ❌ | ❌ | TODO |
+| devenv create | IFunctionDevenvCreate | ❌ | ❌ | TODO |
+| devenv manage | IFunctionDevenvManage | ❌ | ❌ | TODO |
+| devenv help | IFunctionDevenvHelp | ❌ | ❌ | TODO |
+| learning | IFunctionLearning | ❌ | ❌ | TODO |
+| learning beginner | IFunctionLearningBeginner | ❌ | ❌ | TODO |
+| learning advanced | IFunctionLearningAdvanced | ❌ | ❌ | TODO |
+| learning help | IFunctionLearningHelp | ❌ | ❌ | TODO |
+| machines | IFunctionMachines | ❌ | ❌ | TODO |
+| machines setup | IFunctionMachinesSetup | ❌ | ❌ | TODO |
+| machines deploy | IFunctionMachinesDeploy | ❌ | ❌ | TODO |
+| machines help | IFunctionMachinesHelp | ❌ | ❌ | TODO |
+| mcp-server | IFunctionMcpServer | ❌ | ❌ | TODO |
+| neovim | IFunctionNeovim | ❌ | ❌ | TODO |
+| neovim setup | IFunctionNeovimSetup | ❌ | ❌ | TODO |
+| neovim help | IFunctionNeovimHelp | ❌ | ❌ | TODO |
+| snippets | IFunctionSnippets | ❌ | ❌ | TODO |
+
+**Total Functions Needed:** 29
+**Completed:** 0 (0%)
+**Remaining:** 29 (100%)
+
+### Function Calling Features
+
+- **Structured Tool Execution**: Each function provides JSON schema definitions for AI parameter validation
+- **Command Integration**: Functions directly execute nixai commands with validated parameters
+- **Context Awareness**: Functions inherit context from their associated agents and roles
+- **Error Handling**: Comprehensive error handling and user feedback for function execution
+- **Type Safety**: Strong typing for all function parameters and return values
+- **Async Support**: Non-blocking execution for long-running operations
+- **Progress Tracking**: Built-in progress indicators for function execution
+- **Validation**: Input validation and sanitization for all function parameters
+
+### Function Calling Implementation Plan
+
+1. **Phase 1: Base Infrastructure** (Week 1)
+   - Implement `base_function.go` with core function interface
+   - Create `function_manager.go` for function registry and execution
+   - Define shared types and error handling patterns
+   - Set up testing framework for functions
+
+2. **Phase 2: Core Functions** (Week 2)
+   - Implement ask, diagnose, explain-option, and explain-home-option functions
+   - Add comprehensive test coverage
+   - Integrate with existing agent system
+   - Validate JSON schema definitions
+
+3. **Phase 3: Command Functions** (Week 3)
+   - Implement help, install-package, package-repo, search-packages, update-system functions
+   - Add modular command execution patterns
+   - Test integration with NixOS commands
+   - Performance optimization
+
+4. **Phase 4: Submodule Functions** (Week 4)
+   - Implement all community, devenv, learning, machines, neovim, snippets functions
+   - Add specialized context handling for each domain
+   - Complete comprehensive test suite
+   - Documentation and examples
+
+5. **Phase 5: Integration & Testing** (Week 5)
+   - CLI integration with function calling
+   - Provider updates to support function calling
+   - End-to-end testing and validation
+   - Performance benchmarking and optimization
+
+---

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/olafkfreund/nixai/internal/ai/roles"
-	"github.com/olafkfreund/nixai/internal/config"
+	"nix-ai-help/internal/ai"
+	"nix-ai-help/internal/ai/roles"
 )
 
 // SnippetsAgent handles code snippet creation, management, and organization.
@@ -54,12 +54,11 @@ type SnippetsContext struct {
 }
 
 // NewSnippetsAgent creates a new SnippetsAgent.
-func NewSnippetsAgent(cfg *config.Config) *SnippetsAgent {
+func NewSnippetsAgent(provider ai.Provider) *SnippetsAgent {
 	return &SnippetsAgent{
 		BaseAgent: BaseAgent{
-			name:   "SnippetsAgent",
-			role:   roles.RoleSnippets,
-			config: cfg,
+			provider: provider,
+			role:     roles.RoleSnippets,
 		},
 		context: &SnippetsContext{
 			SnippetFormat:     "ultisnips",
@@ -81,7 +80,7 @@ func NewSnippetsAgent(cfg *config.Config) *SnippetsAgent {
 func (a *SnippetsAgent) CreateSnippet(ctx context.Context, language, pattern, description string) (string, error) {
 	prompt := a.buildCreateSnippetPrompt(language, pattern, description)
 
-	response, err := a.query(ctx, prompt)
+	response, err := a.provider.Query(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to create snippet: %w", err)
 	}
@@ -95,7 +94,7 @@ func (a *SnippetsAgent) OrganizeLibrary(ctx context.Context, currentStructure st
 
 	prompt := a.buildOrganizeLibraryPrompt(currentStructure, organizationGoals)
 
-	response, err := a.query(ctx, prompt)
+	response, err := a.provider.Query(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to organize library: %w", err)
 	}
@@ -110,7 +109,7 @@ func (a *SnippetsAgent) SetupSnippetEngine(ctx context.Context, editorType, engi
 
 	prompt := a.buildSetupEnginePrompt(editorType, engineType)
 
-	response, err := a.query(ctx, prompt)
+	response, err := a.provider.Query(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to setup snippet engine: %w", err)
 	}
@@ -124,7 +123,7 @@ func (a *SnippetsAgent) OptimizePerformance(ctx context.Context, performanceIssu
 
 	prompt := a.buildOptimizePrompt(performanceIssues)
 
-	response, err := a.query(ctx, prompt)
+	response, err := a.provider.Query(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to optimize performance: %w", err)
 	}
@@ -136,9 +135,9 @@ func (a *SnippetsAgent) OptimizePerformance(ctx context.Context, performanceIssu
 func (a *SnippetsAgent) GenerateCollection(ctx context.Context, useCase string, languages []string, requirements []string) (string, error) {
 	a.context.Languages = languages
 
-	prompt := a.buildGenerateCollectionPrompt(useCase, languages, requirements)
+	prompt := a.buildGenerateCollectionPrompt([]string{useCase}, languages, requirements)
 
-	response, err := a.query(ctx, prompt)
+	response, err := a.provider.Query(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate collection: %w", err)
 	}
@@ -153,7 +152,7 @@ func (a *SnippetsAgent) MaintainSnippets(ctx context.Context, lastUpdated string
 
 	prompt := a.buildMaintenancePrompt(lastUpdated, conflictIssues)
 
-	response, err := a.query(ctx, prompt)
+	response, err := a.provider.Query(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to maintain snippets: %w", err)
 	}

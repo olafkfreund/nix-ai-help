@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/olafkfreund/nixai/internal/ai/roles"
-	"github.com/olafkfreund/nixai/internal/config"
+	"nix-ai-help/internal/ai"
+	"nix-ai-help/internal/ai/roles"
 )
 
 // NeovimSetupAgent handles Neovim configuration and setup operations.
@@ -53,12 +53,11 @@ type NeovimSetupContext struct {
 }
 
 // NewNeovimSetupAgent creates a new NeovimSetupAgent.
-func NewNeovimSetupAgent(cfg *config.Config) *NeovimSetupAgent {
+func NewNeovimSetupAgent(provider ai.Provider) *NeovimSetupAgent {
 	return &NeovimSetupAgent{
 		BaseAgent: BaseAgent{
-			name:   "NeovimSetupAgent",
-			role:   roles.RoleNeovimSetup,
-			config: cfg,
+			provider: provider,
+			role:     roles.RoleNeovimSetup,
 		},
 		context: &NeovimSetupContext{
 			ConfigType:       "nixvim",
@@ -80,7 +79,7 @@ func (a *NeovimSetupAgent) SetupNeovimConfig(ctx context.Context, configType, ta
 
 	prompt := a.buildSetupPrompt(configType, targetLanguages)
 
-	response, err := a.query(ctx, prompt)
+	response, err := a.provider.Query(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate Neovim setup: %w", err)
 	}
@@ -94,7 +93,7 @@ func (a *NeovimSetupAgent) ConfigureLSP(ctx context.Context, languages []string)
 
 	prompt := a.buildLSPPrompt(languages)
 
-	response, err := a.query(ctx, prompt)
+	response, err := a.provider.Query(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to configure LSP: %w", err)
 	}
@@ -109,7 +108,7 @@ func (a *NeovimSetupAgent) OptimizePerformance(ctx context.Context, currentStart
 
 	prompt := a.buildPerformancePrompt(currentStartupTime, goals)
 
-	response, err := a.query(ctx, prompt)
+	response, err := a.provider.Query(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to optimize performance: %w", err)
 	}
@@ -121,7 +120,7 @@ func (a *NeovimSetupAgent) OptimizePerformance(ctx context.Context, currentStart
 func (a *NeovimSetupAgent) MigrateConfiguration(ctx context.Context, sourceEditor, configPath string) (string, error) {
 	prompt := a.buildMigrationPrompt(sourceEditor, configPath)
 
-	response, err := a.query(ctx, prompt)
+	response, err := a.provider.Query(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate migration guide: %w", err)
 	}
@@ -135,7 +134,7 @@ func (a *NeovimSetupAgent) CustomizeWorkflow(ctx context.Context, workflowType s
 
 	prompt := a.buildWorkflowPrompt(workflowType, requirements)
 
-	response, err := a.query(ctx, prompt)
+	response, err := a.provider.Query(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to customize workflow: %w", err)
 	}
@@ -147,7 +146,7 @@ func (a *NeovimSetupAgent) CustomizeWorkflow(ctx context.Context, workflowType s
 func (a *NeovimSetupAgent) TroubleshootConfig(ctx context.Context, issue, errorMessage string) (string, error) {
 	prompt := a.buildTroubleshootingPrompt(issue, errorMessage)
 
-	response, err := a.query(ctx, prompt)
+	response, err := a.provider.Query(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to troubleshoot configuration: %w", err)
 	}
