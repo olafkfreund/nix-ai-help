@@ -674,13 +674,25 @@ Features:
 - Animated snowflake progress indicator
 - Multi-line input, contextual help, and advanced autocomplete
 - All advanced features available in non-interactive mode
+- Modern TUI interface with --tui flag
 
 Examples:
-  nixai interactive
+  nixai interactive              # Start classic interactive mode
+  nixai interactive --tui        # Start modern TUI interface
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		InteractiveMode()
+		useTUI, _ := cmd.Flags().GetBool("tui")
+		if useTUI {
+			InteractiveModeTUI()
+		} else {
+			InteractiveMode()
+		}
 	},
+}
+
+func init() {
+	// Add the --tui flag to the interactive command
+	interactiveCmd.Flags().Bool("tui", false, "Launch modern TUI interface instead of classic interactive mode")
 }
 
 // Flake management command implementation
