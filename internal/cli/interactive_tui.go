@@ -91,7 +91,6 @@ type tuiModel struct {
 	parameterInput     string
 	inputMode          bool
 	selectedCmdName    string
-	needsParameters    bool
 	currentState       tuiState
 	commandOptions     []commandOption
 	selectedOption     int
@@ -1164,6 +1163,56 @@ func (m tuiModel) renderOptionsPanel(width, height int) string {
 	return panel
 }
 
+// renderSubcommandsPanel renders the middle subcommands panel
+func (m tuiModel) renderSubcommandsPanel(width, height int) string {
+	var content strings.Builder
+
+	// Show subcommand selection
+	if m.focused == focusSubcommands {
+		content.WriteString("⚡ Subcommands (Enter to select, ↑↓ to navigate):\n\n")
+	} else {
+		content.WriteString("Subcommands (Tab to focus here):\n\n")
+	}
+
+	// Get current command to show its subcommands
+	filteredCommands := m.filterCommands()
+	if m.selectedCommand >= 0 && m.selectedCommand < len(filteredCommands) {
+		cmd := filteredCommands[m.selectedCommand]
+
+		for i, subcmd := range cmd.subcommands {
+			line := fmt.Sprintf("  %s", subcmd.name)
+
+			if i == m.selectedSubcommand && m.focused == focusSubcommands {
+				line = selectedStyle.Render(line)
+			} else {
+				line = commandStyle.Render(line)
+			}
+
+			content.WriteString(line + "\n")
+
+			// Add description on next line
+			desc := descriptionStyle.Render(fmt.Sprintf("    %s", subcmd.description))
+			content.WriteString(desc + "\n")
+		}
+
+		if len(cmd.subcommands) > 0 {
+			content.WriteString("\n")
+			if m.focused == focusSubcommands {
+				content.WriteString(descriptionStyle.Render("Enter = select, ↑↓/Ctrl+jk = navigate, Tab = switch panel"))
+			} else {
+				content.WriteString(descriptionStyle.Render("Tab to focus this panel"))
+			}
+		}
+	}
+
+	panel := panelStyle.
+		Width(width).
+		Height(height).
+		Render(content.String())
+
+	return panel
+}
+
 // renderStatusBar renders the bottom status bar
 func (m tuiModel) renderStatusBar(width int) string {
 	var statusItems []string
@@ -1181,6 +1230,21 @@ func (m tuiModel) renderStatusBar(width int) string {
 		statusItems = append(statusItems, "↑↓/Ctrl+jk: Navigate")
 		statusItems = append(statusItems, "Enter: Select")
 		statusItems = append(statusItems, "/: Search")
+		statusItems = append(statusItems, "Ctrl+C: Exit")
+
+	case stateSubcommandSelection:
+		switch m.focused {
+		case focusCommands:
+			statusItems = append(statusItems, "📋 Commands")
+		case focusSubcommands:
+			statusItems = append(statusItems, "⚡ Subcommands")
+		case focusOutput:
+			statusItems = append(statusItems, "💻 Output")
+		}
+		statusItems = append(statusItems, "Tab: Switch Panel")
+		statusItems = append(statusItems, "↑↓/Ctrl+jk: Navigate")
+		statusItems = append(statusItems, "Enter: Select")
+		statusItems = append(statusItems, "Esc: Back")
 		statusItems = append(statusItems, "Ctrl+C: Exit")
 
 	case stateCommandOptions:

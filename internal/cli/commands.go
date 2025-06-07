@@ -2244,6 +2244,7 @@ func initializeCommands() {
 	rootCmd.AddCommand(snippetsCmd)
 	rootCmd.AddCommand(enhancedBuildCmd)
 	rootCmd.AddCommand(devenvCmd)
+	rootCmd.AddCommand(NewDepsCommand())
 	// Register stub commands for missing features
 	rootCmd.AddCommand(communityCmd)
 	rootCmd.AddCommand(configCmd)

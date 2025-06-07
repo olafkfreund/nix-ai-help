@@ -34,7 +34,7 @@ func AnalyzeFlakeDependencies(flakeDir string, hostname string) (*DependencyGrap
 
 	// Step 1: Get the store path of the top-level system derivation
 	targetSystem := fmt.Sprintf(".#nixosConfigurations.%s.config.system.build.toplevel", hostname)
-	buildCmd := exec.Command("nix", "build", targetSystem, "--no-link", "--print-out-paths")
+	buildCmd := exec.Command("nix", "build", targetSystem, "--print-out-paths", "--no-link")
 	buildCmd.Dir = flakeDir
 
 	fmt.Println(utils.FormatProgress(fmt.Sprintf("Executing: %s in %s", buildCmd.String(), flakeDir)))
@@ -46,7 +46,7 @@ func AnalyzeFlakeDependencies(flakeDir string, hostname string) (*DependencyGrap
 		return nil, fmt.Errorf("nix build command failed to get system store path: %v", err)
 	}
 
-	systemStorePath := filepath.Clean(string(buildOut))
+	systemStorePath := strings.TrimSpace(string(buildOut))
 	if systemStorePath == "" {
 		return nil, fmt.Errorf("failed to get system store path, nix build output was empty")
 	}
@@ -60,7 +60,7 @@ func AnalyzeFlakeDependencies(flakeDir string, hostname string) (*DependencyGrap
 	visited := make(map[string]bool)
 
 	// Step 3: Recursively fetch and parse derivations
-	rootNode, err := fetchAndParseDerivationRecursive(systemStorePath, graph, visited, 0, 5) // Limit depth for now
+	rootNode, err := fetchAndParseDerivationRecursive(systemStorePath, graph, visited, 0, 5, flakeDir) // Limit depth for now
 	if err != nil {
 		return nil, fmt.Errorf("failed to recursively parse derivations: %w", err)
 	}
@@ -72,7 +72,8 @@ func AnalyzeFlakeDependencies(flakeDir string, hostname string) (*DependencyGrap
 
 // fetchAndParseDerivationRecursive is a helper to build the dependency tree.
 // currentDepth and maxDepth are used to prevent infinite recursion or excessive processing.
-func fetchAndParseDerivationRecursive(storePath string, graph *DependencyGraph, visited map[string]bool, currentDepth int, maxDepth int) (*DependencyNode, error) {
+// flakeDir is the directory containing the flake.nix file (used for setting working directory)
+func fetchAndParseDerivationRecursive(storePath string, graph *DependencyGraph, visited map[string]bool, currentDepth int, maxDepth int, flakeDir string) (*DependencyNode, error) {
 	if currentDepth >= maxDepth {
 		fmt.Println(utils.FormatWarning(fmt.Sprintf("Reached max depth (%d) at %s, stopping further recursion for this branch.", maxDepth, storePath)))
 		// Return a placeholder node if max depth is reached
@@ -89,57 +90,59 @@ func fetchAndParseDerivationRecursive(storePath string, graph *DependencyGraph, 
 	}
 	visited[storePath] = true
 
-	fmt.Println(utils.FormatProgress(fmt.Sprintf("Fetching derivation: %s (depth %d)", storePath, currentDepth)))
+	fmt.Println(utils.FormatProgress(fmt.Sprintf("Fetching dependencies: %s (depth %d)", storePath, currentDepth)))
 
-	// First, get the derivation path using nix path-info
-	pathInfoCmd := exec.Command("nix", "path-info", "--derivation", storePath)
-	drvPathBytes, err := pathInfoCmd.Output()
+	// Use nix-store --query-references to get runtime dependencies (much simpler and more reliable)
+	queryCmd := exec.Command("nix-store", "--query", "--references", storePath)
+	if flakeDir != "" {
+		queryCmd.Dir = flakeDir // Set working directory for consistency
+	}
+	refsOut, err := queryCmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			return nil, fmt.Errorf("nix path-info --derivation %s failed: %v\nStderr: %s", storePath, err, string(exitErr.Stderr))
+			return nil, fmt.Errorf("nix-store --query --references %s failed: %v\nStderr: %s", storePath, err, string(exitErr.Stderr))
 		}
-		return nil, fmt.Errorf("nix path-info --derivation %s failed: %v", storePath, err)
+		return nil, fmt.Errorf("nix-store --query --references %s failed: %v", storePath, err)
 	}
 
-	drvPath := strings.TrimSpace(string(drvPathBytes))
-	if drvPath == "" {
-		return nil, fmt.Errorf("could not get derivation path for %s", storePath)
+	// Parse the output to get dependency store paths
+	references := []string{}
+	if strings.TrimSpace(string(refsOut)) != "" {
+		references = strings.Split(strings.TrimSpace(string(refsOut)), "\n")
 	}
 
-	// Now use the derivation path with nix derivation show
-	showCmd := exec.Command("nix", "derivation", "show", drvPath)
-	derivJSON, err := showCmd.Output()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return nil, fmt.Errorf("nix derivation show %s failed: %v\nStderr: %s", drvPath, err, string(exitErr.Stderr))
+	// Create current node
+	nodeName := filepath.Base(storePath)
+	// Try to extract a better name from the store path
+	if strings.Contains(storePath, "/nix/store/") {
+		parts := strings.Split(storePath, "-")
+		if len(parts) > 1 {
+			// Remove the hash part and join the rest
+			nodeName = strings.Join(parts[1:], "-")
 		}
-		return nil, fmt.Errorf("nix derivation show %s failed: %v", drvPath, err)
-	}
-
-	derivInfo, err := ParseDerivationOutput(derivJSON)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse derivation output for %s: %w", storePath, err)
 	}
 
 	currentNode := &DependencyNode{
-		Name:         derivInfo.Name, // Use the name from the derivation info
+		Name:         nodeName,
 		StorePath:    storePath,
 		Dependencies: []*DependencyNode{},
-		Version:      extractVersionFromName(derivInfo.Name), // Extract version from derivation name
+		Version:      extractVersionFromName(nodeName),
 	}
 	graph.AllNodes[storePath] = currentNode
 
-	// Recursively process input derivations
-	for _, inputDrvPaths := range derivInfo.InputDrvs {
-		for _, inputDrvPath := range inputDrvPaths {
-			cleanInputPath := filepath.Clean(inputDrvPath)
-			depNode, err := fetchAndParseDerivationRecursive(cleanInputPath, graph, visited, currentDepth+1, maxDepth)
-			if err != nil {
-				fmt.Println(utils.FormatError(fmt.Sprintf("Error processing dependency %s for %s: %v. Skipping this dependency.", cleanInputPath, storePath, err)))
-				continue // Skip this dependency but continue with others
-			}
-			currentNode.Dependencies = append(currentNode.Dependencies, depNode)
+	// Recursively process dependencies
+	for _, refPath := range references {
+		cleanRefPath := strings.TrimSpace(refPath)
+		if cleanRefPath == "" || cleanRefPath == storePath {
+			continue // Skip empty lines and self-references
 		}
+		
+		depNode, err := fetchAndParseDerivationRecursive(cleanRefPath, graph, visited, currentDepth+1, maxDepth, flakeDir)
+		if err != nil {
+			fmt.Println(utils.FormatError(fmt.Sprintf("Error processing dependency %s for %s: %v. Skipping this dependency.", cleanRefPath, storePath, err)))
+			continue // Skip this dependency but continue with others
+		}
+		currentNode.Dependencies = append(currentNode.Dependencies, depNode)
 	}
 
 	return currentNode, nil
@@ -406,7 +409,47 @@ func (graph *DependencyGraph) dfsDepth(node *DependencyNode, currentPath []strin
 	}
 }
 
-// AnalyzeLegacyDependencies attempts to parse dependencies from a legacy configuration.nix.
+// AnalyzeCurrentSystemDependencies analyzes the currently running NixOS system.
+// This uses /run/current-system to get the actual system that's currently active.
+func AnalyzeCurrentSystemDependencies() (*DependencyGraph, error) {
+	fmt.Println(utils.FormatInfo("Analyzing current running system dependencies"))
+
+	// Use the current system's store path
+	currentSystemPath := "/run/current-system"
+	
+	// Verify the path exists
+	if !utils.IsFile(currentSystemPath) && !utils.DirExists(currentSystemPath) {
+		return nil, fmt.Errorf("current system path not found: %s (are you running this on NixOS?)", currentSystemPath)
+	}
+
+	// Resolve the symlink to get the actual store path
+	realSystemPath, err := filepath.EvalSymlinks(currentSystemPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve current system symlink: %w", err)
+	}
+
+	fmt.Println(utils.FormatSuccess(fmt.Sprintf("Current system store path: %s", realSystemPath)))
+
+	// Step 2: Initialize graph and map for visited nodes
+	graph := &DependencyGraph{
+		RootNodes: []*DependencyNode{},
+		AllNodes:  make(map[string]*DependencyNode),
+	}
+	visited := make(map[string]bool)
+
+	// Step 3: Recursively fetch and parse derivations
+	rootNode, err := fetchAndParseDerivationRecursive(realSystemPath, graph, visited, 0, 5, "") // No flake dir for current system
+	if err != nil {
+		return nil, fmt.Errorf("failed to recursively parse current system derivations: %w", err)
+	}
+	if rootNode != nil {
+		rootNode.Name = "Current Running System"
+	}
+	graph.RootNodes = append(graph.RootNodes, rootNode)
+
+	fmt.Println(utils.FormatSuccess(fmt.Sprintf("Successfully analyzed current system with %d unique derivations.", len(graph.AllNodes))))
+	return graph, nil
+}
 // This will be more complex and might involve direct file parsing or nix-instantiate.
 func AnalyzeLegacyDependencies(configFilePath string) (*DependencyGraph, error) {
 	fmt.Println(utils.FormatInfo(fmt.Sprintf("Analyzing legacy dependencies for: %s", configFilePath)))
@@ -427,7 +470,7 @@ func AnalyzeLegacyDependencies(configFilePath string) (*DependencyGraph, error) 
 		return nil, fmt.Errorf("nix-build command failed to get system store path for legacy config: %v", err)
 	}
 
-	systemStorePath := filepath.Clean(string(buildOut))
+	systemStorePath := strings.TrimSpace(string(buildOut))
 	if systemStorePath == "" {
 		return nil, fmt.Errorf("failed to get system store path for legacy config, nix-build output was empty")
 	}
@@ -442,7 +485,7 @@ func AnalyzeLegacyDependencies(configFilePath string) (*DependencyGraph, error) 
 
 	// Step 3: Recursively fetch and parse derivations using the same helper as flakes
 	rootNodeName := filepath.Base(configFilePath)
-	rootNode, err := fetchAndParseDerivationRecursive(systemStorePath, graph, visited, 0, 5) // Limit depth
+	rootNode, err := fetchAndParseDerivationRecursive(systemStorePath, graph, visited, 0, 5, "") // Limit depth, no flake dir for legacy
 	if err != nil {
 		return nil, fmt.Errorf("failed to recursively parse derivations for legacy config: %w", err)
 	}

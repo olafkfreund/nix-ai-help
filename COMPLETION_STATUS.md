@@ -40,6 +40,8 @@ The nixai project has successfully achieved all essential functionality and is r
    - Devenv template system (4 languages)
    - Interactive mode enhancement
    - Repository housekeeping
+   - Dependencies command integration (all 5 subcommands)
+   - TUI subcommand selection functionality
 
 ## Production Readiness Checklist
 
