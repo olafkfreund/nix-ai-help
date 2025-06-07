@@ -30,8 +30,8 @@ func (f *SnippetsFunction) Description() string {
 	return "Manage NixOS configuration snippets for reusable code blocks and common patterns"
 }
 
-// GetSchema returns the function schema for AI interaction
-func (f *SnippetsFunction) GetSchema() functionbase.FunctionSchema {
+// Schema returns the function schema for AI interaction
+func (f *SnippetsFunction) Schema() functionbase.FunctionSchema {
 	return functionbase.FunctionSchema{
 		Name:        f.Name(),
 		Description: f.Description(),
@@ -111,6 +111,33 @@ func (f *SnippetsFunction) GetSchema() functionbase.FunctionSchema {
 			"required": []string{"operation"},
 		},
 	}
+}
+
+// ValidateParameters validates the function parameters
+func (f *SnippetsFunction) ValidateParameters(params map[string]interface{}) error {
+	operation, ok := params["operation"]
+	if !ok {
+		return fmt.Errorf("operation parameter is required")
+	}
+
+	if _, ok := operation.(string); !ok {
+		return fmt.Errorf("operation must be a string")
+	}
+
+	validOperations := []string{
+		"list", "search", "show", "add", "remove", "apply",
+		"edit", "export", "import", "backup", "validate",
+		"tags", "categories", "test", "sync",
+	}
+
+	operationStr := operation.(string)
+	for _, valid := range validOperations {
+		if operationStr == valid {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("invalid operation: %s", operationStr)
 }
 
 // Execute performs the snippet operation
@@ -249,7 +276,9 @@ func (f *SnippetsFunction) handleList(ctx context.Context, params map[string]int
 	return &functionbase.FunctionResult{
 		Success: true,
 		Data:    response,
-		Message: fmt.Sprintf("Listed %d snippets", len(snippets)),
+		Metadata: map[string]interface{}{
+			"message": fmt.Sprintf("Listed %d snippets", len(snippets)),
+		},
 	}, nil
 }
 
@@ -305,7 +334,9 @@ func (f *SnippetsFunction) handleSearch(ctx context.Context, params map[string]i
 	return &functionbase.FunctionResult{
 		Success: true,
 		Data:    response,
-		Message: fmt.Sprintf("Found %d snippets matching '%s'", len(results), query),
+		Metadata: map[string]interface{}{
+			"message": fmt.Sprintf("Found %d snippets matching '%s'", len(results), query),
+		},
 	}, nil
 }
 
@@ -409,7 +440,9 @@ services.fail2ban = {
 	return &functionbase.FunctionResult{
 		Success: true,
 		Data:    snippet,
-		Message: fmt.Sprintf("Retrieved snippet: %s", name),
+		Metadata: map[string]interface{}{
+			"message": fmt.Sprintf("Retrieved snippet: %s", name),
+		},
 	}, nil
 }
 
@@ -456,7 +489,9 @@ func (f *SnippetsFunction) handleAdd(ctx context.Context, params map[string]inte
 	return &functionbase.FunctionResult{
 		Success: true,
 		Data:    snippet,
-		Message: fmt.Sprintf("Snippet '%s' added successfully", name),
+		Metadata: map[string]interface{}{
+			"message": fmt.Sprintf("Snippet '%s' added successfully", name),
+		},
 	}, nil
 }
 
@@ -478,7 +513,9 @@ func (f *SnippetsFunction) handleRemove(ctx context.Context, params map[string]i
 	return &functionbase.FunctionResult{
 		Success: true,
 		Data:    response,
-		Message: fmt.Sprintf("Snippet '%s' removed successfully", name),
+		Metadata: map[string]interface{}{
+			"message": fmt.Sprintf("Snippet '%s' removed successfully", name),
+		},
 	}, nil
 }
 
@@ -521,7 +558,9 @@ func (f *SnippetsFunction) handleApply(ctx context.Context, params map[string]in
 	return &functionbase.FunctionResult{
 		Success: true,
 		Data:    application,
-		Message: fmt.Sprintf("Snippet '%s' applied to %s", name, outputPath),
+		Metadata: map[string]interface{}{
+			"message": fmt.Sprintf("Snippet '%s' applied to %s", name, outputPath),
+		},
 	}, nil
 }
 
@@ -552,7 +591,9 @@ func (f *SnippetsFunction) handleEdit(ctx context.Context, params map[string]int
 	return &functionbase.FunctionResult{
 		Success: true,
 		Data:    edit,
-		Message: fmt.Sprintf("Snippet '%s' edited successfully", name),
+		Metadata: map[string]interface{}{
+			"message": fmt.Sprintf("Snippet '%s' edited successfully", name),
+		},
 	}, nil
 }
 
@@ -581,7 +622,9 @@ func (f *SnippetsFunction) handleExport(ctx context.Context, params map[string]i
 	return &functionbase.FunctionResult{
 		Success: true,
 		Data:    export,
-		Message: fmt.Sprintf("Exported 5 snippets to %s", outputPath),
+		Metadata: map[string]interface{}{
+			"message": fmt.Sprintf("Exported 5 snippets to %s", outputPath),
+		},
 	}, nil
 }
 
@@ -618,7 +661,9 @@ func (f *SnippetsFunction) handleImport(ctx context.Context, params map[string]i
 	return &functionbase.FunctionResult{
 		Success: true,
 		Data:    importResult,
-		Message: fmt.Sprintf("Imported 8 snippets from %s", sourcePath),
+		Metadata: map[string]interface{}{
+			"message": fmt.Sprintf("Imported 8 snippets from %s", sourcePath),
+		},
 	}, nil
 }
 
@@ -664,7 +709,9 @@ func (f *SnippetsFunction) handleOrganize(ctx context.Context, params map[string
 	return &functionbase.FunctionResult{
 		Success: true,
 		Data:    organization,
-		Message: "Snippet organization completed successfully",
+		Metadata: map[string]interface{}{
+			"message": "Snippet organization completed successfully",
+		},
 	}, nil
 }
 
