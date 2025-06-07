@@ -57,7 +57,7 @@ based on the detected dependencies.`,
 		Long: `Traces dependency paths to show all reasons why a specific package is included
 in your NixOS configuration. This helps understand complex dependency relationships
 and identify the root causes of package inclusion.`,
-		Args: cobra.ExactArgs(1),
+		Args: conditionalExactArgsValidator(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			runDepsWhy(args[0])
 		},

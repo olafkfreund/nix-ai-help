@@ -107,7 +107,7 @@ This command:
 - Provides detailed explanations of error messages
 - Suggests specific fixes based on error patterns
 - Tracks build failure history and trends`,
-	Args: cobra.ExactArgs(1),
+	Args: conditionalExactArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		packageName := args[0]
 		runBuildDebug(packageName, cmd)

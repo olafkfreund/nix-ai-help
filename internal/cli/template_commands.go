@@ -657,7 +657,7 @@ Examples:
   nixai templates search desktop kde
   nixai templates search development
   nixai templates search server nginx`,
-	Args: cobra.MinimumNArgs(1),
+	Args: conditionalArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		query := strings.Join(args, " ")
 		fmt.Println(utils.FormatHeader("🔍 Searching Templates: " + query))
@@ -723,7 +723,7 @@ Examples:
   nixai templates github "kde plasma nixos"
   nixai templates github "server nginx configuration.nix"
   nixai templates github "thinkpad nixos hardware"`,
-	Args: cobra.MinimumNArgs(1),
+	Args: conditionalArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		query := strings.Join(args, " ")
 		fmt.Println(utils.FormatHeader("🔍 Searching GitHub: " + query))
@@ -795,7 +795,7 @@ Examples:
   nixai templates show desktop-minimal
   nixai templates show gaming-config
   nixai templates show server-basic`,
-	Args: cobra.ExactArgs(1),
+	Args: conditionalExactArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		templateName := args[0]
 
@@ -858,7 +858,7 @@ Examples:
   nixai templates apply desktop-minimal
   nixai templates apply gaming-config --merge
   nixai templates apply server-basic --output /etc/nixos/server.nix`,
-	Args: cobra.ExactArgs(1),
+	Args: conditionalExactArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		templateName := args[0]
 		merge, _ := cmd.Flags().GetBool("merge")
@@ -917,7 +917,7 @@ Examples:
   nixai templates save my-config /etc/nixos/configuration.nix
   nixai templates save gaming-setup https://github.com/user/nixos-configs/blob/main/gaming.nix
   nixai templates save server-config ./server-configuration.nix --category Server`,
-	Args: cobra.ExactArgs(2),
+	Args: conditionalExactArgsValidator(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		templateName := args[0]
 		source := args[1]
@@ -1081,7 +1081,7 @@ var snippetsSearchCmd = &cobra.Command{
 	Use:   "search <query>",
 	Short: "Search snippets by name or tag",
 	Long:  "Search saved configuration snippets by name, description, or tags.",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  conditionalArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		query := strings.Join(args, " ")
 
@@ -1133,7 +1133,7 @@ Examples:
   nixai snippets add my-nvidia-config --file /etc/nixos/nvidia.nix
   nixai snippets add gaming-setup --file ./gaming.nix --tags gaming,performance
   echo "services.nginx.enable = true;" | nixai snippets add nginx-basic`,
-	Args: cobra.ExactArgs(1),
+	Args: conditionalExactArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		snippetName := args[0]
 		file, _ := cmd.Flags().GetString("file")
@@ -1176,7 +1176,7 @@ var snippetsApplyCmd = &cobra.Command{
 	Use:   "apply <name>",
 	Short: "Apply snippet to configuration",
 	Long:  "Apply a saved snippet to the current configuration or output it to a file.",
-	Args:  cobra.ExactArgs(1),
+	Args:  conditionalExactArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		snippetName := args[0]
 		output, _ := cmd.Flags().GetString("output")
@@ -1210,7 +1210,7 @@ var snippetsShowCmd = &cobra.Command{
 	Use:   "show <name>",
 	Short: "Show snippet content",
 	Long:  "Display the content and metadata of a saved snippet.",
-	Args:  cobra.ExactArgs(1),
+	Args:  conditionalExactArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		snippetName := args[0]
 
@@ -1254,7 +1254,7 @@ var snippetsRemoveCmd = &cobra.Command{
 	Use:   "remove <name>",
 	Short: "Remove saved snippet",
 	Long:  "Delete a saved configuration snippet.",
-	Args:  cobra.ExactArgs(1),
+	Args:  conditionalExactArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		snippetName := args[0]
 

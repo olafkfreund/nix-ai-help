@@ -40,7 +40,21 @@ Usage:
   nixai [command]`,
 	SilenceUsage: true,
 	Version:      version.Get().Version,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Check for global TUI flag and handle it for any command except interactive
+		if globalTUI && cmd.Name() != "interactive" {
+			// For non-interactive commands, launch TUI with the command pre-selected
+			return LaunchTUIMode(cmd, append([]string{cmd.Name()}, args...))
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Check for global TUI flag first
+		if globalTUI {
+			// If TUI mode is requested, launch the TUI with any provided args
+			return LaunchTUIMode(cmd, args)
+		}
+
 		if askQuestion != "" {
 			fmt.Println(utils.FormatHeader("🤖 AI Answer to your question:"))
 
@@ -139,6 +153,7 @@ var daemonMode bool
 var agentRole string
 var agentType string
 var contextFile string
+var globalTUI bool
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&askQuestion, "ask", "a", "", "Ask a question about NixOS configuration")
@@ -146,6 +161,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&agentRole, "role", "", "Specify the agent role (diagnoser, explainer, ask, build, etc.)")
 	rootCmd.PersistentFlags().StringVar(&agentType, "agent", "", "Specify the agent type (ollama, openai, gemini, etc.)")
 	rootCmd.PersistentFlags().StringVar(&contextFile, "context-file", "", "Path to a file containing context information (JSON or text)")
+	rootCmd.PersistentFlags().BoolVar(&globalTUI, "tui", false, "Launch TUI mode for any command")
 	mcpServerCmd.Flags().BoolVarP(&daemonMode, "daemon", "d", false, "Run MCP server in background/daemon mode")
 }
 
@@ -421,7 +437,7 @@ func buildExamplesOnlyPrompt(option, documentation, format, source, version stri
 var searchCmd = &cobra.Command{
 	Use:   "search [package]",
 	Short: "Search for NixOS packages/services and get config/AI tips",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  conditionalArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		query := strings.Join(args, " ")
 		cfg, err := config.LoadUserConfig()
@@ -513,7 +529,7 @@ var searchCmd = &cobra.Command{
 var explainHomeOptionCmd = &cobra.Command{
 	Use:   "explain-home-option <option>",
 	Short: "Explain a Home Manager option using AI and documentation",
-	Args:  cobra.ExactArgs(1),
+	Args:  conditionalExactArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		option := args[0]
 		fmt.Println(utils.FormatHeader("🏠 Home Manager Option: " + option))
@@ -595,7 +611,7 @@ func NewExplainOptionCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "explain-option <option>",
 		Short: "Explain a NixOS option using AI and documentation",
-		Args:  cobra.ExactArgs(1),
+		Args:  conditionalExactArgsValidator(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			option := args[0]
 			format, _ := cmd.Flags().GetString("format")
@@ -670,29 +686,29 @@ var interactiveCmd = &cobra.Command{
 	Long: `Start an interactive shell for NixOS troubleshooting, package search, option explanation, and more.
 
 Features:
-- Live MCP-powered option completion
-- Animated snowflake progress indicator
-- Multi-line input, contextual help, and advanced autocomplete
+- Modern TUI interface with two-panel layout
+- Live command search and filtering
+- Parameter input for commands that need it
+- Real-time command execution
 - All advanced features available in non-interactive mode
-- Modern TUI interface with --tui flag
 
 Examples:
-  nixai interactive              # Start classic interactive mode
-  nixai interactive --tui        # Start modern TUI interface
+  nixai interactive              # Start modern TUI interface (default)
+  nixai interactive --classic    # Start classic interactive mode
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		useTUI, _ := cmd.Flags().GetBool("tui")
-		if useTUI {
-			InteractiveModeTUI()
-		} else {
+		useClassic, _ := cmd.Flags().GetBool("classic")
+		if useClassic {
 			InteractiveMode()
+		} else {
+			InteractiveModeTUI()
 		}
 	},
 }
 
 func init() {
-	// Add the --tui flag to the interactive command
-	interactiveCmd.Flags().Bool("tui", false, "Launch modern TUI interface instead of classic interactive mode")
+	// Add the --classic flag to the interactive command (TUI is now default)
+	interactiveCmd.Flags().Bool("classic", false, "Launch classic interactive mode instead of modern TUI")
 }
 
 // Flake management command implementation
@@ -824,6 +840,58 @@ Examples:
 	},
 }
 
+// conditionalArgsValidator returns a validator that checks if TUI mode is requested
+// and bypasses argument validation if so
+func conditionalArgsValidator(minArgs int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		// If TUI mode is requested, don't validate args
+		if globalTUI {
+			return nil
+		}
+		// Otherwise, apply the minimum args validation
+		return cobra.MinimumNArgs(minArgs)(cmd, args)
+	}
+}
+
+// conditionalExactArgsValidator returns a validator that checks if TUI mode is requested
+// and bypasses exact argument validation if so
+func conditionalExactArgsValidator(exactArgs int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		// If TUI mode is requested, don't validate args
+		if globalTUI {
+			return nil
+		}
+		// Otherwise, apply the exact args validation
+		return cobra.ExactArgs(exactArgs)(cmd, args)
+	}
+}
+
+// conditionalRangeArgsValidator returns a validator that checks if TUI mode is requested
+// and bypasses range argument validation if so
+func conditionalRangeArgsValidator(min, max int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		// If TUI mode is requested, don't validate args
+		if globalTUI {
+			return nil
+		}
+		// Otherwise, apply the range args validation
+		return cobra.RangeArgs(min, max)(cmd, args)
+	}
+}
+
+// conditionalMaximumArgsValidator returns a validator that checks if TUI mode is requested
+// and bypasses maximum argument validation if so
+func conditionalMaximumArgsValidator(maxArgs int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		// If TUI mode is requested, don't validate args
+		if globalTUI {
+			return nil
+		}
+		// Otherwise, apply the maximum args validation
+		return cobra.MaximumNArgs(maxArgs)(cmd, args)
+	}
+}
+
 // Stub commands for missing top-level commands
 var askCmd = &cobra.Command{
 	Use:   "ask [question]",
@@ -833,7 +901,7 @@ var askCmd = &cobra.Command{
 Examples:
   nixai ask "How do I configure nginx?"
   nixai ask "What is the difference between services.openssh.enable and programs.ssh.enable?"`,
-	Args: cobra.MinimumNArgs(1),
+	Args: conditionalArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		question := strings.Join(args, " ")
 		fmt.Println(utils.FormatHeader("🤖 AI Answer to your question:"))
@@ -1036,7 +1104,7 @@ Examples:
   nixai diagnose /var/log/messages
   journalctl -xe | nixai diagnose
 `,
-	Args: cobra.MaximumNArgs(1),
+	Args: conditionalMaximumArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(utils.FormatHeader("🩺 NixOS Diagnostics"))
 		fmt.Println()
@@ -1194,7 +1262,7 @@ Examples:
   nixai completion bash > /etc/bash_completion.d/nixai
   nixai completion zsh > ~/.zshrc
 `,
-	Args: cobra.ExactArgs(1),
+	Args: conditionalExactArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		switch args[0] {
 		case "bash":

@@ -31,7 +31,7 @@ Examples:
   nixai community search "docker configuration"
   nixai community search "kde plasma"
   nixai community search "server nginx"`,
-	Args: cobra.MinimumNArgs(1),
+	Args: conditionalArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		query := strings.Join(args, " ")
 		limit, _ := cmd.Flags().GetInt("limit")
@@ -58,7 +58,7 @@ Examples:
   nixai community share ./configuration.nix
   nixai community share ./flake.nix --description "Gaming setup with Steam"
   nixai community share ./home.nix --category desktop --tags gaming,multimedia`,
-	Args: cobra.ExactArgs(1),
+	Args: conditionalExactArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		configFile := args[0]
 		description, _ := cmd.Flags().GetString("description")
@@ -93,7 +93,7 @@ Examples:
   nixai community validate ./configuration.nix
   nixai community validate ./flake.nix --detailed
   nixai community validate ./home.nix --fix-suggestions`,
-	Args: cobra.ExactArgs(1),
+	Args: conditionalExactArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		configFile := args[0]
 		detailed, _ := cmd.Flags().GetBool("detailed")
@@ -160,7 +160,7 @@ Examples:
   nixai community rate "gaming-setup-v2" 5 --comment "Excellent configuration, works perfectly"
   nixai community rate "server-config" 4 --comment "Good but needs better documentation"
   nixai community rate "kde-plasma-setup" 3`,
-	Args: cobra.ExactArgs(2),
+	Args: conditionalExactArgsValidator(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		configName := args[0]
 		ratingStr := args[1]
