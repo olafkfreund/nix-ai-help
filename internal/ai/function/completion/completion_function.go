@@ -103,6 +103,65 @@ func NewCompletionFunction() *CompletionFunction {
 	return completionFunc
 }
 
+// ValidateParameters validates the function parameters
+func (f *CompletionFunction) ValidateParameters(params map[string]interface{}) error {
+	// Validate required parameters
+	if _, ok := params["context"]; !ok {
+		return fmt.Errorf("required parameter 'context' is missing")
+	}
+
+	// Validate completion_type if provided
+	if completionType, ok := params["completion_type"]; ok {
+		if str, ok := completionType.(string); ok {
+			validTypes := []string{"shell", "nix", "nixos", "packages", "options", "flakes"}
+			valid := false
+			for _, validType := range validTypes {
+				if str == validType {
+					valid = true
+					break
+				}
+			}
+			if !valid {
+				return fmt.Errorf("invalid completion_type '%s', must be one of: %s", str, strings.Join(validTypes, ", "))
+			}
+		}
+	}
+
+	// Validate position (must not be negative)
+	if position, ok := params["position"]; ok {
+		var pos float64
+		switch v := position.(type) {
+		case float64:
+			pos = v
+		case int:
+			pos = float64(v)
+		default:
+			return fmt.Errorf("position must be a number, got %T", position)
+		}
+		if pos < 0 {
+			return fmt.Errorf("position cannot be negative, got %v", pos)
+		}
+	}
+
+	// Validate max_results (must not be negative)
+	if maxResults, ok := params["max_results"]; ok {
+		var max float64
+		switch v := maxResults.(type) {
+		case float64:
+			max = v
+		case int:
+			max = float64(v)
+		default:
+			return fmt.Errorf("max_results must be a number, got %T", maxResults)
+		}
+		if max < 0 {
+			return fmt.Errorf("max_results cannot be negative, got %v", max)
+		}
+	}
+
+	return nil
+}
+
 // Execute implements the FunctionInterface
 func (f *CompletionFunction) Execute(ctx context.Context, params map[string]interface{}, options *functionbase.FunctionOptions) (*functionbase.FunctionResult, error) {
 	startTime := time.Now()
@@ -171,12 +230,20 @@ func (f *CompletionFunction) parseRequest(params map[string]interface{}) (*Compl
 		req.Shell = shell
 	}
 
-	if position, ok := params["position"].(float64); ok {
-		req.Position = int(position)
+	if position, ok := params["position"]; ok {
+		if pos, ok := position.(float64); ok {
+			req.Position = int(pos)
+		} else if pos, ok := position.(int); ok {
+			req.Position = pos
+		}
 	}
 
-	if maxResults, ok := params["max_results"].(float64); ok {
-		req.MaxResults = int(maxResults)
+	if maxResults, ok := params["max_results"]; ok {
+		if max, ok := maxResults.(float64); ok {
+			req.MaxResults = int(max)
+		} else if max, ok := maxResults.(int); ok {
+			req.MaxResults = max
+		}
 	} else {
 		req.MaxResults = 10 // default
 	}

@@ -136,7 +136,16 @@ func (cf *CommunityFunction) ValidateParameters(params map[string]interface{}) e
 	}
 
 	// Validate limit if provided
-	if limit, ok := params["limit"].(float64); ok {
+	if limitVal, ok := params["limit"]; ok {
+		var limit float64
+		switch v := limitVal.(type) {
+		case float64:
+			limit = v
+		case int:
+			limit = float64(v)
+		default:
+			return fmt.Errorf("limit must be a number, got %T", limitVal)
+		}
 		if limit < 1 || limit > 50 {
 			return fmt.Errorf("limit must be between 1 and 50, got %.0f", limit)
 		}
@@ -340,6 +349,23 @@ func (cf *CommunityFunction) searchCommunityResources(request *CommunityRequest)
 			})
 		}
 
+		if strings.Contains(query, "flake") {
+			results = append(results, CommunityResource{
+				Type:        "tutorials",
+				Title:       "Nix Flakes Tutorial",
+				URL:         "https://nixos.wiki/wiki/Flakes",
+				Description: "Comprehensive tutorial on using Nix flakes for reproducible development",
+				Author:      "nix-community",
+				Tags:        []string{"flakes", "tutorial", "reproducible"},
+				Difficulty:  "intermediate",
+				Votes:       95,
+				Metadata: map[string]string{
+					"duration": "3 hours",
+					"updated":  "2024-02-10",
+				},
+			})
+		}
+
 		if strings.Contains(query, "docker") || strings.Contains(query, "container") {
 			results = append(results, CommunityResource{
 				Type:        "tutorials",
@@ -483,7 +509,23 @@ func (cf *CommunityFunction) findRelatedTags(query string, existingTags []string
 
 	// Find related tags based on query content
 	for key, tags := range tagMap {
-		if strings.Contains(query, key) {
+		// Check for exact match or word-based match (e.g., "home manager" matches "home-manager")
+		keyWords := strings.Split(strings.ReplaceAll(key, "-", " "), " ")
+		keyMatches := strings.Contains(query, key)
+
+		// Also check if all words of the key are present in the query
+		if !keyMatches && len(keyWords) > 1 {
+			allWordsPresent := true
+			for _, word := range keyWords {
+				if !strings.Contains(query, word) {
+					allWordsPresent = false
+					break
+				}
+			}
+			keyMatches = allWordsPresent
+		}
+
+		if keyMatches {
 			for _, tag := range tags {
 				if !contains(existingTags, tag) && !contains(relatedTags, tag) {
 					relatedTags = append(relatedTags, tag)

@@ -329,6 +329,7 @@ func (f *TemplatesFunction) handleList(ctx context.Context, params map[string]in
 
 	return map[string]interface{}{
 		"type":            "template_list",
+		"templates":       filteredTemplates,
 		"results":         results,
 		"recommendations": recommendations,
 		"next_steps": []string{
@@ -580,6 +581,7 @@ func (f *TemplatesFunction) handleCreate(ctx context.Context, params map[string]
 
 	return map[string]interface{}{
 		"type":            "project_creation",
+		"project":         creationResult,
 		"results":         creationResult,
 		"recommendations": recommendations,
 		"next_steps":      nextSteps,
@@ -588,9 +590,17 @@ func (f *TemplatesFunction) handleCreate(ctx context.Context, params map[string]
 
 // handleInit handles template initialization in current directory
 func (f *TemplatesFunction) handleInit(ctx context.Context, params map[string]interface{}) (map[string]interface{}, error) {
-	templateName, ok := params["template_name"].(string)
-	if !ok || templateName == "" {
-		return nil, fmt.Errorf("template_name parameter is required")
+	templateName, hasName := params["template_name"].(string)
+	templateUrl, hasUrl := params["template_url"].(string)
+
+	if (!hasName || templateName == "") && (!hasUrl || templateUrl == "") {
+		return nil, fmt.Errorf("template_name or template_url parameter is required")
+	}
+
+	// Use template_name if provided, otherwise extract from template_url
+	if templateName == "" && templateUrl != "" {
+		// Extract template name from URL (simplified)
+		templateName = "template-from-url"
 	}
 
 	variables, _ := params["variables"].(map[string]interface{})
@@ -627,6 +637,7 @@ func (f *TemplatesFunction) handleInit(ctx context.Context, params map[string]in
 
 	return map[string]interface{}{
 		"type":            "template_init",
+		"initialization":  initResult,
 		"results":         initResult,
 		"recommendations": recommendations,
 		"next_steps": []string{
@@ -678,7 +689,8 @@ func (f *TemplatesFunction) handleAdd(ctx context.Context, params map[string]int
 	}
 
 	return map[string]interface{}{
-		"type":            "template_add",
+		"type":            "template_addition",
+		"added_template":  addResult,
 		"results":         addResult,
 		"recommendations": recommendations,
 		"next_steps": []string{
@@ -725,9 +737,10 @@ func (f *TemplatesFunction) handleRemove(ctx context.Context, params map[string]
 	}
 
 	return map[string]interface{}{
-		"type":            "template_remove",
-		"results":         removeResult,
-		"recommendations": recommendations,
+		"type":             "template_removal",
+		"removed_template": removeResult,
+		"results":          removeResult,
+		"recommendations":  recommendations,
 		"next_steps": []string{
 			"Verify template is no longer listed",
 			"Update documentation if needed",
@@ -775,6 +788,7 @@ func (f *TemplatesFunction) handleUpdate(ctx context.Context, params map[string]
 
 	return map[string]interface{}{
 		"type":            "template_update",
+		"update_info":     updateResult,
 		"results":         updateResult,
 		"recommendations": recommendations,
 		"next_steps": []string{
@@ -827,6 +841,7 @@ func (f *TemplatesFunction) handleValidate(ctx context.Context, params map[strin
 
 	return map[string]interface{}{
 		"type":            "template_validation",
+		"validation":      validationResult,
 		"results":         validationResult,
 		"recommendations": recommendations,
 		"next_steps": []string{
@@ -887,6 +902,7 @@ func (f *TemplatesFunction) handleCustomize(ctx context.Context, params map[stri
 
 	return map[string]interface{}{
 		"type":            "template_customization",
+		"customization":   customizationResult,
 		"results":         customizationResult,
 		"recommendations": recommendations,
 		"next_steps": []string{
@@ -967,6 +983,7 @@ clap = { version = "4.0", features = ["derive"] }`,
 
 	return map[string]interface{}{
 		"type":            "template_preview",
+		"preview":         previewResult,
 		"results":         previewResult,
 		"recommendations": recommendations,
 		"next_steps": []string{
@@ -1031,6 +1048,7 @@ func (f *TemplatesFunction) handleExport(ctx context.Context, params map[string]
 
 	return map[string]interface{}{
 		"type":            "template_export",
+		"export_info":     exportResult,
 		"results":         exportResult,
 		"recommendations": recommendations,
 		"next_steps": []string{
@@ -1083,6 +1101,7 @@ func (f *TemplatesFunction) handleImport(ctx context.Context, params map[string]
 
 	return map[string]interface{}{
 		"type":            "template_import",
+		"import_info":     importResult,
 		"results":         importResult,
 		"recommendations": recommendations,
 		"next_steps": []string{
@@ -1135,7 +1154,8 @@ func (f *TemplatesFunction) handleRegistry(ctx context.Context, params map[strin
 	}
 
 	return map[string]interface{}{
-		"type":            "registry_management",
+		"type":            "template_registry",
+		"registry":        registryResult,
 		"results":         registryResult,
 		"recommendations": recommendations,
 		"next_steps": []string{

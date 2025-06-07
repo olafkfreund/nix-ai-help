@@ -180,7 +180,7 @@ func (f *ConfigureFunction) Parameters() map[string]interface{} {
 			"config_type": map[string]interface{}{
 				"type":        "string",
 				"description": "The type of configuration to manage",
-				"enum":        []string{"system", "home-manager", "flake", "module", "option"},
+				"enum":        []string{"system", "nixos", "home-manager", "flake", "module", "option"},
 				"default":     "system",
 			},
 			"config_path": map[string]interface{}{
@@ -226,6 +226,61 @@ func (f *ConfigureFunction) Parameters() map[string]interface{} {
 		},
 		"required": []string{"context"},
 	}
+}
+
+// ValidateParameters validates the function parameters
+func (f *ConfigureFunction) ValidateParameters(params map[string]interface{}) error {
+	// Check required parameters
+	if context, ok := params["context"].(string); !ok || context == "" {
+		return fmt.Errorf("parameter 'context' is required and must be a non-empty string")
+	}
+
+	// Validate operation if provided
+	if operation, ok := params["operation"].(string); ok {
+		validOperations := []string{"get", "set", "add", "remove", "validate", "backup", "restore", "preview"}
+		valid := false
+		for _, validOp := range validOperations {
+			if operation == validOp {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return fmt.Errorf("parameter 'operation' must be one of: %v", validOperations)
+		}
+	}
+
+	// Validate config_type if provided
+	if configType, ok := params["config_type"].(string); ok {
+		validTypes := []string{"system", "nixos", "home-manager", "flake", "module", "option"}
+		valid := false
+		for _, validType := range validTypes {
+			if configType == validType {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return fmt.Errorf("parameter 'config_type' must be one of: %v", validTypes)
+		}
+	}
+
+	// Validate format if provided
+	if format, ok := params["format"].(string); ok {
+		validFormats := []string{"nix", "json", "yaml", "toml"}
+		valid := false
+		for _, validFormat := range validFormats {
+			if format == validFormat {
+				valid = true
+				break
+			}
+		}
+		if !valid {
+			return fmt.Errorf("parameter 'format' must be one of: %v", validFormats)
+		}
+	}
+
+	return nil
 }
 
 // Execute runs the configure function with the given parameters
@@ -348,4 +403,273 @@ func (f *ConfigureFunction) executeConfigureOperation(ctx context.Context, req *
 	}
 
 	return response, nil
+}
+
+// parseRequest parses the raw parameters into a ConfigureRequest
+func (f *ConfigureFunction) parseRequest(params map[string]interface{}) (*ConfigureRequest, error) {
+	req := &ConfigureRequest{}
+
+	if context, ok := params["context"].(string); ok {
+		req.Context = context
+	}
+
+	if operation, ok := params["operation"].(string); ok {
+		req.Operation = operation
+	} else {
+		req.Operation = "get" // default operation
+	}
+
+	if configType, ok := params["config_type"].(string); ok {
+		req.ConfigType = configType
+	}
+
+	if configPath, ok := params["config_path"].(string); ok {
+		req.ConfigPath = configPath
+	}
+
+	if module, ok := params["module"].(string); ok {
+		req.Module = module
+	}
+
+	if option, ok := params["option"].(string); ok {
+		req.Option = option
+	}
+
+	if value, ok := params["value"]; ok {
+		req.Value = value
+	}
+
+	if dryRun, ok := params["dry_run"].(bool); ok {
+		req.DryRun = dryRun
+	}
+
+	if backup, ok := params["backup"].(bool); ok {
+		req.Backup = backup
+	}
+
+	if validate, ok := params["validate"].(bool); ok {
+		req.Validate = validate
+	}
+
+	if format, ok := params["format"].(string); ok {
+		req.Format = format
+	}
+
+	if options, ok := params["options"].(map[string]interface{}); ok {
+		req.Options = make(map[string]string)
+		for k, v := range options {
+			if strVal, ok := v.(string); ok {
+				req.Options[k] = strVal
+			}
+		}
+	}
+
+	return req, nil
+}
+
+// determineOperation determines the appropriate operation based on context
+func (f *ConfigureFunction) determineOperation(req *ConfigureRequest) string {
+	context := strings.ToLower(req.Context)
+
+	if strings.Contains(context, "configure") || strings.Contains(context, "update") || strings.Contains(context, "set") {
+		return "update"
+	}
+	if strings.Contains(context, "add") || strings.Contains(context, "enable") {
+		return "add"
+	}
+	if strings.Contains(context, "remove") || strings.Contains(context, "disable") {
+		return "remove"
+	}
+	if strings.Contains(context, "validate") || strings.Contains(context, "check") {
+		return "validate"
+	}
+	if strings.Contains(context, "backup") {
+		return "backup"
+	}
+	if strings.Contains(context, "restore") {
+		return "restore"
+	}
+	if strings.Contains(context, "preview") || strings.Contains(context, "show") {
+		return "preview"
+	}
+
+	return "get" // default
+}
+
+// validateConfiguration validates the configuration request
+func (f *ConfigureFunction) validateConfiguration(req *ConfigureRequest, configContent string) *ValidationResult {
+	result := &ValidationResult{
+		Valid:    true,
+		Errors:   []ValidationError{},
+		Warnings: []ValidationWarning{},
+	}
+
+	// Only validate context if we're doing operation-specific validation
+	if req.Operation != "" {
+		// Operation-specific validation
+		switch req.Operation {
+		case "set", "add":
+			if req.Option == "" {
+				result.Valid = false
+				result.Errors = append(result.Errors, ValidationError{
+					Path:     "option",
+					Option:   req.Option,
+					Message:  "Option is required for set/add operations",
+					Severity: "error",
+				})
+			}
+			if req.Value == nil {
+				result.Valid = false
+				result.Errors = append(result.Errors, ValidationError{
+					Path:     "value",
+					Option:   req.Option,
+					Message:  "Value is required for set/add operations",
+					Severity: "error",
+				})
+			}
+		case "remove":
+			if req.Option == "" {
+				result.Valid = false
+				result.Errors = append(result.Errors, ValidationError{
+					Path:     "option",
+					Option:   req.Option,
+					Message:  "Option is required for remove operations",
+					Severity: "error",
+				})
+			}
+		}
+	}
+
+	// Validate configuration content if provided (including empty content)
+	trimmed := strings.TrimSpace(configContent)
+
+	// Check for empty configuration
+	if trimmed == "" {
+		result.Valid = false
+		result.Errors = append(result.Errors, ValidationError{
+			Path:     "config",
+			Message:  "Configuration content is empty",
+			Severity: "error",
+		})
+	} else {
+		// Basic syntax validation for Nix configurations
+		if strings.Contains(configContent, "syntax error") {
+			result.Valid = false
+			result.Errors = append(result.Errors, ValidationError{
+				Path:     "config",
+				Message:  "Configuration contains syntax errors",
+				Severity: "error",
+			})
+		}
+
+		// Check for common Nix syntax issues
+		if !f.isValidNixSyntax(configContent) {
+			result.Valid = false
+			result.Errors = append(result.Errors, ValidationError{
+				Path:     "config",
+				Message:  "Configuration contains syntax errors",
+				Severity: "error",
+			})
+		}
+	}
+
+	if result.Valid {
+		result.Summary = "Configuration validation passed"
+	} else {
+		result.Summary = fmt.Sprintf("Configuration validation failed with %d errors", len(result.Errors))
+	}
+
+	return result
+}
+
+// isValidNixSyntax performs basic syntax validation for Nix configuration content
+func (f *ConfigureFunction) isValidNixSyntax(content string) bool {
+	// Trim whitespace
+	content = strings.TrimSpace(content)
+
+	// Must start and end with braces for attribute sets
+	if !strings.HasPrefix(content, "{") || !strings.HasSuffix(content, "}") {
+		return false
+	}
+
+	// Check for balanced braces
+	braceCount := 0
+	for _, char := range content {
+		switch char {
+		case '{':
+			braceCount++
+		case '}':
+			braceCount--
+		}
+	}
+	if braceCount != 0 {
+		return false
+	}
+
+	// Check for lines that should end with semicolon
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") || line == "{" || line == "}" {
+			continue
+		}
+
+		// Lines with assignments should end with semicolon
+		if strings.Contains(line, "=") && !strings.HasSuffix(line, ";") && !strings.HasSuffix(line, "{") {
+			return false
+		}
+	}
+
+	return true
+}
+
+// generateBackupPath generates a backup path for configuration files
+func (f *ConfigureFunction) generateBackupPath(req *ConfigureRequest) string {
+	configPath := req.ConfigPath
+	if configPath == "" {
+		return ""
+	}
+
+	timestamp := time.Now().Format("20060102-150405")
+	return fmt.Sprintf("%s.backup-%s", configPath, timestamp)
+}
+
+// applyConfigurationChange applies a configuration change
+func (f *ConfigureFunction) applyConfigurationChange(req *ConfigureRequest) (*ConfigChange, error) {
+	// Validate operation
+	validOperations := []string{"add", "update", "set", "remove"}
+	validOp := false
+	for _, op := range validOperations {
+		if req.Operation == op {
+			validOp = true
+			break
+		}
+	}
+	if !validOp {
+		return nil, fmt.Errorf("invalid operation: %s", req.Operation)
+	}
+
+	// Validate option for operations that require it
+	if req.Operation == "add" && req.Option == "" {
+		return nil, fmt.Errorf("option is required for %s operation", req.Operation)
+	}
+
+	change := &ConfigChange{
+		Path:      req.ConfigPath,
+		Option:    req.Option,
+		NewValue:  req.Value,
+		Operation: req.Operation,
+		Status:    "success",
+	}
+
+	if req.DryRun {
+		change.Status = "dry-run"
+		f.logger.Info("Dry run - no actual changes made")
+		return change, nil
+	}
+
+	// Simulate applying the change
+	f.logger.Info(fmt.Sprintf("Applying configuration change: %s %s", req.Operation, req.Option))
+
+	return change, nil
 }

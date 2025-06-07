@@ -305,15 +305,15 @@ func (bf *BuildFunction) parseAgentResponse(response string, req *BuildRequest) 
 			continue
 		}
 
-		// Detect sections
-		if strings.Contains(strings.ToLower(line), "command") || strings.Contains(strings.ToLower(line), "run") {
+		// Detect sections - check more specific patterns first
+		if strings.Contains(strings.ToLower(line), "optim") || strings.Contains(strings.ToLower(line), "performance") {
+			currentSection = "optimization"
+			continue
+		} else if strings.Contains(strings.ToLower(line), "command") || strings.Contains(strings.ToLower(line), "run") {
 			currentSection = "commands"
 			continue
 		} else if strings.Contains(strings.ToLower(line), "tip") || strings.Contains(strings.ToLower(line), "suggestion") {
 			currentSection = "tips"
-			continue
-		} else if strings.Contains(strings.ToLower(line), "optim") || strings.Contains(strings.ToLower(line), "performance") {
-			currentSection = "optimization"
 			continue
 		} else if strings.Contains(strings.ToLower(line), "doc") || strings.Contains(strings.ToLower(line), "reference") {
 			currentSection = "docs"

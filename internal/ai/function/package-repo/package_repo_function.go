@@ -296,22 +296,37 @@ func (prf *PackageRepoFunction) detectLanguageFromURL(repoURL string) string {
 	repoName := strings.ToLower(filepath.Base(repoURL))
 	repoName = strings.TrimSuffix(repoName, ".git")
 
+	// Check for specific patterns first (more specific patterns should come first)
 	languagePatterns := map[string][]string{
-		"python":  {"python", "py", "flask", "django", "fastapi"},
-		"rust":    {"rust", "rs", "cargo"},
-		"go":      {"go", "golang"},
-		"node":    {"node", "js", "npm", "yarn", "react", "vue", "angular"},
+		"python":  {"python", "py-", "flask", "django", "fastapi"},
+		"rust":    {"rust", "cargo"},
+		"go":      {"golang", "-go", "go-"},
+		"node":    {"node", "npm", "yarn", "react", "vue", "angular", "express", "next"},
 		"java":    {"java", "spring", "maven", "gradle"},
 		"cpp":     {"cpp", "c++", "cmake"},
-		"c":       {"c", "make"},
-		"haskell": {"haskell", "hs", "cabal", "stack"},
+		"haskell": {"haskell", "hs-", "cabal", "stack"},
 	}
 
+	// First, check for longer patterns to avoid false matches
 	for lang, patterns := range languagePatterns {
 		for _, pattern := range patterns {
 			if strings.Contains(repoName, pattern) {
 				return lang
 			}
+		}
+	}
+
+	// Special case: check for single-letter languages only if they are standalone words
+	words := strings.FieldsFunc(repoName, func(r rune) bool {
+		return r == '-' || r == '_' || r == '.'
+	})
+
+	for _, word := range words {
+		if word == "c" {
+			return "c"
+		}
+		if word == "go" {
+			return "go"
 		}
 	}
 

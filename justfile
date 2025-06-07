@@ -135,6 +135,32 @@ test-specific TEST:
 	@echo "Running specific test: {{TEST}}"
 	go test -run {{TEST}} ./...
 
+# Test AI function packages
+test-functions:
+	@echo "Running AI function package tests..."
+	go test -v ./internal/ai/function/...
+
+# Test specific function package
+test-function FUNC:
+	@echo "Running tests for function: {{FUNC}}"
+	go test -v ./internal/ai/function/{{FUNC}}/...
+
+# Show status of all function tests (summary)
+test-functions-status:
+	#!/bin/bash
+	echo "Checking status of all AI function packages..."
+	echo "=========================================="
+	for pkg in ./internal/ai/function/*/; do
+		name=$(basename "$pkg")
+		printf "Testing %s: " "$name"
+		if go test "$pkg" >/dev/null 2>&1; then
+			echo "✅ PASS"
+		else
+			echo "❌ FAIL"
+		fi
+	done
+	echo "=========================================="
+
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
@@ -311,6 +337,9 @@ help:
 	@echo "  test-mcp      - Run only MCP tests"
 	@echo "  test-vscode   - Run only VS Code integration tests"
 	@echo "  test-providers - Run only AI provider tests"
+	@echo "  test-functions - Run AI function package tests"
+	@echo "  test-function - Run tests for specific function package"
+	@echo "  test-functions-status - Show status summary of all function tests"
 	@echo "  test-coverage - Run tests with coverage"
 	@echo "  test-race     - Run tests with race detection"
 	@echo "  test-bench    - Run benchmark tests"
