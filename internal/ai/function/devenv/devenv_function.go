@@ -121,7 +121,7 @@ type CommandInstruction struct {
 }
 
 // NewDevenvFunction creates a new DevenvFunction instance
-func NewDevenvFunction(agent *agent.DevenvAgent, logger *logger.Logger) *DevenvFunction {
+func NewDevenvFunction() *DevenvFunction {
 	parameters := []functionbase.FunctionParameter{
 		{
 			Name:        "context",
@@ -139,8 +139,8 @@ func NewDevenvFunction(agent *agent.DevenvAgent, logger *logger.Logger) *DevenvF
 
 	return &DevenvFunction{
 		BaseFunction: functionbase.NewBaseFunction("devenv", "Manage development environments using devenv.sh, nix-shell, and flakes", parameters),
-		agent:        agent,
-		logger:       logger,
+		agent:        agent.NewDevenvAgent(nil),
+		logger:       logger.NewLogger(),
 	}
 }
 

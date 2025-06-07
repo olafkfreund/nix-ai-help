@@ -132,7 +132,7 @@ type Troubleshooting struct {
 }
 
 // NewHelpFunction creates a new help function with agent
-func NewHelpFunction(agent *agent.HelpAgent) *HelpFunction {
+func NewHelpFunction() *HelpFunction {
 	// Define function parameters
 	parameters := []functionbase.FunctionParameter{
 		functionbase.StringParam("query", "Help query or question", true),
@@ -148,7 +148,7 @@ func NewHelpFunction(agent *agent.HelpAgent) *HelpFunction {
 
 	return &HelpFunction{
 		BaseFunction: functionbase.NewBaseFunction("help", "AI-powered help and guidance for NixOS", parameters),
-		agent:        agent,
+		agent:        agent.NewHelpAgent(nil),
 	}
 }
 
@@ -429,4 +429,58 @@ End with a clear recommendation based on the context.`, optionsList, context)
 	}
 
 	return hf.parseHelpResponse(response), nil
+}
+
+// Execute implements the FunctionInterface Execute method
+func (hf *HelpFunction) Execute(ctx context.Context, parameters map[string]interface{}, options *functionbase.FunctionOptions) (*functionbase.FunctionResult, error) {
+	// Parse query from parameters
+	query, ok := parameters["query"].(string)
+	if !ok || query == "" {
+		return &functionbase.FunctionResult{
+			Success: false,
+			Error:   "query parameter is required",
+		}, nil
+	}
+
+	// Parse optional parameters
+	topic, _ := parameters["topic"].(string)
+	level, _ := parameters["level"].(string)
+	format, _ := parameters["format"].(string)
+	showExamples, _ := parameters["show_examples"].(bool)
+	detailed, _ := parameters["detailed"].(bool)
+
+	// Execute based on format or default to general help
+	var response *HelpResponse
+	var err error
+
+	switch format {
+	case "tutorial":
+		response, err = hf.GetTutorials(ctx, topic, level)
+	case "guide":
+		response, err = hf.GetBestPractices(ctx, topic)
+	case "reference":
+		response, err = hf.SearchDocumentation(ctx, query)
+	case "example":
+		response, err = hf.GetExamples(ctx, topic, query)
+	default:
+		if showExamples {
+			response, err = hf.GetExamples(ctx, topic, query)
+		} else if detailed {
+			response, err = hf.ExplainConcept(ctx, query)
+		} else {
+			response, err = hf.GetHelp(ctx, query)
+		}
+	}
+
+	if err != nil {
+		return &functionbase.FunctionResult{
+			Success: false,
+			Error:   fmt.Sprintf("help operation failed: %v", err),
+		}, nil
+	}
+
+	return &functionbase.FunctionResult{
+		Success: true,
+		Data:    response,
+	}, nil
 }

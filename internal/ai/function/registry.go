@@ -10,6 +10,7 @@ import (
 	"nix-ai-help/internal/ai/function/completion"
 	configfunction "nix-ai-help/internal/ai/function/config"
 	"nix-ai-help/internal/ai/function/configure"
+	"nix-ai-help/internal/ai/function/devenv"
 	"nix-ai-help/internal/ai/function/diagnose"
 	"nix-ai-help/internal/ai/function/doctor"
 	explainHomeoption "nix-ai-help/internal/ai/function/explain-home-option"
@@ -17,6 +18,7 @@ import (
 	"nix-ai-help/internal/ai/function/flakes"
 	"nix-ai-help/internal/ai/function/gc"
 	"nix-ai-help/internal/ai/function/hardware"
+	"nix-ai-help/internal/ai/function/help"
 	"nix-ai-help/internal/ai/function/interactive"
 	"nix-ai-help/internal/ai/function/learning"
 	"nix-ai-help/internal/ai/function/logs"
@@ -63,7 +65,7 @@ func registerAllFunctions() {
 		{"completion", completion.NewCompletionFunction()},
 		{"config", configfunction.NewConfigFunction()},
 		{"configure", configure.NewConfigureFunction()},
-		// {"devenv", devenv.NewDevenvFunction()}, // Requires agent and logger
+		{"devenv", devenv.NewDevenvFunction()},
 		{"diagnose", diagnose.NewDiagnoseFunction()},
 		{"doctor", doctor.NewDoctorFunction()},
 		{"explain-home-option", explainHomeoption.NewExplainHomeOptionFunction()},
@@ -71,7 +73,7 @@ func registerAllFunctions() {
 		{"flakes", flakes.NewFlakesFunction()},
 		{"gc", gc.NewGcFunction()},
 		{"hardware", hardware.NewHardwareFunction()},
-		// {"help", help.NewHelpFunction()}, // Requires config and logger
+		{"help", help.NewHelpFunction()},
 		{"interactive", interactive.NewInteractiveFunction()},
 		{"learning", learning.NewLearningFunction()},
 		{"logs", logs.NewLogsFunction()},
