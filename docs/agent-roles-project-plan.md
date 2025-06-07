@@ -1,6 +1,6 @@
 # Project Plan: Agent and Role Abstraction for AI Providers in nixai
 
-## Current Status (Updated 2025-12-20)
+## Current Status (Updated 2025-06-07)
 
 🎉 **ALL MAJOR MILESTONES COMPLETED**: Agent system, MCP integration, learning system, packaging, devenv features, and function calling system are complete!
 
@@ -19,7 +19,9 @@
 - ✅ **Function infrastructure COMPLETE**: FunctionManager and base function interface are working
 - ✅ **Function calling system COMPLETE**: All 29 functions implemented, compiled, and operational
 - ✅ **Function compilation issues RESOLVED**: All compilation errors fixed across all functions
-- 📋 **Next steps**: Complete remaining function testing, CLI integration enhancements
+- ✅ **CLI Agent Integration COMPLETE**: New CLI flags (--role, --agent, --context-file) implemented and tested
+- ✅ **MCP Documentation Integration COMPLETE**: MCP docs are passed to AskAgent context when available
+- 📋 **Next steps**: Complete remaining function testing, advanced function calling features
 
 ## Overview
 
