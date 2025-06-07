@@ -15,6 +15,7 @@ type Agent interface {
 	GenerateResponse(ctx context.Context, prompt string) (string, error)
 	SetRole(role roles.RoleType) error
 	SetContext(contextData interface{})
+	SetProvider(provider ai.Provider)
 }
 
 // BaseAgent provides common functionality for all agents.
@@ -36,6 +37,11 @@ func (a *BaseAgent) SetRole(role roles.RoleType) error {
 // SetContext sets the context data for the agent.
 func (a *BaseAgent) SetContext(contextData interface{}) {
 	a.contextData = contextData
+}
+
+// SetProvider sets the AI provider for the agent.
+func (a *BaseAgent) SetProvider(provider ai.Provider) {
+	a.provider = provider
 }
 
 // validateRole validates that the agent has a proper role set.
