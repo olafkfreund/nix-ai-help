@@ -43,6 +43,10 @@ func NewFlakeAgent(provider ai.Provider) *FlakeAgent {
 
 // Query handles flake-related questions and guidance
 func (a *FlakeAgent) Query(ctx context.Context, question string) (string, error) {
+	if a.provider == nil {
+		return "", fmt.Errorf("AI provider not configured")
+	}
+
 	if err := a.validateRole(); err != nil {
 		return "", err
 	}
@@ -60,6 +64,10 @@ func (a *FlakeAgent) Query(ctx context.Context, question string) (string, error)
 
 // GenerateResponse handles flake-related response generation
 func (a *FlakeAgent) GenerateResponse(ctx context.Context, prompt string) (string, error) {
+	if a.provider == nil {
+		return "", fmt.Errorf("AI provider not configured")
+	}
+
 	if err := a.validateRole(); err != nil {
 		return "", err
 	}
