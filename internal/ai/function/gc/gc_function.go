@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"nix-ai-help/internal/ai/agent"
 	"nix-ai-help/internal/ai/functionbase"
 	"nix-ai-help/pkg/logger"
 )
@@ -13,7 +12,6 @@ import (
 // GcFunction handles Nix garbage collection operations
 type GcFunction struct {
 	*functionbase.BaseFunction
-	agent  *agent.GcAgent
 	logger *logger.Logger
 }
 
@@ -57,30 +55,52 @@ type GcDetail struct {
 
 // NewGcFunction creates a new gc function instance
 func NewGcFunction() *GcFunction {
-	return &GcFunction{
-		BaseFunction: &functionbase.BaseFunction{
-			FuncName:    "gc",
-			FuncDesc:    "Manage Nix store garbage collection and cleanup operations",
-			FuncVersion: "1.0.0",
+	// Define function parameters
+	parameters := []functionbase.FunctionParameter{
+		functionbase.StringParam("context", "The context or reason for the garbage collection operation", true),
+		functionbase.StringParamWithOptions("operation", "The garbage collection operation to perform", false,
+			[]string{"collect", "list", "status", "optimize", "clean", "analyze"}, nil, nil),
+		functionbase.BoolParam("dry_run", "Whether to perform a dry run without actually deleting anything", false),
+		functionbase.StringParam("max_age", "Maximum age of paths to keep (e.g., '30d', '1w', '6h')", false),
+		functionbase.StringParam("max_size", "Maximum store size to maintain (e.g., '10GB', '1TB')", false),
+		functionbase.BoolParam("keep_outputs", "Whether to keep build outputs", false),
+		functionbase.BoolParam("keep_derivations", "Whether to keep derivations", false),
+		functionbase.BoolParam("verbose", "Whether to provide verbose output", false),
+		functionbase.BoolParam("force", "Whether to force garbage collection without confirmation", false),
+		{
+			Name:        "options",
+			Type:        "object",
+			Description: "Additional garbage collection options",
+			Required:    false,
 		},
-		agent:  agent.NewGcAgent(),
-		logger: logger.NewLogger(),
+	}
+
+	// Create base function
+	baseFunc := functionbase.NewBaseFunction(
+		"gc",
+		"Manage Nix store garbage collection and cleanup operations",
+		parameters,
+	)
+
+	return &GcFunction{
+		BaseFunction: baseFunc,
+		logger:       logger.NewLogger(),
 	}
 }
 
 // Name returns the function name
 func (f *GcFunction) Name() string {
-	return f.FuncName
+	return f.BaseFunction.Name()
 }
 
 // Description returns the function description
 func (f *GcFunction) Description() string {
-	return f.FuncDesc
+	return f.BaseFunction.Description()
 }
 
 // Version returns the function version
 func (f *GcFunction) Version() string {
-	return f.FuncVersion
+	return "1.0.0"
 }
 
 // Parameters returns the function parameter schema
@@ -142,45 +162,30 @@ func (f *GcFunction) Parameters() map[string]interface{} {
 
 // Execute runs the gc function with the given parameters
 func (f *GcFunction) Execute(ctx context.Context, params map[string]interface{}, options *functionbase.FunctionOptions) (*functionbase.FunctionResult, error) {
-	startTime := time.Now()
+	start := time.Now()
 
-	// Parse the request
-	var req GcRequest
-	if err := f.ParseParams(params, &req); err != nil {
-		return nil, fmt.Errorf("failed to parse parameters: %w", err)
+	// Validate parameters
+	if err := f.ValidateParameters(params); err != nil {
+		return functionbase.ErrorResult(fmt.Errorf("parameter validation failed: %w", err), time.Since(start))
 	}
 
-	// Set defaults
-	if req.Operation == "" {
-		req.Operation = "collect"
+	// Parse request
+	req, err := f.parseRequest(params)
+	if err != nil {
+		return functionbase.ErrorResult(fmt.Errorf("failed to parse request: %w", err), time.Since(start))
 	}
 
 	f.logger.Info(fmt.Sprintf("Executing garbage collection operation: %s", req.Operation))
 
-	// Execute the garbage collection operation
-	response, err := f.executeGcOperation(ctx, &req)
+	// Execute garbage collection operation
+	response, err := f.executeGcOperation(ctx, req)
 	if err != nil {
-		return &functionbase.FunctionResult{
-			Success: false,
-			Data: GcResponse{
-				Context:       req.Context,
-				Operation:     req.Operation,
-				Status:        "error",
-				ErrorMessage:  err.Error(),
-				ExecutionTime: time.Since(startTime),
-			},
-			Error:         err,
-			ExecutionTime: time.Since(startTime),
-		}, nil
+		return functionbase.ErrorResult(err, time.Since(start))
 	}
 
-	response.ExecutionTime = time.Since(startTime)
+	response.ExecutionTime = time.Since(start)
 
-	return &functionbase.FunctionResult{
-		Success:       true,
-		Data:          *response,
-		ExecutionTime: time.Since(startTime),
-	}, nil
+	return functionbase.SuccessResult(response, time.Since(start))
 }
 
 // executeGcOperation performs the actual garbage collection operation

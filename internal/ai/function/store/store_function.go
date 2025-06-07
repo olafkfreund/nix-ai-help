@@ -11,7 +11,7 @@ import (
 
 // StoreFunction provides Nix store management and analysis capabilities
 type StoreFunction struct {
-	log logger.Logger
+	log *logger.Logger
 }
 
 // NewStoreFunction creates a new store function

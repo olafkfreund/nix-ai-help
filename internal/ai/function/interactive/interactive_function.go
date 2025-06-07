@@ -35,52 +35,15 @@ func (f *InteractiveFunction) Schema() functionbase.FunctionSchema {
 	return functionbase.FunctionSchema{
 		Name:        f.Name(),
 		Description: f.Description(),
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"operation": map[string]interface{}{
-					"type":        "string",
-					"description": "The interactive operation to perform",
-					"enum": []string{
-						"start",     // Start interactive mode
-						"status",    // Check interactive mode status
-						"execute",   // Execute command in interactive mode
-						"history",   // Show command history
-						"help",      // Show interactive help
-						"commands",  // List available commands
-						"settings",  // Configure interactive settings
-						"shortcuts", // Show keyboard shortcuts
-					},
-				},
-				"command": map[string]interface{}{
-					"type":        "string",
-					"description": "Command to execute (for execute operation)",
-				},
-				"args": map[string]interface{}{
-					"type":        "array",
-					"items":       map[string]interface{}{"type": "string"},
-					"description": "Arguments for the command",
-				},
-				"mode": map[string]interface{}{
-					"type":        "string",
-					"description": "Interactive mode type",
-					"enum":        []string{"shell", "guided", "expert"},
-				},
-				"session_id": map[string]interface{}{
-					"type":        "string",
-					"description": "Session identifier for multi-session support",
-				},
-				"settings": map[string]interface{}{
-					"type":        "object",
-					"description": "Interactive mode settings",
-					"properties": map[string]interface{}{
-						"auto_complete": map[string]interface{}{"type": "boolean"},
-						"show_hints":    map[string]interface{}{"type": "boolean"},
-						"color_output":  map[string]interface{}{"type": "boolean"},
-					},
-				},
-			},
-			"required": []string{"operation"},
+		Parameters: []functionbase.FunctionParameter{
+			functionbase.StringParamWithEnum("operation", "The interactive operation to perform", true, []string{
+				"start", "status", "execute", "history", "help", "commands", "settings", "shortcuts",
+			}),
+			functionbase.StringParam("command", "Command to execute (for execute operation)", false),
+			functionbase.ArrayParam("args", "Arguments for the command", false),
+			functionbase.StringParamWithEnum("mode", "Interactive mode type", false, []string{"shell", "guided", "expert"}),
+			functionbase.StringParam("session_id", "Session identifier for multi-session support", false),
+			functionbase.ObjectParam("settings", "Interactive mode settings", false),
 		},
 	}
 }

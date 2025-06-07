@@ -35,80 +35,25 @@ func (f *SnippetsFunction) Schema() functionbase.FunctionSchema {
 	return functionbase.FunctionSchema{
 		Name:        f.Name(),
 		Description: f.Description(),
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"operation": map[string]interface{}{
-					"type":        "string",
-					"description": "The snippet operation to perform",
-					"enum": []string{
-						"list",     // List available snippets
-						"search",   // Search snippets by keyword
-						"show",     // Show snippet content
-						"add",      // Add new snippet
-						"remove",   // Remove snippet
-						"apply",    // Apply snippet to configuration
-						"edit",     // Edit existing snippet
-						"export",   // Export snippets to file
-						"import",   // Import snippets from file
-						"organize", // Organize snippets by category
-					},
-				},
-				"name": map[string]interface{}{
-					"type":        "string",
-					"description": "Snippet name (for show, remove, apply, edit operations)",
-				},
-				"query": map[string]interface{}{
-					"type":        "string",
-					"description": "Search query or keyword (for search operation)",
-				},
-				"content": map[string]interface{}{
-					"type":        "string",
-					"description": "Snippet content (for add/edit operations)",
-				},
-				"description": map[string]interface{}{
-					"type":        "string",
-					"description": "Snippet description",
-				},
-				"tags": map[string]interface{}{
-					"type":        "array",
-					"items":       map[string]interface{}{"type": "string"},
-					"description": "Tags for categorizing snippets",
-				},
-				"category": map[string]interface{}{
-					"type":        "string",
-					"description": "Snippet category",
-					"enum":        []string{"desktop", "server", "development", "networking", "security", "services", "packages", "hardware", "gaming", "custom"},
-				},
-				"language": map[string]interface{}{
-					"type":        "string",
-					"description": "Configuration language",
-					"enum":        []string{"nix", "yaml", "json", "bash", "other"},
-				},
-				"output_path": map[string]interface{}{
-					"type":        "string",
-					"description": "Output file path (for apply/export operations)",
-				},
-				"source_path": map[string]interface{}{
-					"type":        "string",
-					"description": "Source file path (for import operations)",
-				},
-				"merge": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Merge with existing configuration (for apply operation)",
-				},
-				"filter": map[string]interface{}{
-					"type":        "object",
-					"description": "Filter criteria for listing/searching",
-					"properties": map[string]interface{}{
-						"category": map[string]interface{}{"type": "string"},
-						"tags":     map[string]interface{}{"type": "array", "items": map[string]interface{}{"type": "string"}},
-						"language": map[string]interface{}{"type": "string"},
-						"author":   map[string]interface{}{"type": "string"},
-					},
-				},
-			},
-			"required": []string{"operation"},
+		Parameters: []functionbase.FunctionParameter{
+			functionbase.StringParamWithEnum("operation", "The snippet operation to perform", true, []string{
+				"list", "search", "show", "add", "remove", "apply", "edit", "export", "import", "organize",
+			}),
+			functionbase.StringParam("name", "Snippet name (for show, remove, apply, edit operations)", false),
+			functionbase.StringParam("query", "Search query or keyword (for search operation)", false),
+			functionbase.StringParam("content", "Snippet content (for add/edit operations)", false),
+			functionbase.StringParam("description", "Snippet description", false),
+			functionbase.ArrayParam("tags", "Tags for categorizing snippets", false),
+			functionbase.StringParamWithEnum("category", "Snippet category", false, []string{
+				"desktop", "server", "development", "networking", "security", "services", "packages", "hardware", "gaming", "custom",
+			}),
+			functionbase.StringParamWithEnum("language", "Configuration language", false, []string{
+				"nix", "yaml", "json", "bash", "other",
+			}),
+			functionbase.StringParam("output_path", "Output file path (for apply/export operations)", false),
+			functionbase.StringParam("source_path", "Source file path (for import operations)", false),
+			functionbase.BoolParam("merge", "Merge with existing configuration (for apply operation)", false),
+			functionbase.ObjectParam("filter", "Filter criteria for listing/searching", false),
 		},
 	}
 }

@@ -6,10 +6,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/olafkfreund/nixai/internal/ai/agent"
-	"github.com/olafkfreund/nixai/internal/ai/functionbase"
-	"github.com/olafkfreund/nixai/internal/config"
-	"github.com/olafkfreund/nixai/pkg/logger"
+	"nix-ai-help/internal/ai/agent"
+	"nix-ai-help/internal/ai/functionbase"
+	"nix-ai-help/internal/config"
+	"nix-ai-help/pkg/logger"
 )
 
 // HelpFunction implements AI-powered help and guidance operations for NixOS

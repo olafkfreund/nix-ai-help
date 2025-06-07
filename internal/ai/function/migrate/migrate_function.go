@@ -10,129 +10,40 @@ import (
 
 // MigrateFunction handles NixOS migration operations
 type MigrateFunction struct {
+	*functionbase.BaseFunction
 	logger *logger.Logger
 }
 
 // NewMigrateFunction creates a new migrate function
 func NewMigrateFunction() *MigrateFunction {
+	parameters := []functionbase.FunctionParameter{
+		functionbase.StringParamWithOptions("operation", "Migration operation to perform", true,
+			[]string{"analyze", "to-flakes", "backup", "rollback", "validate", "preview", "home-manager", "generate", "status", "cleanup"}, nil, nil),
+		functionbase.StringParam("source_type", "Source configuration type", false),
+		functionbase.StringParam("target_type", "Target configuration type", false),
+		functionbase.StringParam("config_path", "Path to configuration directory", false),
+		functionbase.StringParam("backup_name", "Name for backup (for backup operation)", false),
+		functionbase.BoolParam("dry_run", "Perform dry run without making changes", false, false),
+		functionbase.BoolParam("interactive", "Enable interactive migration with prompts", false, true),
+		functionbase.BoolParam("preserve_channels", "Keep existing channels during migration", false, false),
+		functionbase.ObjectParam("migration_options", "Advanced migration options", false),
+	}
+
 	return &MigrateFunction{
+		BaseFunction: functionbase.NewBaseFunction(
+			"migrate",
+			"AI-powered NixOS migration assistance for channels to flakes and configuration updates",
+			parameters,
+		),
 		logger: logger.NewLogger(),
 	}
-}
-
-// Name returns the function name
-func (f *MigrateFunction) Name() string {
-	return "migrate"
-}
-
-// Description returns the function description
-func (f *MigrateFunction) Description() string {
-	return "AI-powered NixOS migration assistance for channels to flakes and configuration updates"
-}
-
-// Schema returns the function schema for AI interaction
-func (f *MigrateFunction) Schema() functionbase.FunctionSchema {
-	return functionbase.FunctionSchema{
-		Name:        f.Name(),
-		Description: f.Description(),
-		Parameters: map[string]interface{}{
-			"type": "object",
-			"properties": map[string]interface{}{
-				"operation": map[string]interface{}{
-					"type":        "string",
-					"description": "The migration operation to perform",
-					"enum": []string{
-						"analyze",      // Analyze current setup for migration
-						"to-flakes",    // Migrate from channels to flakes
-						"backup",       // Create configuration backup
-						"rollback",     // Rollback to previous configuration
-						"validate",     // Validate migration readiness
-						"preview",      // Preview migration changes
-						"home-manager", // Migrate Home Manager configuration
-						"generate",     // Generate migration plan
-						"status",       // Check migration status
-						"cleanup",      // Clean up after migration
-					},
-				},
-				"source_type": map[string]interface{}{
-					"type":        "string",
-					"description": "Source configuration type",
-					"enum":        []string{"channels", "legacy", "mixed", "flakes"},
-				},
-				"target_type": map[string]interface{}{
-					"type":        "string",
-					"description": "Target configuration type",
-					"enum":        []string{"flakes", "modern", "unified"},
-				},
-				"config_path": map[string]interface{}{
-					"type":        "string",
-					"description": "Path to configuration directory",
-				},
-				"backup_name": map[string]interface{}{
-					"type":        "string",
-					"description": "Name for backup (for backup operation)",
-				},
-				"dry_run": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Perform dry run without making changes",
-				},
-				"interactive": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Enable interactive migration with prompts",
-				},
-				"preserve_channels": map[string]interface{}{
-					"type":        "boolean",
-					"description": "Keep existing channels during migration",
-				},
-				"migration_options": map[string]interface{}{
-					"type":        "object",
-					"description": "Advanced migration options",
-					"properties": map[string]interface{}{
-						"update_inputs":   map[string]interface{}{"type": "boolean"},
-						"optimize_config": map[string]interface{}{"type": "boolean"},
-						"generate_flake":  map[string]interface{}{"type": "boolean"},
-						"migrate_secrets": map[string]interface{}{"type": "boolean"},
-						"convert_modules": map[string]interface{}{"type": "boolean"},
-					},
-				},
-			},
-			"required": []string{"operation"},
-		},
-	}
-}
-
-// ValidateParameters validates the function parameters
-func (f *MigrateFunction) ValidateParameters(params map[string]interface{}) error {
-	operation, ok := params["operation"]
-	if !ok {
-		return fmt.Errorf("operation parameter is required")
-	}
-
-	if _, ok := operation.(string); !ok {
-		return fmt.Errorf("operation must be a string")
-	}
-
-	validOperations := []string{
-		"analyze", "to-flakes", "backup", "rollback", "validate",
-		"preview", "home-manager", "config-update", "diagnostics",
-		"version", "cleanup",
-	}
-
-	operationStr := operation.(string)
-	for _, valid := range validOperations {
-		if operationStr == valid {
-			return nil
-		}
-	}
-
-	return fmt.Errorf("invalid operation: %s", operationStr)
 }
 
 // Execute performs the migration operation
 func (f *MigrateFunction) Execute(ctx context.Context, params map[string]interface{}, options *functionbase.FunctionOptions) (*functionbase.FunctionResult, error) {
 	operation, ok := params["operation"].(string)
 	if !ok {
-		return nil, fmt.Errorf("operation parameter is required and must be a string")
+		return functionbase.CreateErrorResult(fmt.Errorf("operation parameter is required and must be a string"), "Invalid operation parameter"), nil
 	}
 
 	f.logger.Info(fmt.Sprintf("Executing migration operation: %s", operation))
@@ -159,7 +70,7 @@ func (f *MigrateFunction) Execute(ctx context.Context, params map[string]interfa
 	case "cleanup":
 		return f.handleCleanup(ctx, params)
 	default:
-		return nil, fmt.Errorf("unsupported migration operation: %s", operation)
+		return functionbase.CreateErrorResult(fmt.Errorf("unsupported migration operation: %s", operation), "Unsupported operation"), nil
 	}
 }
 
@@ -689,6 +600,8 @@ func (f *MigrateFunction) handleCleanup(ctx context.Context, params map[string]i
 	return &functionbase.FunctionResult{
 		Success: true,
 		Data:    cleanup,
-		Message: "Migration cleanup completed successfully",
+		Metadata: map[string]interface{}{
+			"message": "Migration cleanup completed successfully",
+		},
 	}, nil
 }

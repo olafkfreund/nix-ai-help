@@ -15,7 +15,7 @@ import (
 
 // DevenvFunction handles development environment management operations
 type DevenvFunction struct {
-	functionbase.BaseFunction
+	*functionbase.BaseFunction
 	agent  *agent.DevenvAgent
 	logger *logger.Logger
 }
@@ -41,31 +41,31 @@ type DevenvParameters struct {
 
 // DevenvResponse represents the response from development environment operations
 type DevenvResponse struct {
-	Operation       string                 `json:"operation"`
-	Status          string                 `json:"status"`
-	Templates       []TemplateInfo         `json:"templates,omitempty"`
-	Configuration   *DevenvConfig          `json:"configuration,omitempty"`
-	SetupSteps      []string               `json:"setup_steps,omitempty"`
-	GeneratedFiles  map[string]string      `json:"generated_files,omitempty"`
-	Environment     *EnvironmentInfo       `json:"environment,omitempty"`
-	Suggestions     []string               `json:"suggestions,omitempty"`
-	ValidationIssues []ValidationIssue     `json:"validation_issues,omitempty"`
-	OptimizationTips []string              `json:"optimization_tips,omitempty"`
-	Documentation   []DocumentationLink    `json:"documentation,omitempty"`
-	Commands        []CommandInstruction   `json:"commands,omitempty"`
-	Message         string                 `json:"message"`
+	Operation        string               `json:"operation"`
+	Status           string               `json:"status"`
+	Templates        []TemplateInfo       `json:"templates,omitempty"`
+	Configuration    *DevenvConfig        `json:"configuration,omitempty"`
+	SetupSteps       []string             `json:"setup_steps,omitempty"`
+	GeneratedFiles   map[string]string    `json:"generated_files,omitempty"`
+	Environment      *EnvironmentInfo     `json:"environment,omitempty"`
+	Suggestions      []string             `json:"suggestions,omitempty"`
+	ValidationIssues []ValidationIssue    `json:"validation_issues,omitempty"`
+	OptimizationTips []string             `json:"optimization_tips,omitempty"`
+	Documentation    []DocumentationLink  `json:"documentation,omitempty"`
+	Commands         []CommandInstruction `json:"commands,omitempty"`
+	Message          string               `json:"message"`
 }
 
 // TemplateInfo represents information about a devenv template
 type TemplateInfo struct {
-	Name         string   `json:"name"`
-	Description  string   `json:"description"`
-	Language     string   `json:"language"`
-	Frameworks   []string `json:"frameworks"`
-	Services     []string `json:"services"`
-	Complexity   string   `json:"complexity"`
-	Tags         []string `json:"tags"`
-	Example      string   `json:"example"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Language    string   `json:"language"`
+	Frameworks  []string `json:"frameworks"`
+	Services    []string `json:"services"`
+	Complexity  string   `json:"complexity"`
+	Tags        []string `json:"tags"`
+	Example     string   `json:"example"`
 }
 
 // DevenvConfig represents a devenv.nix configuration
@@ -83,24 +83,24 @@ type DevenvConfig struct {
 
 // EnvironmentInfo represents development environment information
 type EnvironmentInfo struct {
-	ProjectPath    string            `json:"project_path"`
-	Language       string            `json:"language"`
-	BuildSystem    string            `json:"build_system"`
-	Frameworks     []string          `json:"frameworks"`
-	Dependencies   map[string]string `json:"dependencies"`
-	Services       []string          `json:"services"`
-	DevTools       []string          `json:"dev_tools"`
-	Configuration  string            `json:"configuration"`
-	Requirements   []string          `json:"requirements"`
+	ProjectPath   string            `json:"project_path"`
+	Language      string            `json:"language"`
+	BuildSystem   string            `json:"build_system"`
+	Frameworks    []string          `json:"frameworks"`
+	Dependencies  map[string]string `json:"dependencies"`
+	Services      []string          `json:"services"`
+	DevTools      []string          `json:"dev_tools"`
+	Configuration string            `json:"configuration"`
+	Requirements  []string          `json:"requirements"`
 }
 
 // ValidationIssue represents a validation issue
 type ValidationIssue struct {
-	Type        string `json:"type"`
-	Level       string `json:"level"`
-	Message     string `json:"message"`
-	Suggestion  string `json:"suggestion"`
-	Location    string `json:"location,omitempty"`
+	Type       string `json:"type"`
+	Level      string `json:"level"`
+	Message    string `json:"message"`
+	Suggestion string `json:"suggestion"`
+	Location   string `json:"location,omitempty"`
 }
 
 // DocumentationLink represents a documentation link
@@ -122,13 +122,25 @@ type CommandInstruction struct {
 
 // NewDevenvFunction creates a new DevenvFunction instance
 func NewDevenvFunction(agent *agent.DevenvAgent, logger *logger.Logger) *DevenvFunction {
-	return &DevenvFunction{
-		BaseFunction: functionbase.BaseFunction{
-			Name:        "devenv",
-			Description: "Manage development environments using devenv.sh, nix-shell, and flakes",
+	parameters := []functionbase.FunctionParameter{
+		{
+			Name:        "context",
+			Type:        "string",
+			Description: "The context or reason for the devenv operation",
+			Required:    true,
 		},
-		agent:  agent,
-		logger: logger,
+		{
+			Name:        "operation",
+			Type:        "string",
+			Description: "The devenv operation to perform",
+			Required:    true,
+		},
+	}
+
+	return &DevenvFunction{
+		BaseFunction: functionbase.NewBaseFunction("devenv", "Manage development environments using devenv.sh, nix-shell, and flakes", parameters),
+		agent:        agent,
+		logger:       logger,
 	}
 }
 
@@ -141,8 +153,8 @@ func (f *DevenvFunction) GetSchema() map[string]interface{} {
 			"type": "object",
 			"properties": map[string]interface{}{
 				"operation": map[string]interface{}{
-					"type": "string",
-					"enum": []string{"create", "list", "suggest", "analyze", "generate", "setup", "optimize", "validate", "templates"},
+					"type":        "string",
+					"enum":        []string{"create", "list", "suggest", "analyze", "generate", "setup", "optimize", "validate", "templates"},
 					"description": "Operation to perform",
 				},
 				"project_type": map[string]interface{}{
@@ -213,7 +225,7 @@ func (f *DevenvFunction) GetSchema() map[string]interface{} {
 // Execute performs the development environment operation
 func (f *DevenvFunction) Execute(ctx context.Context, params map[string]interface{}, options *functionbase.FunctionOptions) (*functionbase.FunctionResult, error) {
 	start := time.Now()
-	f.logger.Debug("Executing devenv function with params: %+v", params)
+	f.logger.Debug(fmt.Sprintf("Executing devenv function with params: %+v", params))
 
 	// Parse parameters
 	devenvParams, err := f.parseParameters(params)
@@ -357,7 +369,7 @@ func (f *DevenvFunction) createDevenvContext(params *DevenvParameters) *agent.De
 
 // executeCreate handles devenv creation operations
 func (f *DevenvFunction) executeCreate(ctx context.Context, params *DevenvParameters, devenvCtx *agent.DevenvContext) (*DevenvResponse, error) {
-	f.logger.Info("Creating development environment for %s", params.Language)
+	f.logger.Info(fmt.Sprintf("Creating development environment for %s", params.Language))
 
 	response, err := f.agent.GenerateResponse(ctx, f.buildCreatePrompt(params))
 	if err != nil {
@@ -373,10 +385,10 @@ func (f *DevenvFunction) executeCreate(ctx context.Context, params *DevenvParame
 
 	// Parse setup steps
 	devenvResponse.SetupSteps = f.parseSetupSteps(response)
-	
+
 	// Parse commands
 	devenvResponse.Commands = f.parseCommands(response)
-	
+
 	// Parse generated files
 	devenvResponse.GeneratedFiles = f.parseGeneratedFiles(response)
 
@@ -412,7 +424,7 @@ func (f *DevenvFunction) executeList(ctx context.Context, params *DevenvParamete
 
 // executeSuggest handles template suggestion operations
 func (f *DevenvFunction) executeSuggest(ctx context.Context, params *DevenvParameters, devenvCtx *agent.DevenvContext) (*DevenvResponse, error) {
-	f.logger.Info("Suggesting development environment for query: %s", params.Query)
+	f.logger.Info(fmt.Sprintf("Suggesting development environment for query: %s", params.Query))
 
 	response, err := f.agent.GenerateResponse(ctx, f.buildSuggestPrompt(params))
 	if err != nil {
@@ -432,7 +444,7 @@ func (f *DevenvFunction) executeSuggest(ctx context.Context, params *DevenvParam
 
 // executeAnalyze handles project analysis operations
 func (f *DevenvFunction) executeAnalyze(ctx context.Context, params *DevenvParameters, devenvCtx *agent.DevenvContext) (*DevenvResponse, error) {
-	f.logger.Info("Analyzing project at %s", params.Directory)
+	f.logger.Info(fmt.Sprintf("Analyzing project at %s", params.Directory))
 
 	response, err := f.agent.AnalyzeProject(ctx, params.Directory, params.ProjectType)
 	if err != nil {
@@ -572,7 +584,7 @@ func (f *DevenvFunction) executeTemplates(ctx context.Context, params *DevenvPar
 func (f *DevenvFunction) buildCreatePrompt(params *DevenvParameters) string {
 	var prompt strings.Builder
 	prompt.WriteString("Create a development environment configuration with the following requirements:\n\n")
-	
+
 	if params.Language != "" {
 		prompt.WriteString(fmt.Sprintf("Language: %s\n", params.Language))
 	}
@@ -622,7 +634,7 @@ func (f *DevenvFunction) buildSuggestPrompt(params *DevenvParameters) string {
 func (f *DevenvFunction) buildGeneratePrompt(params *DevenvParameters) string {
 	var prompt strings.Builder
 	prompt.WriteString("Generate a complete development environment configuration")
-	
+
 	if params.NixShell {
 		prompt.WriteString(" using nix-shell (shell.nix)")
 	} else if params.Flakes {
@@ -630,7 +642,7 @@ func (f *DevenvFunction) buildGeneratePrompt(params *DevenvParameters) string {
 	} else {
 		prompt.WriteString(" using devenv.sh (devenv.nix)")
 	}
-	
+
 	prompt.WriteString(".\n\nInclude all necessary packages, tools, and environment setup.")
 	return prompt.String()
 }
@@ -675,27 +687,27 @@ func (f *DevenvFunction) buildTemplatesPrompt(params *DevenvParameters) string {
 
 func (f *DevenvFunction) parseSetupSteps(response string) []string {
 	var steps []string
-	
+
 	// Look for numbered lists or bullet points
 	stepRegex := regexp.MustCompile(`(?m)^\s*(?:\d+\.|[-*])\s*(.+)$`)
 	matches := stepRegex.FindAllStringSubmatch(response, -1)
-	
+
 	for _, match := range matches {
 		if len(match) > 1 && len(strings.TrimSpace(match[1])) > 0 {
 			steps = append(steps, strings.TrimSpace(match[1]))
 		}
 	}
-	
+
 	return steps
 }
 
 func (f *DevenvFunction) parseCommands(response string) []CommandInstruction {
 	var commands []CommandInstruction
-	
+
 	// Look for command patterns
 	cmdRegex := regexp.MustCompile(`(?m)^\s*(?:\$|>|#)?\s*([a-zA-Z0-9][^\n]+)$`)
 	matches := cmdRegex.FindAllStringSubmatch(response, -1)
-	
+
 	order := 1
 	for _, match := range matches {
 		if len(match) > 1 {
@@ -712,17 +724,17 @@ func (f *DevenvFunction) parseCommands(response string) []CommandInstruction {
 			}
 		}
 	}
-	
+
 	return commands
 }
 
 func (f *DevenvFunction) parseGeneratedFiles(response string) map[string]string {
 	files := make(map[string]string)
-	
+
 	// Look for file content sections
-	fileRegex := regexp.MustCompile(`(?s)(?:```|~~~)(?:nix|yaml|json|toml)?\s*\n(.*?)\n(?:```|~~~)`)
+	fileRegex := regexp.MustCompile("(?s)(?:```|~~~)(?:nix|yaml|json|toml)?\\s*\\n(.*?)\\n(?:```|~~~)")
 	matches := fileRegex.FindAllStringSubmatch(response, -1)
-	
+
 	for i, match := range matches {
 		if len(match) > 1 {
 			filename := fmt.Sprintf("file_%d", i+1)
@@ -736,7 +748,7 @@ func (f *DevenvFunction) parseGeneratedFiles(response string) map[string]string 
 			files[filename] = strings.TrimSpace(match[1])
 		}
 	}
-	
+
 	return files
 }
 
@@ -744,7 +756,7 @@ func (f *DevenvFunction) parseDevenvConfig(response string) *DevenvConfig {
 	// Try to extract devenv configuration from the response
 	configRegex := regexp.MustCompile(`(?s)devenv\.nix.*?{(.*?)}`)
 	matches := configRegex.FindStringSubmatch(response)
-	
+
 	if len(matches) > 1 {
 		// This is a simplified parser - in a real implementation,
 		// you'd want more sophisticated Nix parsing
@@ -756,24 +768,24 @@ func (f *DevenvFunction) parseDevenvConfig(response string) *DevenvConfig {
 			Scripts:     make(map[string]interface{}),
 		}
 	}
-	
+
 	return nil
 }
 
 func (f *DevenvFunction) parseTemplates(response string) []TemplateInfo {
 	var templates []TemplateInfo
-	
+
 	// This is a simplified parser - you'd want more sophisticated parsing
 	// for a production implementation
 	lines := strings.Split(response, "\n")
-	
+
 	for _, line := range lines {
 		if strings.Contains(line, "template") || strings.Contains(line, "Template") {
 			parts := strings.Split(line, ":")
 			if len(parts) >= 2 {
 				name := strings.TrimSpace(parts[0])
 				desc := strings.TrimSpace(parts[1])
-				
+
 				templates = append(templates, TemplateInfo{
 					Name:        name,
 					Description: desc,
@@ -784,17 +796,17 @@ func (f *DevenvFunction) parseTemplates(response string) []TemplateInfo {
 			}
 		}
 	}
-	
+
 	return templates
 }
 
 func (f *DevenvFunction) parseSuggestions(response string) []string {
 	var suggestions []string
-	
+
 	// Look for suggestion patterns
 	suggRegex := regexp.MustCompile(`(?i)(?:suggest|recommend|consider).*?:?\s*(.+)`)
 	matches := suggRegex.FindAllStringSubmatch(response, -1)
-	
+
 	for _, match := range matches {
 		if len(match) > 1 {
 			suggestion := strings.TrimSpace(match[1])
@@ -803,7 +815,7 @@ func (f *DevenvFunction) parseSuggestions(response string) []string {
 			}
 		}
 	}
-	
+
 	return suggestions
 }
 
@@ -823,11 +835,11 @@ func (f *DevenvFunction) parseEnvironmentInfo(response string) *EnvironmentInfo 
 
 func (f *DevenvFunction) parseOptimizationTips(response string) []string {
 	var tips []string
-	
+
 	// Look for optimization-related content
 	tipRegex := regexp.MustCompile(`(?i)(?:optimize|improve|enhance|tip).*?:?\s*(.+)`)
 	matches := tipRegex.FindAllStringSubmatch(response, -1)
-	
+
 	for _, match := range matches {
 		if len(match) > 1 {
 			tip := strings.TrimSpace(match[1])
@@ -836,13 +848,13 @@ func (f *DevenvFunction) parseOptimizationTips(response string) []string {
 			}
 		}
 	}
-	
+
 	return tips
 }
 
 func (f *DevenvFunction) parseValidationIssues(response string) []ValidationIssue {
 	var issues []ValidationIssue
-	
+
 	// Look for warning/error patterns
 	if strings.Contains(strings.ToLower(response), "error") {
 		issues = append(issues, ValidationIssue{
@@ -852,7 +864,7 @@ func (f *DevenvFunction) parseValidationIssues(response string) []ValidationIssu
 			Suggestion: "Review the configuration for syntax errors",
 		})
 	}
-	
+
 	if strings.Contains(strings.ToLower(response), "warning") {
 		issues = append(issues, ValidationIssue{
 			Type:       "warning",
@@ -861,17 +873,17 @@ func (f *DevenvFunction) parseValidationIssues(response string) []ValidationIssu
 			Suggestion: "Consider addressing the warning for better stability",
 		})
 	}
-	
+
 	return issues
 }
 
 func (f *DevenvFunction) parseDocumentationLinks(response string) []DocumentationLink {
 	var links []DocumentationLink
-	
+
 	// Look for URL patterns
 	urlRegex := regexp.MustCompile(`https?://[^\s]+`)
 	urls := urlRegex.FindAllString(response, -1)
-	
+
 	for _, url := range urls {
 		links = append(links, DocumentationLink{
 			Title:       "Documentation",
@@ -880,6 +892,6 @@ func (f *DevenvFunction) parseDocumentationLinks(response string) []Documentatio
 			Description: "Related documentation",
 		})
 	}
-	
+
 	return links
 }

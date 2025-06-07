@@ -122,7 +122,7 @@ func NewLogsFunction() *LogsFunction {
 		functionbase.StringParamWithOptions("level", "Log level filter", false,
 			[]string{"emergency", "alert", "critical", "error", "warning", "notice", "info", "debug"}, nil, nil),
 		functionbase.StringParam("filter", "Text filter or regex pattern", false),
-		functionbase.IntParam("lines", "Number of lines to retrieve", false, &[]int{100}[0], &[]int{1}[0], &[]int{10000}[0]),
+		functionbase.IntParam("lines", "Number of lines to retrieve", false, 100),
 		functionbase.BoolParam("follow", "Follow logs in real-time", false),
 		functionbase.StringParamWithOptions("format", "Output format", false,
 			[]string{"json", "plain", "table", "colored", "short", "verbose"}, nil, nil),

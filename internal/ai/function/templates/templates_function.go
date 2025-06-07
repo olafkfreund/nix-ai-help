@@ -11,7 +11,7 @@ import (
 
 // TemplatesFunction provides Nix template and project scaffolding capabilities
 type TemplatesFunction struct {
-	log logger.Logger
+	log *logger.Logger
 }
 
 // NewTemplatesFunction creates a new templates function
