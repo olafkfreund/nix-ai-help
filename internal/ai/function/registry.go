@@ -7,18 +7,29 @@ import (
 	"nix-ai-help/internal/ai/function/ask"
 	"nix-ai-help/internal/ai/function/build"
 	"nix-ai-help/internal/ai/function/community"
+	"nix-ai-help/internal/ai/function/completion"
 	configfunction "nix-ai-help/internal/ai/function/config"
+	"nix-ai-help/internal/ai/function/configure"
 	"nix-ai-help/internal/ai/function/diagnose"
+	"nix-ai-help/internal/ai/function/doctor"
 	explainHomeoption "nix-ai-help/internal/ai/function/explain-home-option"
 	explainoption "nix-ai-help/internal/ai/function/explain-option"
 	"nix-ai-help/internal/ai/function/flakes"
+	"nix-ai-help/internal/ai/function/gc"
+	"nix-ai-help/internal/ai/function/hardware"
+	"nix-ai-help/internal/ai/function/interactive"
 	"nix-ai-help/internal/ai/function/learning"
 	"nix-ai-help/internal/ai/function/logs"
 	"nix-ai-help/internal/ai/function/machines"
 	mcpserver "nix-ai-help/internal/ai/function/mcp-server"
+	"nix-ai-help/internal/ai/function/migrate"
 	"nix-ai-help/internal/ai/function/neovim"
 	packagerepo "nix-ai-help/internal/ai/function/package-repo"
 	"nix-ai-help/internal/ai/function/packages"
+	"nix-ai-help/internal/ai/function/search"
+	"nix-ai-help/internal/ai/function/snippets"
+	"nix-ai-help/internal/ai/function/store"
+	"nix-ai-help/internal/ai/function/templates"
 	"nix-ai-help/internal/ai/functionbase"
 	"nix-ai-help/pkg/logger"
 )
@@ -49,20 +60,31 @@ func registerAllFunctions() {
 		{"ask", ask.NewAskFunction()},
 		{"build", build.NewBuildFunction()},
 		{"community", community.NewCommunityFunction()},
+		{"completion", completion.NewCompletionFunction()},
 		{"config", configfunction.NewConfigFunction()},
+		{"configure", configure.NewConfigureFunction()},
 		// {"devenv", devenv.NewDevenvFunction()}, // Requires agent and logger
 		{"diagnose", diagnose.NewDiagnoseFunction()},
+		{"doctor", doctor.NewDoctorFunction()},
 		{"explain-home-option", explainHomeoption.NewExplainHomeOptionFunction()},
 		{"explain-option", explainoption.NewExplainOptionFunction()},
 		{"flakes", flakes.NewFlakesFunction()},
+		{"gc", gc.NewGcFunction()},
+		{"hardware", hardware.NewHardwareFunction()},
 		// {"help", help.NewHelpFunction()}, // Requires config and logger
+		{"interactive", interactive.NewInteractiveFunction()},
 		{"learning", learning.NewLearningFunction()},
 		{"logs", logs.NewLogsFunction()},
 		{"machines", machines.NewMachinesFunction()},
 		{"mcp-server", mcpserver.NewMcpServerFunction()},
+		{"migrate", migrate.NewMigrateFunction()},
 		{"neovim", neovim.NewNeovimFunction()},
 		{"packages", packages.NewPackagesFunction()},
 		{"package-repo", packagerepo.NewPackageRepoFunction()},
+		{"search", search.NewSearchFunction()},
+		{"snippets", snippets.NewSnippetsFunction()},
+		{"store", store.NewStoreFunction()},
+		{"templates", templates.NewTemplatesFunction()},
 	}
 
 	successCount := 0
