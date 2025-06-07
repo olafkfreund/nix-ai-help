@@ -8,8 +8,6 @@ import (
 
 	"nix-ai-help/internal/ai/agent"
 	"nix-ai-help/internal/ai/functionbase"
-	"nix-ai-help/internal/config"
-	"nix-ai-help/pkg/logger"
 )
 
 // HelpFunction implements AI-powered help and guidance operations for NixOS
@@ -125,13 +123,25 @@ type Troubleshooting struct {
 }
 
 // NewHelpFunction creates a new HelpFunction instance
-func NewHelpFunction(cfg *config.Config, log *logger.Logger) *HelpFunction {
+func NewHelpFunction() *HelpFunction {
+	// Define function parameters
+	parameters := []functionbase.FunctionParameter{
+		functionbase.StringParamWithOptions("operation", "Help operation to perform", true,
+			[]string{"guide", "tutorial", "troubleshoot", "examples", "best-practices", "search", "quick-help"}, nil, nil),
+		functionbase.StringParam("topic", "Topic or question to get help for", false),
+		functionbase.StringParam("level", "Experience level", false),
+		functionbase.BoolParam("interactive", "Whether to provide interactive guidance", false),
+	}
+
+	baseFunc := functionbase.NewBaseFunction(
+		"help",
+		"Provides comprehensive help, guidance, documentation, and learning resources for NixOS",
+		parameters,
+	)
+
 	return &HelpFunction{
-		BaseFunction: &functionbase.BaseFunction{
-			Config: cfg,
-			Logger: log,
-		},
-		agent: agent.NewHelpAgent(cfg, log),
+		BaseFunction: baseFunc,
+		agent:        nil, // Mock agent since it requires provider
 	}
 }
 

@@ -203,11 +203,6 @@ func (f *CompletionFunction) parseRequest(params map[string]interface{}) (*Compl
 
 // executeCompletion performs the completion operation using the agent
 func (f *CompletionFunction) executeCompletion(ctx context.Context, req *CompletionRequest) (*CompletionResponse, error) {
-	response := &CompletionResponse{
-		Context: req.Context,
-		Status:  "success",
-	}
-
 	// Execute different completion types
 	switch req.CompletionType {
 	case "shell":

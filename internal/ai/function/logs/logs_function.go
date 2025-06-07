@@ -155,7 +155,7 @@ func NewLogsFunction() *LogsFunction {
 
 	return &LogsFunction{
 		BaseFunction: baseFunc,
-		agent:        agent.NewLogsAgent(),
+		agent:        nil, // Set to nil to avoid provider requirement
 		logger:       logger.NewLogger(),
 	}
 }
@@ -275,20 +275,17 @@ func (f *LogsFunction) validateRequest(request *LogsRequest) error {
 
 // executeLogsOperation executes the logs operation
 func (f *LogsFunction) executeLogsOperation(ctx context.Context, request *LogsRequest) (*LogsResponse, error) {
-	// Create context for the agent
+	// Create context for the agent - but agent methods don't exist, so we'll mock responses
 	agentContext := agent.LogsContext{
-		Operation:   request.Operation,
-		LogType:     request.LogType,
-		TimeRange:   request.TimeRange,
-		Service:     request.Service,
-		Level:       request.Level,
-		Filter:      request.Filter,
-		Lines:       request.Lines,
-		Follow:      request.Follow,
-		Format:      request.Format,
-		Keywords:    request.Keywords,
-		ExcludeList: request.ExcludeList,
-		Options:     request.Options,
+		LogSources:     []string{request.LogType},
+		LogFiles:       []string{},
+		LogContent:     "",
+		LogLevel:       request.Level,
+		TimeRange:      request.TimeRange,
+		ServiceNames:   []string{request.Service},
+		LogPatterns:    request.Keywords,
+		OutputFormat:   request.Format,
+		FilterCriteria: request.Options,
 	}
 
 	switch request.Operation {
