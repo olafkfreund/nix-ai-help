@@ -414,7 +414,7 @@ func runLogsCmd(args []string, out io.Writer) {
 		var aiProvider interface{ Query(string) (string, error) }
 		switch providerName {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		case "gemini":
@@ -923,7 +923,7 @@ func runSearchCmd(args []string, out io.Writer) {
 	var aiProvider ai.AIProvider
 	switch providerName {
 	case "ollama":
-		aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 	case "openai":
 		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 	case "gemini":
@@ -1017,7 +1017,7 @@ func runAskCmd(args []string, out io.Writer) {
 	var aiProvider ai.AIProvider
 	switch providerName {
 	case "ollama":
-		aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 	case "openai":
 		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 	case "gemini":

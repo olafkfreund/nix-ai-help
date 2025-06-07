@@ -2,7 +2,14 @@
 
 Welcome to the nixai Command Manual. Each command has its own dedicated documentation page with usage, options, and real-life examples.
 
-**Command Index:**
+## 📚 System Documentation
+
+- [**Function System**](functions.md) - Complete guide to nixai's 29 specialized functions
+- [**Agent Architecture**](agents.md) - AI agent system with 26+ specialized agents
+- [**Role System**](roles.md) - Role-based AI behavior and prompt templates
+
+## 🛠️ Command Index
+
 - [ask](ask.md)
 - [build](build.md)
 - [community](community.md)

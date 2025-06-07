@@ -2,103 +2,127 @@ package ai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	"time"
 )
 
-// OllamaProvider implements the AIProvider interface for the Ollama model.
+// OllamaProvider implements the new Provider interface for Ollama.
 type OllamaProvider struct {
-	modelPath string
-	host      string
-	client    *http.Client
+	Endpoint string
+	Model    string
+	Client   *http.Client
 }
 
-// OllamaGenerateRequest represents the request structure for Ollama's generate API
-type OllamaGenerateRequest struct {
-	Model  string `json:"model"`
-	Prompt string `json:"prompt"`
-	Stream bool   `json:"stream"`
-}
-
-// OllamaGenerateResponse represents the response structure for Ollama's generate API
-type OllamaGenerateResponse struct {
-	Response string `json:"response"`
-	Done     bool   `json:"done"`
-}
-
-// NewOllamaProvider creates a new instance of OllamaProvider.
-func NewOllamaProvider(modelPath string) *OllamaProvider {
-	host := os.Getenv("OLLAMA_HOST")
-	if host == "" {
-		host = "http://localhost:11434"
+// NewOllamaProvider creates a new OllamaProvider.
+func NewOllamaProvider(model string) *OllamaProvider {
+	endpoint := os.Getenv("OLLAMA_ENDPOINT")
+	if endpoint == "" {
+		endpoint = "http://localhost:11434/api/generate"
 	}
+
+	if model == "" {
+		model = "llama3"
+	}
+
 	return &OllamaProvider{
-		modelPath: modelPath,
-		host:      host,
-		client: &http.Client{
+		Endpoint: endpoint,
+		Model:    model,
+		Client: &http.Client{
 			Timeout: 60 * time.Second,
 		},
 	}
 }
 
-// Query sends a query to the Ollama model and returns the response.
-func (o *OllamaProvider) Query(prompt string) (string, error) {
-	// Build the API URL
-	apiURL := fmt.Sprintf("%s/api/generate", o.host)
+// ollamaRequest is the request format for Ollama's API.
+type ollamaRequest struct {
+	Model  string `json:"model"`
+	Prompt string `json:"prompt"`
+	Stream bool   `json:"stream"`
+}
 
-	// Create the request payload
-	requestBody := OllamaGenerateRequest{
-		Model:  o.modelPath,
+// ollamaResponse is the response format from Ollama's API.
+type ollamaResponse struct {
+	Response string `json:"response"`
+	Done     bool   `json:"done"`
+	Error    string `json:"error,omitempty"`
+}
+
+// Query sends a prompt to Ollama with context support.
+// This implements the new Provider interface.
+func (o *OllamaProvider) Query(ctx context.Context, prompt string) (string, error) {
+	return o.queryWithContext(ctx, prompt)
+}
+
+// GenerateResponse sends a prompt to Ollama with context support.
+// This implements the new Provider interface.
+func (o *OllamaProvider) GenerateResponse(ctx context.Context, prompt string) (string, error) {
+	return o.queryWithContext(ctx, prompt)
+}
+
+// queryWithContext is the internal implementation that handles the actual API call.
+func (o *OllamaProvider) queryWithContext(ctx context.Context, prompt string) (string, error) {
+	reqBody := ollamaRequest{
+		Model:  o.Model,
 		Prompt: prompt,
-		Stream: false, // We want a single response, not streaming
+		Stream: false,
 	}
 
-	body, err := json.Marshal(requestBody)
+	body, err := json.Marshal(reqBody)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	// Create and send the HTTP request
-	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", o.Endpoint, bytes.NewBuffer(body))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := o.client.Do(req)
+	resp, err := o.Client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to send request to Ollama server: %w", err)
+		return "", fmt.Errorf("ollama request failed: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("ollama server returned non-200 response: %s\n%s", resp.Status, string(body))
+		return "", fmt.Errorf("ollama returned status %d", resp.StatusCode)
 	}
 
-	// Parse the response
-	var responseBody OllamaGenerateResponse
-	if err := json.NewDecoder(resp.Body).Decode(&responseBody); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
+	var result ollamaResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode ollama response: %w", err)
 	}
 
-	return responseBody.Response, nil
+	if result.Error != "" {
+		return "", fmt.Errorf("ollama error: %s", result.Error)
+	}
+
+	return result.Response, nil
 }
 
-// ModelInfo returns information about the model.
-func (o *OllamaProvider) ModelInfo() (string, error) {
-	info := map[string]string{
-		"model": "Ollama",
-		"path":  o.modelPath,
+// Legacy Provider Wrapper for backward compatibility
+type OllamaLegacyProvider struct {
+	*OllamaProvider
+}
+
+// NewOllamaLegacyProvider creates a legacy provider wrapper.
+func NewOllamaLegacyProvider(model string) *OllamaLegacyProvider {
+	return &OllamaLegacyProvider{
+		OllamaProvider: NewOllamaProvider(model),
 	}
-	infoJSON, err := json.Marshal(info)
-	if err != nil {
-		return "", err
-	}
-	return string(infoJSON), nil
+}
+
+// Query implements the legacy AIProvider interface.
+func (o *OllamaLegacyProvider) Query(prompt string) (string, error) {
+	return o.OllamaProvider.Query(context.Background(), prompt)
+}
+
+// GenerateResponse implements the legacy AIProvider interface.
+func (o *OllamaLegacyProvider) GenerateResponse(prompt string) (string, error) {
+	return o.OllamaProvider.GenerateResponse(context.Background(), prompt)
 }

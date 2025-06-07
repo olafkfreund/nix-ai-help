@@ -23,13 +23,24 @@ func NewMCPClient(baseURL string) *MCPClient {
 	}
 }
 
-func (c *MCPClient) QueryDocumentation(query string) (string, error) {
-	requestBody, err := json.Marshal(map[string]string{"query": query})
+func (c *MCPClient) QueryDocumentation(query string, sources ...string) (string, error) {
+	var requestBody interface{}
+
+	if len(sources) > 0 {
+		requestBody = map[string]interface{}{
+			"query":   query,
+			"sources": sources,
+		}
+	} else {
+		requestBody = map[string]string{"query": query}
+	}
+
+	jsonData, err := json.Marshal(requestBody)
 	if err != nil {
 		return "", err
 	}
 
-	resp, err := c.httpClient.Post(c.baseURL+"/query", "application/json", bytes.NewBuffer(requestBody))
+	resp, err := c.httpClient.Post(c.baseURL+"/query", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", err
 	}

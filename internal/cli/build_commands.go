@@ -54,7 +54,7 @@ Advanced usage:
 				provider = initializeAIProvider(cfg)
 			} else {
 				fmt.Fprintf(os.Stderr, "Warning: Failed to load config, using defaults: %v\n", err)
-				provider = ai.NewOllamaProvider("llama3")
+				provider = ai.NewOllamaLegacyProvider("llama3")
 			}
 
 			// Run nix build
@@ -394,7 +394,7 @@ func runBuildProfile(packageName string, cmd *cobra.Command) {
 func initializeAIProvider(cfg *config.UserConfig) ai.AIProvider {
 	switch cfg.AIProvider {
 	case "ollama":
-		return ai.NewOllamaProvider(cfg.AIModel)
+		return ai.NewOllamaLegacyProvider(cfg.AIModel)
 	case "gemini":
 		return ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
 	case "openai":
@@ -403,9 +403,9 @@ func initializeAIProvider(cfg *config.UserConfig) ai.AIProvider {
 		if cfg.CustomAI.BaseURL != "" {
 			return ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
 		}
-		return ai.NewOllamaProvider("llama3")
+		return ai.NewOllamaLegacyProvider("llama3")
 	default:
-		return ai.NewOllamaProvider("llama3")
+		return ai.NewOllamaLegacyProvider("llama3")
 	}
 }
 

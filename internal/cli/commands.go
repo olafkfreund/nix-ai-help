@@ -7,10 +7,13 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
 	"nix-ai-help/internal/ai"
+	"nix-ai-help/internal/ai/agent"
+	"nix-ai-help/internal/ai/roles"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/learning"
 	"nix-ai-help/internal/mcp"
@@ -47,48 +50,77 @@ Usage:
 				os.Exit(1)
 			}
 
+			// Create AI provider
 			providerName := cfg.AIProvider
-			if providerName == "" {
+			if agentType != "" {
+				providerName = agentType
+			} else if providerName == "" {
 				providerName = "ollama"
 			}
-			var aiProvider ai.AIProvider
+
+			var aiProvider ai.Provider
 			switch providerName {
 			case "ollama":
 				aiProvider = ai.NewOllamaProvider(cfg.AIModel)
 			case "openai":
-				aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+				openaiClient := ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+				aiProvider = ai.NewLegacyProviderAdapter(openaiClient)
 			case "gemini":
-				aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
+				geminiClient := ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
+				aiProvider = ai.NewLegacyProviderAdapter(geminiClient)
 			default:
 				fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
 				os.Exit(1)
 			}
 
+			// Create agent from flags
+			agentInstance, err := createAgentFromFlags(aiProvider)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to create agent: "+err.Error()))
+				os.Exit(1)
+			}
+
+			// Set role if specified
+			if err := validateAndSetRole(agentInstance); err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to set role: "+err.Error()))
+				os.Exit(1)
+			}
+
+			// Set context if specified
+			if err := setAgentContext(agentInstance); err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to set context: "+err.Error()))
+				os.Exit(1)
+			}
+
 			// Query MCP for documentation context (optional, ignore errors)
-			var docExcerpts []string
+			var mcpDocumentation string
 			mcpBase := cfg.MCPServer.Host
 			if mcpBase != "" {
 				mcpClient := mcp.NewMCPClient(mcpBase)
-				doc, err := mcpClient.QueryDocumentation(askQuestion)
-				if err == nil && doc != "" {
-					docExcerpts = append(docExcerpts, doc)
+				doc, mcpErr := mcpClient.QueryDocumentation(askQuestion)
+				if mcpErr == nil && doc != "" {
+					mcpDocumentation = doc
 				}
 			}
 
-			promptCtx := ai.PromptContext{
-				Question:     askQuestion,
-				DocExcerpts:  docExcerpts,
-				Intent:       "explain",
-				OutputFormat: "markdown",
-				Provider:     providerName,
+			// Use agent to answer the question
+			ctx := context.Background()
+			var answer string
+
+			// If we have MCP documentation and this is an AskAgent, use QueryWithContext
+			if mcpDocumentation != "" {
+				if askAgent, ok := agentInstance.(*agent.AskAgent); ok {
+					askCtx := &agent.AskContext{
+						Question: askQuestion,
+						Context:  mcpDocumentation,
+					}
+					answer, err = askAgent.QueryWithContext(ctx, askQuestion, askCtx)
+				} else {
+					answer, err = agentInstance.Query(ctx, askQuestion)
+				}
+			} else {
+				answer, err = agentInstance.Query(ctx, askQuestion)
 			}
-			builder := ai.DefaultPromptBuilder{}
-			prompt, err := builder.BuildPrompt(promptCtx)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, utils.FormatError("Prompt build error: "+err.Error()))
-				os.Exit(1)
-			}
-			answer, err := aiProvider.Query(prompt)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
 				os.Exit(1)
@@ -103,10 +135,81 @@ Usage:
 
 var askQuestion string
 var nixosPath string
+var daemonMode bool
+var agentRole string
+var agentType string
+var contextFile string
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&askQuestion, "ask", "a", "", "Ask a question about NixOS configuration")
 	rootCmd.PersistentFlags().StringVarP(&nixosPath, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
+	rootCmd.PersistentFlags().StringVar(&agentRole, "role", "", "Specify the agent role (diagnoser, explainer, ask, build, etc.)")
+	rootCmd.PersistentFlags().StringVar(&agentType, "agent", "", "Specify the agent type (ollama, openai, gemini, etc.)")
+	rootCmd.PersistentFlags().StringVar(&contextFile, "context-file", "", "Path to a file containing context information (JSON or text)")
+	mcpServerCmd.Flags().BoolVarP(&daemonMode, "daemon", "d", false, "Run MCP server in background/daemon mode")
+}
+
+// Helper functions for agent/role/context handling
+func loadContextFromFile(filepath string) (interface{}, error) {
+	if filepath == "" {
+		return nil, nil
+	}
+
+	data, err := os.ReadFile(filepath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read context file: %w", err)
+	}
+
+	// Try to parse as JSON first
+	var jsonContext interface{}
+	if err := json.Unmarshal(data, &jsonContext); err == nil {
+		return jsonContext, nil
+	}
+
+	// If not valid JSON, return as string
+	return string(data), nil
+}
+
+func createAgentFromFlags(provider ai.Provider) (agent.Agent, error) {
+	// If no agent type specified, use default behavior
+	if agentType == "" {
+		return agent.NewOllamaAgent(provider), nil
+	}
+
+	// Create agent based on type
+	switch strings.ToLower(agentType) {
+	case "ollama":
+		return agent.NewOllamaAgent(provider), nil
+	default:
+		return nil, fmt.Errorf("unsupported agent type: %s", agentType)
+	}
+}
+
+func validateAndSetRole(agentInstance agent.Agent) error {
+	if agentRole == "" {
+		return nil // No role specified, use default
+	}
+
+	// Validate role
+	if !roles.ValidateRole(agentRole) {
+		return fmt.Errorf("invalid role: %s", agentRole)
+	}
+
+	// Set role on agent
+	return agentInstance.SetRole(roles.RoleType(agentRole))
+}
+
+func setAgentContext(agentInstance agent.Agent) error {
+	contextData, err := loadContextFromFile(contextFile)
+	if err != nil {
+		return err
+	}
+
+	if contextData != nil {
+		agentInstance.SetContext(contextData)
+	}
+
+	return nil
 }
 
 // Configuration management functions
@@ -345,7 +448,7 @@ var searchCmd = &cobra.Command{
 		var aiProvider ai.AIProvider
 		switch providerName {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		case "gemini":
@@ -429,7 +532,7 @@ var explainHomeOptionCmd = &cobra.Command{
 		var aiProvider ai.AIProvider
 		switch providerName {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		case "gemini":
@@ -530,13 +633,13 @@ func NewExplainOptionCommand() *cobra.Command {
 			var aiProvider ai.AIProvider
 			switch aiProviderName {
 			case "ollama":
-				aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+				aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 			case "openai":
 				aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 			case "gemini":
 				aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
 			default:
-				aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+				aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 			}
 			var prompt string
 			if examplesOnly {
@@ -699,10 +802,11 @@ var mcpServerCmd = &cobra.Command{
 The MCP server provides VS Code integration and documentation querying capabilities.
 
 Examples:
-  nixai mcp-server start     # Start the MCP server
-  nixai mcp-server stop      # Stop the MCP server  
-  nixai mcp-server status    # Check server status
-  nixai mcp-server restart   # Restart the MCP server`,
+  nixai mcp-server start        # Start the MCP server
+  nixai mcp-server start -d     # Start the MCP server in daemon mode
+  nixai mcp-server stop         # Stop the MCP server  
+  nixai mcp-server status       # Check server status
+  nixai mcp-server restart      # Restart the MCP server`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return handleMCPServerCommand(args)
 	},
@@ -735,7 +839,7 @@ Examples:
 		var aiProvider ai.AIProvider
 		switch providerName {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		case "gemini":
@@ -882,7 +986,7 @@ Examples:
 		var aiProvider ai.AIProvider
 		switch providerName {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		case "gemini":
@@ -956,7 +1060,7 @@ Examples:
 		var aiProvider ai.AIProvider
 		switch providerName {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		case "gemini":
@@ -1000,7 +1104,7 @@ Examples:
 		var aiProvider ai.AIProvider
 		switch providerName {
 		case "ollama":
-			aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		case "gemini":
@@ -1109,6 +1213,7 @@ func handleMCPServerCommand(args []string) error {
 		fmt.Println()
 		fmt.Println(utils.FormatSubsection("Available Commands", ""))
 		fmt.Println("  start         - Start the MCP server")
+		fmt.Println("  start -d      - Start the MCP server in daemon mode")
 		fmt.Println("  stop          - Stop the MCP server")
 		fmt.Println("  status        - Check server status")
 		fmt.Println("  restart       - Restart the MCP server")
@@ -1121,7 +1226,7 @@ func handleMCPServerCommand(args []string) error {
 	subcommand := args[0]
 	switch subcommand {
 	case "start":
-		return handleMCPServerStart(cfg)
+		return handleMCPServerStart(cfg, daemonMode)
 	case "stop":
 		return handleMCPServerStop(cfg)
 	case "status":
@@ -1132,17 +1237,62 @@ func handleMCPServerCommand(args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("query command requires a query string")
 		}
-		query := strings.Join(args[1:], " ")
-		return handleMCPServerQuery(cfg, query)
+
+		var query string
+		var sources []string
+		var inSourcesMode bool
+
+		for i := 1; i < len(args); i++ {
+			if args[i] == "--source" || args[i] == "-s" {
+				inSourcesMode = true
+			} else if inSourcesMode {
+				sources = append(sources, args[i])
+				inSourcesMode = false
+			} else {
+				if query != "" {
+					query += " "
+				}
+				query += args[i]
+			}
+		}
+
+		return handleMCPServerQuery(cfg, query, sources...)
 	default:
 		return fmt.Errorf("unknown subcommand: %s. Available: start, stop, status, restart, query", subcommand)
 	}
 }
 
 // handleMCPServerStart starts the MCP server
-func handleMCPServerStart(cfg *config.UserConfig) error {
+func handleMCPServerStart(cfg *config.UserConfig, daemon bool) error {
 	fmt.Println(utils.FormatHeader("🚀 Starting MCP Server"))
 	fmt.Println()
+
+	// If daemon mode is requested, fork the process
+	if daemon {
+		// Create a command to start the server without daemon flag
+		cmd := exec.Command(os.Args[0], "mcp-server", "start")
+
+		// Start the background process without complex process group management
+		err := cmd.Start()
+		if err != nil {
+			return fmt.Errorf("failed to start daemon process: %v", err)
+		}
+
+		// Don't wait for the process - let it run in background
+		go func() {
+			cmd.Wait() // Clean up when process exits
+		}()
+
+		fmt.Println(utils.FormatSuccess("MCP server started in daemon mode"))
+		fmt.Println(utils.FormatKeyValue("Process ID", fmt.Sprintf("%d", cmd.Process.Pid)))
+		fmt.Println(utils.FormatKeyValue("HTTP Server", fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)))
+		fmt.Println(utils.FormatKeyValue("Unix Socket", cfg.MCPServer.SocketPath))
+		fmt.Println()
+		fmt.Println(utils.FormatTip("Use 'nixai mcp-server status' to check server health"))
+		fmt.Println(utils.FormatTip("Use 'nixai mcp-server stop' to stop the server"))
+
+		return nil
+	}
 
 	// Create MCP server from config
 	configPath, _ := config.ConfigFilePath()
@@ -1261,14 +1411,17 @@ func handleMCPServerRestart(cfg *config.UserConfig) error {
 	fmt.Println(utils.FormatSuccess("done"))
 
 	// Start again
-	return handleMCPServerStart(cfg)
+	return handleMCPServerStart(cfg, false)
 }
 
 // handleMCPServerQuery queries the MCP server directly
-func handleMCPServerQuery(cfg *config.UserConfig, query string) error {
+func handleMCPServerQuery(cfg *config.UserConfig, query string, sources ...string) error {
 	fmt.Println(utils.FormatHeader("🔍 MCP Server Query"))
 	fmt.Println()
 	fmt.Println(utils.FormatKeyValue("Query", query))
+	if len(sources) > 0 {
+		fmt.Println(utils.FormatKeyValue("Sources", strings.Join(sources, ", ")))
+	}
 	fmt.Println()
 
 	// Create MCP client
@@ -1277,7 +1430,7 @@ func handleMCPServerQuery(cfg *config.UserConfig, query string) error {
 
 	fmt.Print(utils.FormatInfo("Querying documentation... "))
 
-	result, err := client.QueryDocumentation(query)
+	result, err := client.QueryDocumentation(query, sources...)
 	if err != nil {
 		fmt.Println(utils.FormatError("failed"))
 		return fmt.Errorf("query failed: %v", err)
@@ -1362,7 +1515,7 @@ func handleFlakeAnalyze(cmd *cobra.Command, args []string) {
 	var aiProvider ai.AIProvider
 	switch providerName {
 	case "ollama":
-		aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 	case "openai":
 		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 	case "gemini":
@@ -1501,7 +1654,7 @@ func handleLogsAnalyze(cmd *cobra.Command, args []string) {
 	var aiProvider ai.AIProvider
 	switch providerName {
 	case "ollama":
-		aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 	case "openai":
 		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 	case "gemini":
@@ -1749,7 +1902,7 @@ func handlePackageRepoAnalysis(cmd *cobra.Command, args []string) {
 	var aiProvider ai.AIProvider
 	switch providerName {
 	case "ollama":
-		aiProvider = ai.NewOllamaProvider(cfg.AIModel)
+		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 	case "openai":
 		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 	case "gemini":
