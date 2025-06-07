@@ -136,7 +136,7 @@ func fetchAndParseDerivationRecursive(storePath string, graph *DependencyGraph, 
 		if cleanRefPath == "" || cleanRefPath == storePath {
 			continue // Skip empty lines and self-references
 		}
-		
+
 		depNode, err := fetchAndParseDerivationRecursive(cleanRefPath, graph, visited, currentDepth+1, maxDepth, flakeDir)
 		if err != nil {
 			fmt.Println(utils.FormatError(fmt.Sprintf("Error processing dependency %s for %s: %v. Skipping this dependency.", cleanRefPath, storePath, err)))
@@ -416,7 +416,7 @@ func AnalyzeCurrentSystemDependencies() (*DependencyGraph, error) {
 
 	// Use the current system's store path
 	currentSystemPath := "/run/current-system"
-	
+
 	// Verify the path exists
 	if !utils.IsFile(currentSystemPath) && !utils.DirExists(currentSystemPath) {
 		return nil, fmt.Errorf("current system path not found: %s (are you running this on NixOS?)", currentSystemPath)
@@ -450,6 +450,7 @@ func AnalyzeCurrentSystemDependencies() (*DependencyGraph, error) {
 	fmt.Println(utils.FormatSuccess(fmt.Sprintf("Successfully analyzed current system with %d unique derivations.", len(graph.AllNodes))))
 	return graph, nil
 }
+
 // This will be more complex and might involve direct file parsing or nix-instantiate.
 func AnalyzeLegacyDependencies(configFilePath string) (*DependencyGraph, error) {
 	fmt.Println(utils.FormatInfo(fmt.Sprintf("Analyzing legacy dependencies for: %s", configFilePath)))
