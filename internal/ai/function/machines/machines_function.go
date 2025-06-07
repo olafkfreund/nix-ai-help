@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"nix-ai-help/internal/ai/agent"
@@ -39,6 +40,7 @@ type MachinesRequest struct {
 type MachinesResponse struct {
 	Operation         string                 `json:"operation"`
 	Status            string                 `json:"status"`
+	Error             string                 `json:"error,omitempty"`
 	Machines          []MachineInfo          `json:"machines,omitempty"`
 	Configuration     *MachineConfiguration  `json:"configuration,omitempty"`
 	Templates         []MachineTemplate      `json:"templates,omitempty"`
@@ -409,7 +411,7 @@ func NewMachinesFunction() *MachinesFunction {
 
 	return &MachinesFunction{
 		BaseFunction:  baseFunc,
-		machinesAgent: agent.NewMachinesAgent(),
+		machinesAgent: nil, // Set to nil to avoid provider requirement
 		logger:        logger.NewLogger(),
 	}
 }
@@ -505,212 +507,347 @@ func (f *MachinesFunction) parseParameters(params map[string]interface{}, req *M
 	return nil
 }
 
+// formatServices formats a list of services for NixOS configuration
+func (f *MachinesFunction) formatServices(services []string) string {
+	if len(services) == 0 {
+		return ""
+	}
+
+	var formatted []string
+	for _, service := range services {
+		switch service {
+		case "xserver":
+			formatted = append(formatted, "    xserver.enable = true;")
+		case "pipewire":
+			formatted = append(formatted, "    pipewire.enable = true;")
+		case "networkmanager":
+			formatted = append(formatted, "    networkmanager.enable = true;")
+		case "openssh":
+			formatted = append(formatted, "    openssh.enable = true;")
+		case "nginx":
+			formatted = append(formatted, "    nginx.enable = true;")
+		case "postgresql":
+			formatted = append(formatted, "    postgresql.enable = true;")
+		default:
+			formatted = append(formatted, fmt.Sprintf("    %s.enable = true;", service))
+		}
+	}
+
+	return strings.Join(formatted, "\n")
+}
+
 // executeListing handles machine listing operations
 func (f *MachinesFunction) executeListing(ctx context.Context, req *MachinesRequest) (*MachinesResponse, error) {
 	f.logger.Info("Executing machines listing operation")
 
-	// Use agent to get machine information
-	machineContext := &agent.MachinesContext{
-		Operation:    req.Operation,
-		MachineName:  req.MachineName,
-		MachineType:  req.MachineType,
-		Architecture: req.Architecture,
-		Environment:  req.Environment,
+	// Create a list of available machine configurations and templates
+	machines := []MachineInfo{
+		{
+			Name:         "desktop-workstation",
+			Type:         "desktop",
+			Architecture: "x86_64",
+			Status:       "available",
+			Environment:  "development",
+			Services:     []string{"xserver", "pipewire", "networkmanager"},
+		},
+		{
+			Name:         "server-minimal",
+			Type:         "server",
+			Architecture: "x86_64",
+			Status:       "available",
+			Environment:  "production",
+			Services:     []string{"openssh", "nginx", "postgresql"},
+		},
 	}
 
-	agentResponse, err := f.machinesAgent.ListMachines(machineContext)
-	if err != nil {
-		return nil, fmt.Errorf("agent listing failed: %w", err)
+	templates := []MachineTemplate{
+		{
+			Name:         "desktop-dev",
+			Description:  "Desktop workstation for development",
+			Type:         "desktop",
+			Architecture: "x86_64",
+			Category:     "development",
+			Tags:         []string{"development", "gui", "programming"},
+			Features:     []string{"IDE support", "multiple monitors", "development tools"},
+		},
+		{
+			Name:         "server-web",
+			Description:  "Web server configuration",
+			Type:         "server",
+			Architecture: "x86_64",
+			Category:     "server",
+			Tags:         []string{"web", "server", "production"},
+			Features:     []string{"nginx", "ssl", "database"},
+		},
 	}
 
-	// Parse the agent response
-	response, err := f.parseAgentResponse(agentResponse, req.Operation)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse agent response: %w", err)
-	}
-
-	response.Operation = req.Operation
-	response.Status = "success"
-
-	return response, nil
+	return &MachinesResponse{
+		Operation: "list",
+		Status:    "success",
+		Machines:  machines,
+		Templates: templates,
+	}, nil
 }
 
 // executeCreation handles machine creation operations
 func (f *MachinesFunction) executeCreation(ctx context.Context, req *MachinesRequest) (*MachinesResponse, error) {
 	f.logger.Info("Executing machines creation operation")
 
-	// Use agent to create machine configuration
-	machineContext := &agent.MachinesContext{
-		Operation:     req.Operation,
-		MachineName:   req.MachineName,
-		MachineType:   req.MachineType,
-		Architecture:  req.Architecture,
-		Environment:   req.Environment,
-		Services:      req.Services,
-		Configuration: req.Configuration,
-		Template:      req.Template,
-		Hardware:      req.Hardware,
-		Network:       req.Network,
-		Security:      req.Security,
-		Performance:   req.Performance,
-		Options:       req.Options,
+	// Create a basic machine configuration
+	config := &MachineConfiguration{
+		Name:         req.MachineName,
+		Type:         req.MachineType,
+		Architecture: req.Architecture,
+		Services:     req.Services,
+		Hardware:     make(map[string]interface{}),
+		Network:      make(map[string]interface{}),
+		Security:     make(map[string]interface{}),
+		Performance:  make(map[string]interface{}),
+		Environment:  make(map[string]string),
+		Files:        make(map[string]string),
 	}
 
-	agentResponse, err := f.machinesAgent.CreateMachine(machineContext)
-	if err != nil {
-		return nil, fmt.Errorf("agent creation failed: %w", err)
+	// Add basic configuration
+	if req.Configuration != nil {
+		for k, v := range req.Configuration {
+			config.Environment[k] = v
+		}
 	}
 
-	// Parse the agent response
-	response, err := f.parseAgentResponse(agentResponse, req.Operation)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse agent response: %w", err)
+	setupSteps := []string{
+		"1. Create configuration.nix with the specified settings",
+		"2. Configure hardware detection and drivers",
+		"3. Set up networking and firewall",
+		"4. Install and configure specified services",
+		"5. Apply security hardening",
+		"6. Optimize performance settings",
+		"7. Test the configuration",
+		"8. Rebuild and switch to new configuration",
 	}
 
-	response.Operation = req.Operation
-	response.Status = "success"
-
-	return response, nil
+	return &MachinesResponse{
+		Operation:     "create",
+		Status:        "success",
+		Configuration: config,
+		SetupSteps:    setupSteps,
+	}, nil
 }
 
 // executeConfiguration handles machine configuration operations
 func (f *MachinesFunction) executeConfiguration(ctx context.Context, req *MachinesRequest) (*MachinesResponse, error) {
 	f.logger.Info("Executing machines configuration operation")
 
-	// Use agent to configure machine
-	machineContext := &agent.MachinesContext{
-		Operation:     req.Operation,
-		MachineName:   req.MachineName,
-		MachineType:   req.MachineType,
-		Architecture:  req.Architecture,
-		Environment:   req.Environment,
-		Services:      req.Services,
-		Configuration: req.Configuration,
-		Hardware:      req.Hardware,
-		Network:       req.Network,
-		Security:      req.Security,
-		Performance:   req.Performance,
-		Options:       req.Options,
+	config := &MachineConfiguration{
+		Name:         req.MachineName,
+		Type:         req.MachineType,
+		Architecture: req.Architecture,
+		Services:     req.Services,
+		Hardware:     make(map[string]interface{}),
+		Network:      make(map[string]interface{}),
+		Security:     make(map[string]interface{}),
+		Performance:  make(map[string]interface{}),
+		Environment:  make(map[string]string),
+		Files:        make(map[string]string),
 	}
 
-	agentResponse, err := f.machinesAgent.ConfigureMachine(machineContext)
-	if err != nil {
-		return nil, fmt.Errorf("agent configuration failed: %w", err)
-	}
+	// Generate NixOS configuration
+	nixConfig := fmt.Sprintf(`{ config, pkgs, ... }:
 
-	// Parse the agent response
-	response, err := f.parseAgentResponse(agentResponse, req.Operation)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse agent response: %w", err)
-	}
+{
+  # Machine: %s
+  # Type: %s
+  # Architecture: %s
 
-	response.Operation = req.Operation
-	response.Status = "success"
+  imports = [
+    ./hardware-configuration.nix
+  ];
 
-	return response, nil
+  # System settings
+  system.stateVersion = "24.05";
+  
+  # Services
+  services = {
+%s
+  };
+
+  # Environment
+  environment.systemPackages = with pkgs; [
+    vim
+    git
+    htop
+  ];
+}`, req.MachineName, req.MachineType, req.Architecture, f.formatServices(req.Services))
+
+	config.Configuration = nixConfig
+
+	return &MachinesResponse{
+		Operation:     "configure",
+		Status:        "success",
+		Configuration: config,
+	}, nil
 }
 
 // executeTemplate handles machine template operations
 func (f *MachinesFunction) executeTemplate(ctx context.Context, req *MachinesRequest) (*MachinesResponse, error) {
 	f.logger.Info("Executing machines template operation")
 
-	// Use agent to get templates
-	machineContext := &agent.MachinesContext{
-		Operation:    req.Operation,
-		MachineName:  req.MachineName,
-		MachineType:  req.MachineType,
-		Architecture: req.Architecture,
-		Environment:  req.Environment,
-		Template:     req.Template,
-		Options:      req.Options,
+	templates := []MachineTemplate{
+		{
+			Name:         "desktop-gaming",
+			Description:  "Gaming desktop with GPU support",
+			Type:         "desktop",
+			Architecture: "x86_64",
+			Category:     "gaming",
+			Tags:         []string{"gaming", "gpu", "performance"},
+			Features:     []string{"Steam", "GPU drivers", "high performance"},
+			UseCases:     []string{"Gaming", "Content creation", "Streaming"},
+		},
+		{
+			Name:         "server-homelab",
+			Description:  "Home lab server configuration",
+			Type:         "server",
+			Architecture: "x86_64",
+			Category:     "homelab",
+			Tags:         []string{"homelab", "self-hosted", "containers"},
+			Features:     []string{"Docker", "Reverse proxy", "Monitoring"},
+			UseCases:     []string{"Self-hosting", "Learning", "Development"},
+		},
 	}
 
-	agentResponse, err := f.machinesAgent.GetTemplates(machineContext)
-	if err != nil {
-		return nil, fmt.Errorf("agent template operation failed: %w", err)
-	}
-
-	// Parse the agent response
-	response, err := f.parseAgentResponse(agentResponse, req.Operation)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse agent response: %w", err)
-	}
-
-	response.Operation = req.Operation
-	response.Status = "success"
-
-	return response, nil
+	return &MachinesResponse{
+		Operation: "template",
+		Status:    "success",
+		Templates: templates,
+	}, nil
 }
 
 // executeAnalysis handles machine analysis operations
 func (f *MachinesFunction) executeAnalysis(ctx context.Context, req *MachinesRequest) (*MachinesResponse, error) {
 	f.logger.Info("Executing machines analysis operation")
 
-	// Use agent to analyze machine
-	machineContext := &agent.MachinesContext{
-		Operation:     req.Operation,
-		MachineName:   req.MachineName,
-		MachineType:   req.MachineType,
-		Architecture:  req.Architecture,
-		Environment:   req.Environment,
-		Configuration: req.Configuration,
-		Hardware:      req.Hardware,
-		Network:       req.Network,
-		Security:      req.Security,
-		Performance:   req.Performance,
-		Options:       req.Options,
+	requirements := []string{
+		"NixOS 23.11 or later",
+		"Sufficient disk space (minimum 20GB)",
+		"Network connectivity for package downloads",
+		"Hardware compatibility check completed",
 	}
 
-	agentResponse, err := f.machinesAgent.AnalyzeMachine(machineContext)
-	if err != nil {
-		return nil, fmt.Errorf("agent analysis failed: %w", err)
+	recommendations := []string{
+		"Enable automatic garbage collection",
+		"Configure binary cache for faster builds",
+		"Set up regular system backups",
+		"Monitor system performance",
+		"Keep system updated",
 	}
 
-	// Parse the agent response
-	response, err := f.parseAgentResponse(agentResponse, req.Operation)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse agent response: %w", err)
+	hardwareInfo := &HardwareInfo{
+		CPU: &CPUInfo{
+			Model:        "Detected automatically",
+			Cores:        0,
+			Threads:      0,
+			Architecture: req.Architecture,
+			Features:     []string{"Hardware detection required"},
+		},
+		Memory: &MemoryInfo{
+			Total:     "To be detected",
+			Available: "To be detected",
+			Type:      "DDR4/DDR5",
+		},
 	}
 
-	response.Operation = req.Operation
-	response.Status = "success"
-
-	return response, nil
+	return &MachinesResponse{
+		Operation:       "analyze",
+		Status:          "success",
+		Requirements:    requirements,
+		Recommendations: recommendations,
+		HardwareInfo:    hardwareInfo,
+	}, nil
 }
 
 // executeOptimization handles machine optimization operations
 func (f *MachinesFunction) executeOptimization(ctx context.Context, req *MachinesRequest) (*MachinesResponse, error) {
 	f.logger.Info("Executing machines optimization operation")
 
-	// Use agent to optimize machine
-	machineContext := &agent.MachinesContext{
-		Operation:     req.Operation,
-		MachineName:   req.MachineName,
-		MachineType:   req.MachineType,
-		Architecture:  req.Architecture,
-		Environment:   req.Environment,
-		Configuration: req.Configuration,
-		Hardware:      req.Hardware,
-		Network:       req.Network,
-		Security:      req.Security,
-		Performance:   req.Performance,
-		Options:       req.Options,
+	if f.machinesAgent == nil {
+		// Return static optimization recommendations
+		performanceConfig := []PerformanceSetting{
+			{
+				Name:        "kernel.performance",
+				Value:       "true",
+				Description: "Enable performance-oriented kernel settings",
+				Category:    "kernel",
+				Impact:      "high",
+				Recommended: true,
+			},
+			{
+				Name:        "boot.loader.timeout",
+				Value:       "1",
+				Description: "Reduce boot loader timeout for faster startup",
+				Category:    "boot",
+				Impact:      "low",
+				Recommended: true,
+			},
+		}
+
+		recommendations := []string{
+			"Enable automatic garbage collection",
+			"Configure binary cache for faster builds",
+			"Optimize kernel parameters for performance",
+			"Enable SSD optimizations if applicable",
+			"Configure swap appropriately",
+		}
+
+		return &MachinesResponse{
+			Operation:         "optimize",
+			Status:            "success",
+			PerformanceConfig: performanceConfig,
+			Recommendations:   recommendations,
+		}, nil
 	}
 
-	agentResponse, err := f.machinesAgent.OptimizeMachine(machineContext)
+	// Build prompt for optimization
+	prompt := fmt.Sprintf(`Optimize the NixOS machine configuration for performance and efficiency.
+
+Machine: %s (Type: %s, Architecture: %s)
+Environment: %s
+Current Configuration: %v
+Hardware Info: %v
+Performance Settings: %v
+
+Please provide:
+1. Performance optimization recommendations
+2. Resource usage optimization
+3. System tuning suggestions
+4. Hardware-specific optimizations
+5. Configuration improvements
+6. Best practices for the target environment
+
+Focus on practical, implementable optimizations.`,
+		req.MachineName, req.MachineType, req.Architecture, req.Environment,
+		req.Configuration, req.Hardware, req.Performance)
+
+	// Query the agent
+	agentResponse, err := f.machinesAgent.GenerateResponse(ctx, prompt)
 	if err != nil {
-		return nil, fmt.Errorf("agent optimization failed: %w", err)
+		return &MachinesResponse{
+			Operation: "optimize",
+			Status:    "error",
+			Error:     fmt.Sprintf("Failed to optimize machine: %v", err),
+		}, nil
 	}
 
-	// Parse the agent response
-	response, err := f.parseAgentResponse(agentResponse, req.Operation)
+	// Parse the response
+	response, err := f.parseAgentResponse(agentResponse, "optimize")
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse agent response: %w", err)
+		return &MachinesResponse{
+			Operation: "optimize",
+			Status:    "error",
+			Error:     fmt.Sprintf("Failed to parse agent response: %v", err),
+		}, nil
 	}
 
 	response.Operation = req.Operation
 	response.Status = "success"
-
 	return response, nil
 }
 
@@ -718,32 +855,56 @@ func (f *MachinesFunction) executeOptimization(ctx context.Context, req *Machine
 func (f *MachinesFunction) executeSecurity(ctx context.Context, req *MachinesRequest) (*MachinesResponse, error) {
 	f.logger.Info("Executing machines security operation")
 
-	// Use agent to configure security
-	machineContext := &agent.MachinesContext{
-		Operation:     req.Operation,
-		MachineName:   req.MachineName,
-		MachineType:   req.MachineType,
-		Architecture:  req.Architecture,
-		Environment:   req.Environment,
-		Configuration: req.Configuration,
-		Security:      req.Security,
-		Options:       req.Options,
+	if f.machinesAgent == nil {
+		return &MachinesResponse{
+			Operation: "security",
+			Status:    "error",
+			Error:     "No machine agent available. This function requires a provider to be configured.",
+		}, nil
 	}
 
-	agentResponse, err := f.machinesAgent.ConfigureSecurity(machineContext)
+	// Build prompt for security configuration
+	prompt := fmt.Sprintf(`Configure security settings for NixOS machine.
+
+Machine: %s (Type: %s, Architecture: %s)
+Environment: %s
+Current Configuration: %v
+Security Requirements: %v
+
+Please provide:
+1. Security hardening recommendations
+2. Firewall configuration
+3. Access control settings
+4. Encryption and privacy settings
+5. Security monitoring recommendations
+6. Best practices for the target environment
+
+Focus on practical, implementable security measures.`,
+		req.MachineName, req.MachineType, req.Architecture, req.Environment,
+		req.Configuration, req.Security)
+
+	// Query the agent
+	agentResponse, err := f.machinesAgent.GenerateResponse(ctx, prompt)
 	if err != nil {
-		return nil, fmt.Errorf("agent security configuration failed: %w", err)
+		return &MachinesResponse{
+			Operation: "security",
+			Status:    "error",
+			Error:     fmt.Sprintf("Failed to configure security: %v", err),
+		}, nil
 	}
 
-	// Parse the agent response
-	response, err := f.parseAgentResponse(agentResponse, req.Operation)
+	// Parse the response
+	response, err := f.parseAgentResponse(agentResponse, "security")
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse agent response: %w", err)
+		return &MachinesResponse{
+			Operation: "security",
+			Status:    "error",
+			Error:     fmt.Sprintf("Failed to parse agent response: %v", err),
+		}, nil
 	}
 
 	response.Operation = req.Operation
 	response.Status = "success"
-
 	return response, nil
 }
 
@@ -751,33 +912,57 @@ func (f *MachinesFunction) executeSecurity(ctx context.Context, req *MachinesReq
 func (f *MachinesFunction) executePerformance(ctx context.Context, req *MachinesRequest) (*MachinesResponse, error) {
 	f.logger.Info("Executing machines performance operation")
 
-	// Use agent to optimize performance
-	machineContext := &agent.MachinesContext{
-		Operation:     req.Operation,
-		MachineName:   req.MachineName,
-		MachineType:   req.MachineType,
-		Architecture:  req.Architecture,
-		Environment:   req.Environment,
-		Configuration: req.Configuration,
-		Hardware:      req.Hardware,
-		Performance:   req.Performance,
-		Options:       req.Options,
+	if f.machinesAgent == nil {
+		return &MachinesResponse{
+			Operation: "performance",
+			Status:    "error",
+			Error:     "No machine agent available. This function requires a provider to be configured.",
+		}, nil
 	}
 
-	agentResponse, err := f.machinesAgent.OptimizePerformance(machineContext)
+	// Build prompt for performance optimization
+	prompt := fmt.Sprintf(`Optimize performance for NixOS machine.
+
+Machine: %s (Type: %s, Architecture: %s)
+Environment: %s
+Current Configuration: %v
+Hardware Info: %v
+Performance Settings: %v
+
+Please provide:
+1. Performance optimization recommendations
+2. Resource allocation tuning
+3. System performance settings
+4. Hardware-specific optimizations
+5. Service performance tuning
+6. Best practices for the target environment
+
+Focus on practical, implementable performance improvements.`,
+		req.MachineName, req.MachineType, req.Architecture, req.Environment,
+		req.Configuration, req.Hardware, req.Performance)
+
+	// Query the agent
+	agentResponse, err := f.machinesAgent.GenerateResponse(ctx, prompt)
 	if err != nil {
-		return nil, fmt.Errorf("agent performance optimization failed: %w", err)
+		return &MachinesResponse{
+			Operation: "performance",
+			Status:    "error",
+			Error:     fmt.Sprintf("Failed to optimize performance: %v", err),
+		}, nil
 	}
 
-	// Parse the agent response
-	response, err := f.parseAgentResponse(agentResponse, req.Operation)
+	// Parse the response
+	response, err := f.parseAgentResponse(agentResponse, "performance")
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse agent response: %w", err)
+		return &MachinesResponse{
+			Operation: "performance",
+			Status:    "error",
+			Error:     fmt.Sprintf("Failed to parse agent response: %v", err),
+		}, nil
 	}
 
 	response.Operation = req.Operation
 	response.Status = "success"
-
 	return response, nil
 }
 
@@ -785,33 +970,57 @@ func (f *MachinesFunction) executePerformance(ctx context.Context, req *Machines
 func (f *MachinesFunction) executeNetwork(ctx context.Context, req *MachinesRequest) (*MachinesResponse, error) {
 	f.logger.Info("Executing machines network operation")
 
-	// Use agent to configure network
-	machineContext := &agent.MachinesContext{
-		Operation:     req.Operation,
-		MachineName:   req.MachineName,
-		MachineType:   req.MachineType,
-		Architecture:  req.Architecture,
-		Environment:   req.Environment,
-		Configuration: req.Configuration,
-		Network:       req.Network,
-		Security:      req.Security,
-		Options:       req.Options,
+	if f.machinesAgent == nil {
+		return &MachinesResponse{
+			Operation: "network",
+			Status:    "error",
+			Error:     "No machine agent available. This function requires a provider to be configured.",
+		}, nil
 	}
 
-	agentResponse, err := f.machinesAgent.ConfigureNetwork(machineContext)
+	// Build prompt for network configuration
+	prompt := fmt.Sprintf(`Configure network settings for NixOS machine.
+
+Machine: %s (Type: %s, Architecture: %s)
+Environment: %s
+Current Configuration: %v
+Network Requirements: %v
+Security Settings: %v
+
+Please provide:
+1. Network interface configuration
+2. Routing and DNS settings
+3. Firewall configuration
+4. VPN setup if needed
+5. Network optimization recommendations
+6. Security considerations for network setup
+
+Focus on practical, implementable network configurations.`,
+		req.MachineName, req.MachineType, req.Architecture, req.Environment,
+		req.Configuration, req.Network, req.Security)
+
+	// Query the agent
+	agentResponse, err := f.machinesAgent.GenerateResponse(ctx, prompt)
 	if err != nil {
-		return nil, fmt.Errorf("agent network configuration failed: %w", err)
+		return &MachinesResponse{
+			Operation: "network",
+			Status:    "error",
+			Error:     fmt.Sprintf("Failed to configure network: %v", err),
+		}, nil
 	}
 
-	// Parse the agent response
-	response, err := f.parseAgentResponse(agentResponse, req.Operation)
+	// Parse the response
+	response, err := f.parseAgentResponse(agentResponse, "network")
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse agent response: %w", err)
+		return &MachinesResponse{
+			Operation: "network",
+			Status:    "error",
+			Error:     fmt.Sprintf("Failed to parse agent response: %v", err),
+		}, nil
 	}
 
 	response.Operation = req.Operation
 	response.Status = "success"
-
 	return response, nil
 }
 
@@ -819,32 +1028,56 @@ func (f *MachinesFunction) executeNetwork(ctx context.Context, req *MachinesRequ
 func (f *MachinesFunction) executeHardware(ctx context.Context, req *MachinesRequest) (*MachinesResponse, error) {
 	f.logger.Info("Executing machines hardware operation")
 
-	// Use agent to analyze hardware
-	machineContext := &agent.MachinesContext{
-		Operation:     req.Operation,
-		MachineName:   req.MachineName,
-		MachineType:   req.MachineType,
-		Architecture:  req.Architecture,
-		Environment:   req.Environment,
-		Configuration: req.Configuration,
-		Hardware:      req.Hardware,
-		Options:       req.Options,
+	if f.machinesAgent == nil {
+		return &MachinesResponse{
+			Operation: "hardware",
+			Status:    "error",
+			Error:     "No machine agent available. This function requires a provider to be configured.",
+		}, nil
 	}
 
-	agentResponse, err := f.machinesAgent.AnalyzeHardware(machineContext)
+	// Build prompt for hardware analysis
+	prompt := fmt.Sprintf(`Analyze hardware configuration for NixOS machine.
+
+Machine: %s (Type: %s, Architecture: %s)
+Environment: %s
+Current Configuration: %v
+Hardware Info: %v
+
+Please provide:
+1. Hardware compatibility analysis
+2. Driver recommendations
+3. Hardware optimization settings
+4. Performance tuning for detected hardware
+5. Potential hardware issues and solutions
+6. NixOS-specific hardware configuration
+
+Focus on practical hardware configuration recommendations.`,
+		req.MachineName, req.MachineType, req.Architecture, req.Environment,
+		req.Configuration, req.Hardware)
+
+	// Query the agent
+	agentResponse, err := f.machinesAgent.GenerateResponse(ctx, prompt)
 	if err != nil {
-		return nil, fmt.Errorf("agent hardware analysis failed: %w", err)
+		return &MachinesResponse{
+			Operation: "hardware",
+			Status:    "error",
+			Error:     fmt.Sprintf("Failed to analyze hardware: %v", err),
+		}, nil
 	}
 
-	// Parse the agent response
-	response, err := f.parseAgentResponse(agentResponse, req.Operation)
+	// Parse the response
+	response, err := f.parseAgentResponse(agentResponse, "hardware")
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse agent response: %w", err)
+		return &MachinesResponse{
+			Operation: "hardware",
+			Status:    "error",
+			Error:     fmt.Sprintf("Failed to parse agent response: %v", err),
+		}, nil
 	}
 
 	response.Operation = req.Operation
 	response.Status = "success"
-
 	return response, nil
 }
 

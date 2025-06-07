@@ -14,7 +14,7 @@ import (
 // NeovimFunction handles Neovim configuration and integration operations
 type NeovimFunction struct {
 	*functionbase.BaseFunction
-	neovimAgent *agent.NeovimAgent
+	neovimAgent *agent.NeovimSetupAgent
 	logger      *logger.Logger
 }
 
@@ -439,7 +439,7 @@ func NewNeovimFunction() *NeovimFunction {
 
 	return &NeovimFunction{
 		BaseFunction: baseFunc,
-		neovimAgent:  agent.NewNeovimAgent(),
+		neovimAgent:  agent.NewNeovimSetupAgent(nil), // Will be set with provider
 		logger:       logger.NewLogger(),
 	}
 }
@@ -540,30 +540,7 @@ func (f *NeovimFunction) executeConfiguration(ctx context.Context, req *NeovimRe
 	f.logger.Info("Executing neovim configuration operation")
 
 	// Use agent to configure neovim
-	neovimContext := &agent.NeovimContext{
-		Operation:    req.Operation,
-		ConfigType:   req.ConfigType,
-		Language:     req.Language,
-		Framework:    req.Framework,
-		Plugins:      req.Plugins,
-		Features:     req.Features,
-		Theme:        req.Theme,
-		KeyMappings:  req.KeyMappings,
-		LSP:          req.LSP,
-		Formatter:    req.Formatter,
-		Linter:       req.Linter,
-		Debugger:     req.Debugger,
-		Git:          req.Git,
-		FileExplorer: req.FileExplorer,
-		StatusLine:   req.StatusLine,
-		TabLine:      req.TabLine,
-		Terminal:     req.Terminal,
-		Copilot:      req.Copilot,
-		AI:           req.AI,
-		Options:      req.Options,
-	}
-
-	agentResponse, err := f.neovimAgent.ConfigureNeovim(neovimContext)
+	agentResponse, err := f.neovimAgent.SetupNeovimConfig(ctx, req.ConfigType, req.Language)
 	if err != nil {
 		return nil, fmt.Errorf("agent configuration failed: %w", err)
 	}
@@ -584,18 +561,16 @@ func (f *NeovimFunction) executeConfiguration(ctx context.Context, req *NeovimRe
 func (f *NeovimFunction) executePlugins(ctx context.Context, req *NeovimRequest) (*NeovimResponse, error) {
 	f.logger.Info("Executing neovim plugins operation")
 
-	// Use agent to manage plugins
-	neovimContext := &agent.NeovimContext{
-		Operation:  req.Operation,
-		ConfigType: req.ConfigType,
-		Language:   req.Language,
-		Framework:  req.Framework,
-		Plugins:    req.Plugins,
-		Features:   req.Features,
-		Options:    req.Options,
+	// Build plugin management requirements and use CustomizeWorkflow
+	var requirements []string
+	if len(req.Plugins) > 0 {
+		requirements = append(requirements, fmt.Sprintf("Plugins: %v", req.Plugins))
+	}
+	if len(req.Features) > 0 {
+		requirements = append(requirements, fmt.Sprintf("Features: %v", req.Features))
 	}
 
-	agentResponse, err := f.neovimAgent.ManagePlugins(neovimContext)
+	agentResponse, err := f.neovimAgent.CustomizeWorkflow(ctx, "plugin-management", requirements)
 	if err != nil {
 		return nil, fmt.Errorf("agent plugin management failed: %w", err)
 	}
@@ -616,19 +591,8 @@ func (f *NeovimFunction) executePlugins(ctx context.Context, req *NeovimRequest)
 func (f *NeovimFunction) executeLSP(ctx context.Context, req *NeovimRequest) (*NeovimResponse, error) {
 	f.logger.Info("Executing neovim LSP operation")
 
-	// Use agent to configure LSP
-	neovimContext := &agent.NeovimContext{
-		Operation: req.Operation,
-		Language:  req.Language,
-		Framework: req.Framework,
-		LSP:       req.LSP,
-		Formatter: req.Formatter,
-		Linter:    req.Linter,
-		Debugger:  req.Debugger,
-		Options:   req.Options,
-	}
-
-	agentResponse, err := f.neovimAgent.ConfigureLSP(neovimContext)
+	// Use agent to configure LSP with correct signature
+	agentResponse, err := f.neovimAgent.ConfigureLSP(ctx, req.LSP)
 	if err != nil {
 		return nil, fmt.Errorf("agent LSP configuration failed: %w", err)
 	}
@@ -649,14 +613,16 @@ func (f *NeovimFunction) executeLSP(ctx context.Context, req *NeovimRequest) (*N
 func (f *NeovimFunction) executeThemes(ctx context.Context, req *NeovimRequest) (*NeovimResponse, error) {
 	f.logger.Info("Executing neovim themes operation")
 
-	// Use agent to manage themes
-	neovimContext := &agent.NeovimContext{
-		Operation: req.Operation,
-		Theme:     req.Theme,
-		Options:   req.Options,
+	// Use CustomizeWorkflow for theme management
+	var requirements []string
+	if req.Theme != "" {
+		requirements = append(requirements, fmt.Sprintf("Theme: %s", req.Theme))
+	}
+	if len(req.Features) > 0 {
+		requirements = append(requirements, fmt.Sprintf("Features: %v", req.Features))
 	}
 
-	agentResponse, err := f.neovimAgent.ManageThemes(neovimContext)
+	agentResponse, err := f.neovimAgent.CustomizeWorkflow(ctx, "theme-management", requirements)
 	if err != nil {
 		return nil, fmt.Errorf("agent theme management failed: %w", err)
 	}
@@ -677,15 +643,16 @@ func (f *NeovimFunction) executeThemes(ctx context.Context, req *NeovimRequest) 
 func (f *NeovimFunction) executeKeymaps(ctx context.Context, req *NeovimRequest) (*NeovimResponse, error) {
 	f.logger.Info("Executing neovim keymaps operation")
 
-	// Use agent to manage keymaps
-	neovimContext := &agent.NeovimContext{
-		Operation:   req.Operation,
-		KeyMappings: req.KeyMappings,
-		Features:    req.Features,
-		Options:     req.Options,
+	// Use CustomizeWorkflow for keymap management
+	var requirements []string
+	if len(req.KeyMappings) > 0 {
+		requirements = append(requirements, fmt.Sprintf("KeyMappings: %v", req.KeyMappings))
+	}
+	if len(req.Features) > 0 {
+		requirements = append(requirements, fmt.Sprintf("Features: %v", req.Features))
 	}
 
-	agentResponse, err := f.neovimAgent.ManageKeymaps(neovimContext)
+	agentResponse, err := f.neovimAgent.CustomizeWorkflow(ctx, "keymap-management", requirements)
 	if err != nil {
 		return nil, fmt.Errorf("agent keymap management failed: %w", err)
 	}
@@ -706,20 +673,13 @@ func (f *NeovimFunction) executeKeymaps(ctx context.Context, req *NeovimRequest)
 func (f *NeovimFunction) executeLanguage(ctx context.Context, req *NeovimRequest) (*NeovimResponse, error) {
 	f.logger.Info("Executing neovim language operation")
 
-	// Use agent to configure for language
-	neovimContext := &agent.NeovimContext{
-		Operation: req.Operation,
-		Language:  req.Language,
-		Framework: req.Framework,
-		Features:  req.Features,
-		LSP:       req.LSP,
-		Formatter: req.Formatter,
-		Linter:    req.Linter,
-		Debugger:  req.Debugger,
-		Options:   req.Options,
+	// Use SetupNeovimConfig for language-specific configuration
+	configType := "language-specific"
+	if req.ConfigType != "" {
+		configType = req.ConfigType
 	}
 
-	agentResponse, err := f.neovimAgent.ConfigureForLanguage(neovimContext)
+	agentResponse, err := f.neovimAgent.SetupNeovimConfig(ctx, configType, req.Language)
 	if err != nil {
 		return nil, fmt.Errorf("agent language configuration failed: %w", err)
 	}
@@ -740,13 +700,12 @@ func (f *NeovimFunction) executeLanguage(ctx context.Context, req *NeovimRequest
 func (f *NeovimFunction) executeHealth(ctx context.Context, req *NeovimRequest) (*NeovimResponse, error) {
 	f.logger.Info("Executing neovim health operation")
 
-	// Use agent to run health check
-	neovimContext := &agent.NeovimContext{
-		Operation: req.Operation,
-		Options:   req.Options,
-	}
+	// Use CustomizeWorkflow for health check functionality
+	var requirements []string
+	requirements = append(requirements, "Health check diagnostics")
+	requirements = append(requirements, "System validation")
 
-	agentResponse, err := f.neovimAgent.RunHealthCheck(neovimContext)
+	agentResponse, err := f.neovimAgent.CustomizeWorkflow(ctx, "health-check", requirements)
 	if err != nil {
 		return nil, fmt.Errorf("agent health check failed: %w", err)
 	}
@@ -767,17 +726,19 @@ func (f *NeovimFunction) executeHealth(ctx context.Context, req *NeovimRequest) 
 func (f *NeovimFunction) executeTroubleshoot(ctx context.Context, req *NeovimRequest) (*NeovimResponse, error) {
 	f.logger.Info("Executing neovim troubleshoot operation")
 
-	// Use agent to troubleshoot
-	neovimContext := &agent.NeovimContext{
-		Operation: req.Operation,
-		Language:  req.Language,
-		Framework: req.Framework,
-		Plugins:   req.Plugins,
-		Features:  req.Features,
-		Options:   req.Options,
+	// Use TroubleshootConfig for troubleshooting
+	issue := "configuration-issue"
+	errorMessage := "General troubleshooting request"
+	if req.Options != nil {
+		if req.Options["issue"] != "" {
+			issue = req.Options["issue"]
+		}
+		if req.Options["error_message"] != "" {
+			errorMessage = req.Options["error_message"]
+		}
 	}
 
-	agentResponse, err := f.neovimAgent.Troubleshoot(neovimContext)
+	agentResponse, err := f.neovimAgent.TroubleshootConfig(ctx, issue, errorMessage)
 	if err != nil {
 		return nil, fmt.Errorf("agent troubleshooting failed: %w", err)
 	}
@@ -798,18 +759,25 @@ func (f *NeovimFunction) executeTroubleshoot(ctx context.Context, req *NeovimReq
 func (f *NeovimFunction) executeExamples(ctx context.Context, req *NeovimRequest) (*NeovimResponse, error) {
 	f.logger.Info("Executing neovim examples operation")
 
-	// Use agent to get examples
-	neovimContext := &agent.NeovimContext{
-		Operation:  req.Operation,
-		ConfigType: req.ConfigType,
-		Language:   req.Language,
-		Framework:  req.Framework,
-		Features:   req.Features,
-		Theme:      req.Theme,
-		Options:    req.Options,
+	// Use CustomizeWorkflow for examples
+	var requirements []string
+	if req.ConfigType != "" {
+		requirements = append(requirements, fmt.Sprintf("ConfigType: %s", req.ConfigType))
+	}
+	if req.Language != "" {
+		requirements = append(requirements, fmt.Sprintf("Language: %s", req.Language))
+	}
+	if req.Framework != "" {
+		requirements = append(requirements, fmt.Sprintf("Framework: %s", req.Framework))
+	}
+	if len(req.Features) > 0 {
+		requirements = append(requirements, fmt.Sprintf("Features: %v", req.Features))
+	}
+	if req.Theme != "" {
+		requirements = append(requirements, fmt.Sprintf("Theme: %s", req.Theme))
 	}
 
-	agentResponse, err := f.neovimAgent.GetExamples(neovimContext)
+	agentResponse, err := f.neovimAgent.CustomizeWorkflow(ctx, "examples-generation", requirements)
 	if err != nil {
 		return nil, fmt.Errorf("agent examples retrieval failed: %w", err)
 	}
@@ -831,13 +799,18 @@ func (f *NeovimFunction) executeMigrate(ctx context.Context, req *NeovimRequest)
 	f.logger.Info("Executing neovim migrate operation")
 
 	// Use agent to migrate configuration
-	neovimContext := &agent.NeovimContext{
-		Operation:  req.Operation,
-		ConfigType: req.ConfigType,
-		Options:    req.Options,
+	sourceEditor := "vim"
+	configPath := ""
+	if req.Options != nil {
+		if req.Options["source_editor"] != "" {
+			sourceEditor = req.Options["source_editor"]
+		}
+		if req.Options["config_path"] != "" {
+			configPath = req.Options["config_path"]
+		}
 	}
 
-	agentResponse, err := f.neovimAgent.MigrateConfiguration(neovimContext)
+	agentResponse, err := f.neovimAgent.MigrateConfiguration(ctx, sourceEditor, configPath)
 	if err != nil {
 		return nil, fmt.Errorf("agent migration failed: %w", err)
 	}

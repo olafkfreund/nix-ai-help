@@ -52,590 +52,513 @@ type LogsResponse struct {
 
 // LogEntry represents a single log entry
 type LogEntry struct {
-	Timestamp string            `json:"timestamp"`
+	Timestamp time.Time         `json:"timestamp"`
 	Level     string            `json:"level"`
 	Service   string            `json:"service"`
 	Message   string            `json:"message"`
-	PID       string            `json:"pid,omitempty"`
+	Source    string            `json:"source,omitempty"`
+	PID       int               `json:"pid,omitempty"`
 	Unit      string            `json:"unit,omitempty"`
-	Priority  string            `json:"priority,omitempty"`
+	Priority  int               `json:"priority,omitempty"`
 	Fields    map[string]string `json:"fields,omitempty"`
 }
 
-// LogSummary provides a summary of log analysis
+// LogSummary provides an overview of the logs
 type LogSummary struct {
-	TotalEntries      int            `json:"total_entries"`
-	ErrorCount        int            `json:"error_count"`
-	WarningCount      int            `json:"warning_count"`
-	TimeSpan          string         `json:"time_span"`
-	TopServices       []string       `json:"top_services"`
-	CommonPatterns    []string       `json:"common_patterns"`
-	CriticalIssues    []string       `json:"critical_issues"`
-	RecentActivity    []LogEntry     `json:"recent_activity"`
-	LevelDistribution map[string]int `json:"level_distribution"`
+	TotalEntries int            `json:"total_entries"`
+	TimeSpan     string         `json:"time_span"`
+	Services     []string       `json:"services"`
+	LogLevels    map[string]int `json:"log_levels"`
+	TopErrors    []string       `json:"top_errors,omitempty"`
+	TopWarnings  []string       `json:"top_warnings,omitempty"`
+	Patterns     map[string]int `json:"patterns,omitempty"`
+	Analysis     string         `json:"analysis,omitempty"`
 }
 
-// LogError represents an error found in logs
+// LogError represents a parsed error from logs
 type LogError struct {
-	Timestamp  string `json:"timestamp"`
-	Service    string `json:"service"`
-	Message    string `json:"message"`
-	Severity   string `json:"severity"`
-	Count      int    `json:"count"`
-	FirstSeen  string `json:"first_seen"`
-	LastSeen   string `json:"last_seen"`
-	Suggestion string `json:"suggestion"`
+	Timestamp   time.Time `json:"timestamp"`
+	Service     string    `json:"service"`
+	Message     string    `json:"message"`
+	Severity    string    `json:"severity"`
+	Context     string    `json:"context,omitempty"`
+	Suggestions []string  `json:"suggestions,omitempty"`
+	Related     []string  `json:"related,omitempty"`
 }
 
-// LogWarning represents a warning found in logs
+// LogWarning represents a parsed warning from logs
 type LogWarning struct {
-	Timestamp  string `json:"timestamp"`
-	Service    string `json:"service"`
-	Message    string `json:"message"`
-	Count      int    `json:"count"`
-	Suggestion string `json:"suggestion"`
+	Timestamp   time.Time `json:"timestamp"`
+	Service     string    `json:"service"`
+	Message     string    `json:"message"`
+	Context     string    `json:"context,omitempty"`
+	Suggestions []string  `json:"suggestions,omitempty"`
 }
 
 // LogStats provides statistical information about logs
 type LogStats struct {
-	TotalSize        string         `json:"total_size"`
-	OldestEntry      string         `json:"oldest_entry"`
-	NewestEntry      string         `json:"newest_entry"`
-	LogRotations     int            `json:"log_rotations"`
-	ServicesActive   int            `json:"services_active"`
-	AverageEntrySize string         `json:"average_entry_size"`
-	PeakActivityTime string         `json:"peak_activity_time"`
-	LogLevels        map[string]int `json:"log_levels"`
-	ServiceActivity  map[string]int `json:"service_activity"`
+	EntriesPerHour   map[string]int `json:"entries_per_hour,omitempty"`
+	ErrorsPerService map[string]int `json:"errors_per_service,omitempty"`
+	LogLevelTrends   map[string]int `json:"log_level_trends,omitempty"`
+	ServiceActivity  map[string]int `json:"service_activity,omitempty"`
+	PeakTimes        []string       `json:"peak_times,omitempty"`
+	Anomalies        []string       `json:"anomalies,omitempty"`
 }
 
-// NewLogsFunction creates a new logs function
-func NewLogsFunction() *LogsFunction {
+// NewLogsFunction creates a new logs function with an agent
+func NewLogsFunction(agent *agent.LogsAgent, logger *logger.Logger) *LogsFunction {
 	// Define function parameters
 	parameters := []functionbase.FunctionParameter{
-		functionbase.StringParamWithOptions("operation", "Operation to perform", true,
-			[]string{"view", "analyze", "search", "filter", "tail", "monitor", "export", "clean", "summary"}, nil, nil),
-		functionbase.StringParamWithOptions("log_type", "Type of logs to access", false,
-			[]string{"system", "service", "kernel", "boot", "user", "application", "security", "network"}, nil, nil),
-		functionbase.StringParam("time_range", "Time range for log retrieval (e.g., '1h', '24h', 'since yesterday')", false),
-		functionbase.StringParam("service", "Specific service name to filter logs", false),
-		functionbase.StringParamWithOptions("level", "Log level filter", false,
-			[]string{"emergency", "alert", "critical", "error", "warning", "notice", "info", "debug"}, nil, nil),
-		functionbase.StringParam("filter", "Text filter or regex pattern", false),
-		functionbase.IntParam("lines", "Number of lines to retrieve", false, 100),
-		functionbase.BoolParam("follow", "Follow logs in real-time", false),
-		functionbase.StringParamWithOptions("format", "Output format", false,
-			[]string{"json", "plain", "table", "colored", "short", "verbose"}, nil, nil),
-		functionbase.StringParam("output", "Output file path", false),
-		{
-			Name:        "keywords",
-			Type:        "array",
-			Description: "Keywords to search for in logs",
-			Required:    false,
-		},
-		{
-			Name:        "exclude_list",
-			Type:        "array",
-			Description: "Patterns to exclude from results",
-			Required:    false,
-		},
-		{
-			Name:        "options",
-			Type:        "object",
-			Description: "Additional options for log operations",
-			Required:    false,
-		},
+		functionbase.StringParamWithOptions("operation", "Log operation to perform", true,
+			[]string{"analyze", "parse", "diagnose", "filter", "search", "monitor", "rotate", "export", "statistics", "troubleshoot", "correlate"}, nil, nil),
+		functionbase.StringParam("log_type", "Type of logs to process", false),
+		functionbase.StringParam("time_range", "Time range for log analysis", false),
+		functionbase.StringParam("service", "Specific service to focus on", false),
+		functionbase.StringParam("level", "Log level filter", false),
+		functionbase.StringParam("filter", "Additional filter criteria", false),
+		functionbase.IntParam("lines", "Number of lines to process", false, 100),
+		functionbase.BoolParam("follow", "Follow log output in real-time", false, false),
+		functionbase.StringParam("format", "Output format preference", false),
+		functionbase.StringParam("output", "Output destination", false),
+		functionbase.ArrayParam("keywords", "Keywords to search for", false),
+		functionbase.ArrayParam("exclude_list", "Patterns to exclude", false),
+		functionbase.ObjectParam("options", "Additional options", false),
 	}
-
-	baseFunc := functionbase.NewBaseFunction(
-		"logs",
-		"Analyze and manage system logs using journalctl and other log tools",
-		parameters,
-	)
 
 	return &LogsFunction{
-		BaseFunction: baseFunc,
-		agent:        nil, // Set to nil to avoid provider requirement
-		logger:       logger.NewLogger(),
+		BaseFunction: functionbase.NewBaseFunction("logs", "System log analysis and management", parameters),
+		agent:        agent,
+		logger:       logger,
 	}
 }
 
-// Execute implements the FunctionInterface
-func (f *LogsFunction) Execute(ctx context.Context, params map[string]interface{}, options *functionbase.FunctionOptions) (*functionbase.FunctionResult, error) {
-	startTime := time.Now()
+// AnalyzeLogs analyzes system logs using AI
+func (lf *LogsFunction) AnalyzeLogs(ctx context.Context, request *LogsRequest) (*LogsResponse, error) {
+	if lf.agent == nil {
+		return nil, fmt.Errorf("logs agent not available")
+	}
 
-	// Parse and validate request
-	request, err := f.parseRequest(params)
+	prompt := fmt.Sprintf(`Analyze the following log request: %+v
+
+Please provide:
+1. Log retrieval strategy
+2. Analysis approach
+3. What to look for (errors, warnings, patterns)
+4. Suggested filters or search terms
+5. Expected output format
+6. Troubleshooting steps if issues are found
+
+Be specific about systemd/journalctl commands to use.`, request)
+
+	response, err := lf.agent.GenerateResponse(ctx, prompt)
 	if err != nil {
-		return functionbase.ErrorResult(fmt.Errorf("invalid request: %w", err), time.Since(startTime)), nil
+		return nil, fmt.Errorf("failed to analyze logs: %w", err)
 	}
 
-	if err := f.validateRequest(request); err != nil {
-		return functionbase.ErrorResult(fmt.Errorf("validation failed: %w", err), time.Since(startTime)), nil
+	return &LogsResponse{
+		Operation: request.Operation,
+		Status:    "analyzed",
+		Summary: &LogSummary{
+			Analysis: response,
+		},
+	}, nil
+}
+
+// ParseLogs parses and structures log content
+func (lf *LogsFunction) ParseLogs(ctx context.Context, logContent string, logType string) (*LogsResponse, error) {
+	if lf.agent == nil {
+		return nil, fmt.Errorf("logs agent not available")
 	}
 
-	// Execute logs operation
-	response, err := f.executeLogsOperation(ctx, request)
+	prompt := fmt.Sprintf(`Parse and analyze this %s log content:
+
+%s
+
+Please provide:
+1. Summary of log entries
+2. Identified errors and warnings
+3. Service activity patterns
+4. Notable events or anomalies
+5. Recommendations for further investigation
+6. Suggested actions or fixes
+
+Structure the analysis clearly with sections.`, logType, logContent)
+
+	response, err := lf.agent.GenerateResponse(ctx, prompt)
 	if err != nil {
-		return functionbase.ErrorResult(fmt.Errorf("execution failed: %w", err), time.Since(startTime)), nil
+		return nil, fmt.Errorf("failed to parse logs: %w", err)
 	}
 
-	return functionbase.SuccessResult(response, time.Since(startTime)), nil
+	return &LogsResponse{
+		Operation:  "parse",
+		Status:     "completed",
+		TotalLines: len(strings.Split(logContent, "\n")),
+		Summary: &LogSummary{
+			Analysis: response,
+		},
+	}, nil
 }
 
-// parseRequest converts the raw parameters into a structured request
-func (f *LogsFunction) parseRequest(params map[string]interface{}) (*LogsRequest, error) {
-	request := &LogsRequest{}
-
-	if operation, ok := params["operation"].(string); ok {
-		request.Operation = operation
+// DiagnoseLogs diagnoses issues found in logs
+func (lf *LogsFunction) DiagnoseLogs(ctx context.Context, logContent string, symptoms []string) (*LogsResponse, error) {
+	if lf.agent == nil {
+		return nil, fmt.Errorf("logs agent not available")
 	}
 
-	if logType, ok := params["log_type"].(string); ok {
-		request.LogType = logType
-	}
+	symptomsStr := strings.Join(symptoms, ", ")
+	prompt := fmt.Sprintf(`Diagnose issues in these logs based on symptoms: %s
 
-	if timeRange, ok := params["time_range"].(string); ok {
-		request.TimeRange = timeRange
-	}
+Log content:
+%s
 
-	if service, ok := params["service"].(string); ok {
-		request.Service = service
-	}
+Please provide:
+1. Root cause analysis
+2. Identified error patterns
+3. Service dependencies affected
+4. Timeline of events
+5. Specific fix recommendations
+6. Prevention strategies
+7. Commands to run for resolution
 
-	if level, ok := params["level"].(string); ok {
-		request.Level = level
-	}
+Focus on actionable solutions.`, symptomsStr, logContent)
 
-	if filter, ok := params["filter"].(string); ok {
-		request.Filter = filter
-	}
-
-	if lines, ok := params["lines"].(float64); ok {
-		request.Lines = int(lines)
-	}
-
-	if follow, ok := params["follow"].(bool); ok {
-		request.Follow = follow
-	}
-
-	if format, ok := params["format"].(string); ok {
-		request.Format = format
-	}
-
-	if output, ok := params["output"].(string); ok {
-		request.Output = output
-	}
-
-	if keywords, ok := params["keywords"].([]interface{}); ok {
-		for _, keyword := range keywords {
-			if k, ok := keyword.(string); ok {
-				request.Keywords = append(request.Keywords, k)
-			}
-		}
-	}
-
-	if excludeList, ok := params["exclude_list"].([]interface{}); ok {
-		for _, exclude := range excludeList {
-			if e, ok := exclude.(string); ok {
-				request.ExcludeList = append(request.ExcludeList, e)
-			}
-		}
-	}
-
-	if options, ok := params["options"].(map[string]interface{}); ok {
-		request.Options = make(map[string]string)
-		for k, v := range options {
-			if s, ok := v.(string); ok {
-				request.Options[k] = s
-			}
-		}
-	}
-
-	return request, nil
-}
-
-// validateRequest validates the parsed request
-func (f *LogsFunction) validateRequest(request *LogsRequest) error {
-	if request.Operation == "" {
-		return fmt.Errorf("operation is required")
-	}
-
-	validOps := []string{"view", "analyze", "search", "filter", "tail", "monitor", "export", "clean", "summary"}
-	if !f.contains(validOps, request.Operation) {
-		return fmt.Errorf("invalid operation: %s", request.Operation)
-	}
-
-	if request.Lines != 0 && (request.Lines < 1 || request.Lines > 10000) {
-		return fmt.Errorf("lines must be between 1 and 10000")
-	}
-
-	return nil
-}
-
-// executeLogsOperation executes the logs operation
-func (f *LogsFunction) executeLogsOperation(ctx context.Context, request *LogsRequest) (*LogsResponse, error) {
-	// Create context for the agent - but agent methods don't exist, so we'll mock responses
-	agentContext := agent.LogsContext{
-		LogSources:     []string{request.LogType},
-		LogFiles:       []string{},
-		LogContent:     "",
-		LogLevel:       request.Level,
-		TimeRange:      request.TimeRange,
-		ServiceNames:   []string{request.Service},
-		LogPatterns:    request.Keywords,
-		OutputFormat:   request.Format,
-		FilterCriteria: request.Options,
-	}
-
-	switch request.Operation {
-	case "view":
-		return f.handleViewOperation(ctx, agentContext)
-	case "analyze":
-		return f.handleAnalyzeOperation(ctx, agentContext)
-	case "search":
-		return f.handleSearchOperation(ctx, agentContext)
-	case "filter":
-		return f.handleFilterOperation(ctx, agentContext)
-	case "tail":
-		return f.handleTailOperation(ctx, agentContext)
-	case "monitor":
-		return f.handleMonitorOperation(ctx, agentContext)
-	case "export":
-		return f.handleExportOperation(ctx, agentContext)
-	case "clean":
-		return f.handleCleanOperation(ctx, agentContext)
-	case "summary":
-		return f.handleSummaryOperation(ctx, agentContext)
-	default:
-		return nil, fmt.Errorf("unsupported operation: %s", request.Operation)
-	}
-}
-
-// handleViewOperation handles log viewing
-func (f *LogsFunction) handleViewOperation(ctx context.Context, agentContext agent.LogsContext) (*LogsResponse, error) {
-	result, err := f.agent.ViewLogs(ctx, agentContext)
+	response, err := lf.agent.GenerateResponse(ctx, prompt)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to diagnose logs: %w", err)
 	}
 
-	response := &LogsResponse{
-		Operation:     "view",
-		Status:        "success",
-		LogEntries:    f.parseLogEntries(result),
-		TotalLines:    f.countLines(result),
-		FilteredLines: f.countFilteredLines(result, agentContext),
-	}
-
-	return response, nil
+	return &LogsResponse{
+		Operation: "diagnose",
+		Status:    "completed",
+		Summary: &LogSummary{
+			Analysis: response,
+		},
+		Suggestions: []string{
+			"Review the diagnosis and follow recommended steps",
+			"Monitor logs after applying fixes",
+			"Consider implementing preventive measures",
+		},
+	}, nil
 }
 
-// handleAnalyzeOperation handles log analysis
-func (f *LogsFunction) handleAnalyzeOperation(ctx context.Context, agentContext agent.LogsContext) (*LogsResponse, error) {
-	result, err := f.agent.AnalyzeLogs(ctx, agentContext)
+// FilterLogs filters logs based on criteria
+func (lf *LogsFunction) FilterLogs(ctx context.Context, request *LogsRequest, logContent string) (*LogsResponse, error) {
+	if lf.agent == nil {
+		return nil, fmt.Errorf("logs agent not available")
+	}
+
+	prompt := fmt.Sprintf(`Filter this log content based on these criteria:
+- Service: %s
+- Level: %s
+- Time Range: %s
+- Keywords: %v
+- Filter: %s
+
+Log content:
+%s
+
+Provide:
+1. Filtered log entries that match criteria
+2. Summary of filtered content
+3. Statistics about filtering results
+4. Suggested additional filters
+5. Commands to reproduce this filtering`,
+		request.Service, request.Level, request.TimeRange,
+		request.Keywords, request.Filter, logContent)
+
+	response, err := lf.agent.GenerateResponse(ctx, prompt)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to filter logs: %w", err)
 	}
 
-	response := &LogsResponse{
-		Operation:   "analyze",
-		Status:      "success",
-		Summary:     f.parseLogSummary(result),
-		Errors:      f.parseLogErrors(result),
-		Warnings:    f.parseLogWarnings(result),
-		Statistics:  f.parseLogStats(result),
-		Suggestions: f.parseAnalysisSuggestions(result),
-		NextSteps:   f.parseNextSteps(result),
-	}
-
-	return response, nil
-}
-
-// handleSearchOperation handles log searching
-func (f *LogsFunction) handleSearchOperation(ctx context.Context, agentContext agent.LogsContext) (*LogsResponse, error) {
-	result, err := f.agent.SearchLogs(ctx, agentContext)
-	if err != nil {
-		return nil, err
-	}
-
-	response := &LogsResponse{
-		Operation:     "search",
-		Status:        "success",
-		LogEntries:    f.parseLogEntries(result),
-		TotalLines:    f.countLines(result),
-		FilteredLines: f.countFilteredLines(result, agentContext),
-		Suggestions:   f.parseSearchSuggestions(result),
-	}
-
-	return response, nil
-}
-
-// handleFilterOperation handles log filtering
-func (f *LogsFunction) handleFilterOperation(ctx context.Context, agentContext agent.LogsContext) (*LogsResponse, error) {
-	result, err := f.agent.FilterLogs(ctx, agentContext)
-	if err != nil {
-		return nil, err
-	}
-
-	response := &LogsResponse{
+	lines := strings.Split(logContent, "\n")
+	return &LogsResponse{
 		Operation:     "filter",
-		Status:        "success",
-		LogEntries:    f.parseLogEntries(result),
-		TotalLines:    f.countLines(result),
-		FilteredLines: f.countFilteredLines(result, agentContext),
-	}
-
-	return response, nil
+		Status:        "completed",
+		TotalLines:    len(lines),
+		FilteredLines: len(lines), // This would be calculated based on actual filtering
+		Summary: &LogSummary{
+			Analysis: response,
+		},
+	}, nil
 }
 
-// handleTailOperation handles log tailing
-func (f *LogsFunction) handleTailOperation(ctx context.Context, agentContext agent.LogsContext) (*LogsResponse, error) {
-	result, err := f.agent.TailLogs(ctx, agentContext)
+// SearchLogs searches for specific patterns in logs
+func (lf *LogsFunction) SearchLogs(ctx context.Context, pattern string, logContent string) (*LogsResponse, error) {
+	if lf.agent == nil {
+		return nil, fmt.Errorf("logs agent not available")
+	}
+
+	prompt := fmt.Sprintf(`Search for pattern "%s" in these logs:
+
+%s
+
+Provide:
+1. Matching log entries
+2. Context around matches
+3. Pattern frequency and distribution
+4. Related patterns or correlations
+5. Analysis of what these matches indicate
+6. Suggested follow-up searches
+
+Focus on relevant matches and their significance.`, pattern, logContent)
+
+	response, err := lf.agent.GenerateResponse(ctx, prompt)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to search logs: %w", err)
 	}
 
-	response := &LogsResponse{
-		Operation:  "tail",
-		Status:     "success",
-		LogEntries: f.parseLogEntries(result),
-		NextSteps:  []string{"Use Ctrl+C to stop tailing", "Monitor for new entries"},
-	}
-
-	return response, nil
+	return &LogsResponse{
+		Operation: "search",
+		Status:    "completed",
+		Summary: &LogSummary{
+			Analysis: response,
+		},
+	}, nil
 }
 
-// handleMonitorOperation handles log monitoring
-func (f *LogsFunction) handleMonitorOperation(ctx context.Context, agentContext agent.LogsContext) (*LogsResponse, error) {
-	result, err := f.agent.MonitorLogs(ctx, agentContext)
+// MonitorLogs provides guidance for log monitoring
+func (lf *LogsFunction) MonitorLogs(ctx context.Context, services []string, duration string) (*LogsResponse, error) {
+	if lf.agent == nil {
+		return nil, fmt.Errorf("logs agent not available")
+	}
+
+	servicesStr := strings.Join(services, ", ")
+	prompt := fmt.Sprintf(`Provide log monitoring guidance for services: %s (duration: %s)
+
+Include:
+1. Commands to monitor these services in real-time
+2. Key metrics and patterns to watch for
+3. Alert conditions and thresholds
+4. Log rotation and retention considerations
+5. Performance monitoring integration
+6. Automated monitoring setup instructions
+7. Dashboard and visualization options
+
+Make it practical for system administrators.`, servicesStr, duration)
+
+	response, err := lf.agent.GenerateResponse(ctx, prompt)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to generate monitoring guidance: %w", err)
 	}
 
-	response := &LogsResponse{
-		Operation:   "monitor",
-		Status:      "success",
-		Statistics:  f.parseLogStats(result),
-		Summary:     f.parseLogSummary(result),
-		Suggestions: f.parseMonitorSuggestions(result),
-		NextSteps:   []string{"Review monitored patterns", "Set up alerts if needed"},
-	}
-
-	return response, nil
+	return &LogsResponse{
+		Operation: "monitor",
+		Status:    "guidance_provided",
+		Summary: &LogSummary{
+			Analysis: response,
+		},
+		NextSteps: []string{
+			"Set up monitoring commands as suggested",
+			"Configure alerting for critical conditions",
+			"Establish log retention policies",
+			"Test monitoring setup",
+		},
+	}, nil
 }
 
-// handleExportOperation handles log export
-func (f *LogsFunction) handleExportOperation(ctx context.Context, agentContext agent.LogsContext) (*LogsResponse, error) {
-	result, err := f.agent.ExportLogs(ctx, agentContext)
-	if err != nil {
-		return nil, err
+// RotateLogs provides log rotation guidance and commands
+func (lf *LogsFunction) RotateLogs(ctx context.Context, service string, retentionDays int) (*LogsResponse, error) {
+	if lf.agent == nil {
+		return nil, fmt.Errorf("logs agent not available")
 	}
 
-	response := &LogsResponse{
+	prompt := fmt.Sprintf(`Provide log rotation guidance for service: %s (retention: %d days)
+
+Include:
+1. Current log rotation status check commands
+2. Configuration of logrotate for this service
+3. Manual rotation commands if needed
+4. Disk space management considerations
+5. Backup strategies before rotation
+6. Verification steps after rotation
+7. Troubleshooting common rotation issues
+
+Ensure compatibility with systemd and NixOS.`, service, retentionDays)
+
+	response, err := lf.agent.GenerateResponse(ctx, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate rotation guidance: %w", err)
+	}
+
+	return &LogsResponse{
+		Operation: "rotate",
+		Status:    "guidance_provided",
+		Summary: &LogSummary{
+			Analysis: response,
+		},
+		NextSteps: []string{
+			"Check current log sizes and rotation status",
+			"Apply recommended rotation configuration",
+			"Test rotation with a small log first",
+			"Monitor disk space after rotation",
+		},
+	}, nil
+}
+
+// ExportLogs provides guidance for exporting logs
+func (lf *LogsFunction) ExportLogs(ctx context.Context, request *LogsRequest) (*LogsResponse, error) {
+	if lf.agent == nil {
+		return nil, fmt.Errorf("logs agent not available")
+	}
+
+	prompt := fmt.Sprintf(`Provide log export guidance for this request: %+v
+
+Include:
+1. Appropriate journalctl export commands
+2. Format conversion options (JSON, plain text, etc.)
+3. Compression and archiving strategies
+4. Remote transfer methods
+5. Privacy and security considerations
+6. Incremental export strategies
+7. Verification of exported data
+
+Make commands ready to use.`, request)
+
+	response, err := lf.agent.GenerateResponse(ctx, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate export guidance: %w", err)
+	}
+
+	return &LogsResponse{
 		Operation: "export",
-		Status:    "success",
-		NextSteps: f.parseExportInfo(result),
-	}
-
-	return response, nil
+		Status:    "guidance_provided",
+		Summary: &LogSummary{
+			Analysis: response,
+		},
+		NextSteps: []string{
+			"Choose appropriate export format",
+			"Run export commands as provided",
+			"Verify exported data integrity",
+			"Secure exported files appropriately",
+		},
+	}, nil
 }
 
-// handleCleanOperation handles log cleanup
-func (f *LogsFunction) handleCleanOperation(ctx context.Context, agentContext agent.LogsContext) (*LogsResponse, error) {
-	result, err := f.agent.CleanLogs(ctx, agentContext)
+// GetLogStatistics analyzes log statistics and patterns
+func (lf *LogsFunction) GetLogStatistics(ctx context.Context, logContent string, timeRange string) (*LogsResponse, error) {
+	if lf.agent == nil {
+		return nil, fmt.Errorf("logs agent not available")
+	}
+
+	prompt := fmt.Sprintf(`Analyze statistics for these logs (time range: %s):
+
+%s
+
+Provide:
+1. Entry count by time periods
+2. Log level distribution
+3. Service activity analysis
+4. Error/warning frequency
+5. Peak activity times
+6. Unusual patterns or anomalies
+7. Resource usage indicators from logs
+8. Trends and projections
+
+Present in a structured, easy-to-read format.`, timeRange, logContent)
+
+	response, err := lf.agent.GenerateResponse(ctx, prompt)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to generate log statistics: %w", err)
 	}
 
-	response := &LogsResponse{
-		Operation:   "clean",
-		Status:      "success",
-		Statistics:  f.parseLogStats(result),
-		Suggestions: []string{"Review cleanup results", "Verify log rotation settings"},
-		NextSteps:   f.parseCleanupInfo(result),
-	}
-
-	return response, nil
+	lines := strings.Split(logContent, "\n")
+	return &LogsResponse{
+		Operation:  "statistics",
+		Status:     "completed",
+		TotalLines: len(lines),
+		Summary: &LogSummary{
+			TotalEntries: len(lines),
+			Analysis:     response,
+		},
+		Statistics: &LogStats{
+			// These would be populated with actual statistical analysis
+		},
+	}, nil
 }
 
-// handleSummaryOperation handles log summary
-func (f *LogsFunction) handleSummaryOperation(ctx context.Context, agentContext agent.LogsContext) (*LogsResponse, error) {
-	result, err := f.agent.GetLogsSummary(ctx, agentContext)
+// TroubleshootFromLogs troubleshoots issues using log analysis
+func (lf *LogsFunction) TroubleshootFromLogs(ctx context.Context, logContent string, issueDescription string) (*LogsResponse, error) {
+	if lf.agent == nil {
+		return nil, fmt.Errorf("logs agent not available")
+	}
+
+	prompt := fmt.Sprintf(`Troubleshoot this issue using log analysis:
+
+Issue: %s
+
+Log content:
+%s
+
+Provide:
+1. Issue identification in logs
+2. Root cause analysis
+3. Timeline of events leading to issue
+4. Related service dependencies
+5. Step-by-step troubleshooting guide
+6. Fix recommendations with commands
+7. Prevention strategies
+8. Monitoring improvements
+
+Be specific and actionable.`, issueDescription, logContent)
+
+	response, err := lf.agent.GenerateResponse(ctx, prompt)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to troubleshoot from logs: %w", err)
 	}
 
-	response := &LogsResponse{
-		Operation:  "summary",
-		Status:     "success",
-		Summary:    f.parseLogSummary(result),
-		Statistics: f.parseLogStats(result),
-		Errors:     f.parseLogErrors(result),
-		Warnings:   f.parseLogWarnings(result),
-		NextSteps:  []string{"Review summary details", "Investigate any errors or warnings"},
-	}
-
-	return response, nil
+	return &LogsResponse{
+		Operation: "troubleshoot",
+		Status:    "analysis_completed",
+		Summary: &LogSummary{
+			Analysis: response,
+		},
+		NextSteps: []string{
+			"Follow the troubleshooting steps provided",
+			"Apply recommended fixes carefully",
+			"Monitor logs after changes",
+			"Implement prevention measures",
+		},
+	}, nil
 }
 
-// Helper methods for parsing agent responses
-
-func (f *LogsFunction) parseLogEntries(response string) []LogEntry {
-	var entries []LogEntry
-
-	// Simple parsing - in a real implementation, this would parse actual log formats
-	lines := strings.Split(response, "\n")
-	for _, line := range lines {
-		if strings.TrimSpace(line) != "" {
-			entry := LogEntry{
-				Timestamp: time.Now().Format(time.RFC3339),
-				Level:     "info",
-				Message:   line,
-				Service:   "unknown",
-			}
-			entries = append(entries, entry)
-		}
+// CorrelateEvents correlates events across different logs and services
+func (lf *LogsFunction) CorrelateEvents(ctx context.Context, logSources []string, timeWindow string) (*LogsResponse, error) {
+	if lf.agent == nil {
+		return nil, fmt.Errorf("logs agent not available")
 	}
 
-	return entries
-}
+	sourcesStr := strings.Join(logSources, ", ")
+	prompt := fmt.Sprintf(`Correlate events across these log sources within %s time window: %s
 
-func (f *LogsFunction) parseLogSummary(response string) *LogSummary {
-	return &LogSummary{
-		TotalEntries:      100,
-		ErrorCount:        5,
-		WarningCount:      10,
-		TimeSpan:          "24h",
-		TopServices:       []string{"systemd", "networkd", "nixos-rebuild"},
-		CommonPatterns:    []string{"startup", "configuration", "service start"},
-		CriticalIssues:    []string{},
-		LevelDistribution: map[string]int{"info": 70, "warning": 20, "error": 10},
-	}
-}
+Provide:
+1. Commands to collect logs from all sources
+2. Event correlation methodology
+3. Timeline synchronization approaches
+4. Pattern identification across services
+5. Dependency analysis between services
+6. Common event sequences
+7. Anomaly detection strategies
+8. Visualization recommendations
 
-func (f *LogsFunction) parseLogErrors(response string) []LogError {
-	var errors []LogError
+Focus on practical correlation techniques.`, timeWindow, sourcesStr)
 
-	if strings.Contains(strings.ToLower(response), "error") {
-		errors = append(errors, LogError{
-			Timestamp:  time.Now().Format(time.RFC3339),
-			Service:    "system",
-			Message:    "Error detected in logs",
-			Severity:   "medium",
-			Count:      1,
-			Suggestion: "Review the error details and check system status",
-		})
+	response, err := lf.agent.GenerateResponse(ctx, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("failed to correlate events: %w", err)
 	}
 
-	return errors
-}
-
-func (f *LogsFunction) parseLogWarnings(response string) []LogWarning {
-	var warnings []LogWarning
-
-	if strings.Contains(strings.ToLower(response), "warning") {
-		warnings = append(warnings, LogWarning{
-			Timestamp:  time.Now().Format(time.RFC3339),
-			Service:    "system",
-			Message:    "Warning detected in logs",
-			Count:      1,
-			Suggestion: "Monitor for recurring warnings",
-		})
-	}
-
-	return warnings
-}
-
-func (f *LogsFunction) parseLogStats(response string) *LogStats {
-	return &LogStats{
-		TotalSize:        "1.2GB",
-		OldestEntry:      "7 days ago",
-		NewestEntry:      "now",
-		LogRotations:     7,
-		ServicesActive:   25,
-		AverageEntrySize: "120 bytes",
-		PeakActivityTime: "09:00",
-		LogLevels:        map[string]int{"info": 70, "warning": 20, "error": 10},
-		ServiceActivity:  map[string]int{"systemd": 40, "networkd": 20, "other": 40},
-	}
-}
-
-func (f *LogsFunction) parseAnalysisSuggestions(response string) []string {
-	return []string{
-		"Review error patterns for recurring issues",
-		"Check system resource usage during peak times",
-		"Monitor service startup times",
-		"Consider log rotation settings",
-	}
-}
-
-func (f *LogsFunction) parseSearchSuggestions(response string) []string {
-	return []string{
-		"Try broader search terms if no results found",
-		"Use time ranges to narrow results",
-		"Check service-specific logs",
-	}
-}
-
-func (f *LogsFunction) parseMonitorSuggestions(response string) []string {
-	return []string{
-		"Set up alerting for critical errors",
-		"Review log retention policies",
-		"Monitor disk usage for log storage",
-	}
-}
-
-func (f *LogsFunction) parseNextSteps(response string) []string {
-	return []string{
-		"Review analysis results",
-		"Address any critical issues",
-		"Monitor system performance",
-	}
-}
-
-func (f *LogsFunction) parseExportInfo(response string) []string {
-	return []string{
-		"Logs exported successfully",
-		"Check output file location",
-		"Verify export format and content",
-	}
-}
-
-func (f *LogsFunction) parseCleanupInfo(response string) []string {
-	return []string{
-		"Log cleanup completed",
-		"Review freed disk space",
-		"Verify log rotation configuration",
-	}
-}
-
-func (f *LogsFunction) countLines(response string) int {
-	return len(strings.Split(response, "\n"))
-}
-
-func (f *LogsFunction) countFilteredLines(response string, context agent.LogsContext) int {
-	lines := strings.Split(response, "\n")
-	filtered := 0
-
-	for _, line := range lines {
-		if context.Filter != "" && strings.Contains(strings.ToLower(line), strings.ToLower(context.Filter)) {
-			filtered++
-		}
-	}
-
-	if context.Filter == "" {
-		return len(lines)
-	}
-
-	return filtered
-}
-
-// Helper function to check if slice contains string
-func (f *LogsFunction) contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
+	return &LogsResponse{
+		Operation: "correlate",
+		Status:    "guidance_provided",
+		Summary: &LogSummary{
+			Analysis: response,
+		},
+		NextSteps: []string{
+			"Collect logs from all specified sources",
+			"Apply correlation techniques as suggested",
+			"Look for patterns in the timeline",
+			"Document findings for future reference",
+		},
+	}, nil
 }
