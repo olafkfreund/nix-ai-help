@@ -1,0 +1,57 @@
+{ lib, buildNpmPackage, fetchFromGitHub, typescript }:
+
+buildNpmPackage rec {
+  pname = "{{.ProjectName}}";
+  version = "{{.Version}}";
+
+  src = fetchFromGitHub {
+    owner = "{{.Owner}}";
+    repo = "{{.ProjectName}}";
+    rev = "v${version}";
+    sha256 = lib.fakeHash;
+  };
+
+  npmDepsHash = lib.fakeHash;
+
+  nativeBuildInputs = [ typescript ];
+
+  # TypeScript projects usually need build step
+  npmBuildScript = "build";
+  npmPackFlags = [ "--ignore-scripts" ];
+
+{{- if .BuildPhase}}
+  buildPhase = ''
+{{.BuildPhase}}
+  '';
+{{- end}}
+
+{{- if .InstallPhase}}
+  installPhase = ''
+{{.InstallPhase}}
+  '';
+{{- else}}
+  installPhase = ''
+    runHook preInstall
+    mkdir -p $out/bin
+    cp -r dist/* $out/ || cp -r build/* $out/ || cp -r lib/* $out/
+    runHook postInstall
+  '';
+{{- end}}
+
+{{- if .CheckPhase}}
+  doCheck = true;
+  checkPhase = ''
+{{.CheckPhase}}
+  '';
+{{- end}}
+
+  meta = with lib; {
+    description = "{{.Description}}";
+    homepage = "{{.Homepage}}";
+{{- if .License}}
+    license = licenses.{{.License | lower}};
+{{- end}}
+    maintainers = with maintainers; [ ];
+    platforms = platforms.all;
+  };
+}

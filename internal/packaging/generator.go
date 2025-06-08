@@ -26,7 +26,7 @@ func NewDerivationGenerator(aiProvider ai.AIProvider, mcpClient *mcp.MCPClient) 
 // GenerateDerivation generates a Nix derivation for the analyzed repository
 func (dg *DerivationGenerator) GenerateDerivation(ctx context.Context, analysis *RepoAnalysis) (string, error) {
 	// Get relevant nixpkgs documentation and examples
-	nixpkgsContext, err := dg.getNixpkgsContext(ctx, analysis.BuildSystem, analysis.Language)
+	nixpkgsContext, err := dg.GetNixpkgsContext(ctx, analysis.BuildSystem, analysis.Language)
 	if err != nil {
 		return "", fmt.Errorf("failed to get nixpkgs context: %w", err)
 	}
@@ -41,13 +41,13 @@ func (dg *DerivationGenerator) GenerateDerivation(ctx context.Context, analysis 
 	}
 
 	// Extract and clean the derivation from the response
-	derivation := dg.extractDerivation(response)
+	derivation := dg.ExtractDerivation(response)
 
 	return derivation, nil
 }
 
-// getNixpkgsContext retrieves relevant nixpkgs documentation and examples
-func (dg *DerivationGenerator) getNixpkgsContext(ctx context.Context, buildSystem BuildSystem, language string) (string, error) {
+// GetNixpkgsContext retrieves relevant nixpkgs documentation and examples
+func (dg *DerivationGenerator) GetNixpkgsContext(ctx context.Context, buildSystem BuildSystem, language string) (string, error) {
 	var contextQueries []string
 
 	// Build system specific queries
@@ -242,8 +242,8 @@ DERIVATION:
 	return prompt.String()
 }
 
-// extractDerivation extracts the Nix derivation from AI response
-func (dg *DerivationGenerator) extractDerivation(response string) string {
+// ExtractDerivation extracts the Nix derivation from AI response
+func (dg *DerivationGenerator) ExtractDerivation(response string) string {
 	// Remove common markdown formatting if present
 	response = strings.ReplaceAll(response, "```nix", "")
 	response = strings.ReplaceAll(response, "```", "")

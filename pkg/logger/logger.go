@@ -78,6 +78,14 @@ func NewLoggerWithLevelAndWriter(levelStr string, w io.Writer) *Logger {
 	}
 }
 
+// NewTestLogger creates a new logger for testing that outputs to a discarded writer
+func NewTestLogger() *Logger {
+	return &Logger{
+		Logger: log.New(io.Discard, "", log.LstdFlags),
+		level:  DebugLevel, // Enable all logs for testing
+	}
+}
+
 // SetLevel sets the logging level
 func (l *Logger) SetLevel(levelStr string) {
 	switch strings.ToLower(levelStr) {
