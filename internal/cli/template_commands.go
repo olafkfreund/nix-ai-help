@@ -17,7 +17,7 @@ import (
 	"nix-ai-help/pkg/utils"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
+	yaml "gopkg.in/yaml.v3"
 )
 
 // GitHub API structures for searching code

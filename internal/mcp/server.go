@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/hashicorp/go-retryablehttp"
+	retryablehttp "github.com/hashicorp/go-retryablehttp"
 	"github.com/sourcegraph/jsonrpc2"
 )
 
@@ -753,10 +753,10 @@ func NewServerWithDebug(addr string, documentationSources []string) *Server {
 		debugLogging:         true,
 		mcpServer:            &MCPServer{logger: *log, lspProvider: lspProvider},
 	}
-	
+
 	// Set the global server instance for cross-referencing
 	globalServerInstance = server
-	
+
 	return server
 }
 
@@ -804,7 +804,7 @@ func NewServerFromConfig(configPath string) (*Server, error) {
 		mcpServer:            &MCPServer{logger: *log, lspProvider: lspProvider},
 		configPath:           configPath,
 	}
-	
+
 	// Set the global server instance for cross-referencing
 	globalServerInstance = srv
 
@@ -1066,19 +1066,19 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 	cacheMutex.RUnlock()
 	// Use the mcpServer's handleDocQuery method for consistency
 	s.logger.Debug(fmt.Sprintf("handleQuery: calling handleDocQuery with query=%s and sources=%v", query, sources))
-	
+
 	// Debug check if globalServerInstance is set correctly
 	if s.debugLogging {
 		if globalServerInstance == nil {
 			s.logger.Debug("handleQuery: WARNING - globalServerInstance is nil")
 		} else {
-			s.logger.Debug(fmt.Sprintf("handleQuery: globalServerInstance has %d documentation sources", 
+			s.logger.Debug(fmt.Sprintf("handleQuery: globalServerInstance has %d documentation sources",
 				len(globalServerInstance.documentationSources)))
 		}
 	}
-	
+
 	result := s.mcpServer.handleDocQuery(query, sources...)
-	
+
 	// Cache the result
 	cacheMutex.Lock()
 	cache[cacheKey] = result

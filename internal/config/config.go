@@ -6,7 +6,7 @@ import (
 	"os/user"
 	"path/filepath"
 
-	"gopkg.in/yaml.v3"
+	yaml "gopkg.in/yaml.v3"
 )
 
 // EmbeddedDefaultConfig contains the default configuration YAML that gets compiled into the binary.
