@@ -2,7 +2,7 @@ package cli
 
 import (
 	"fmt"
-	"strings"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -100,11 +100,11 @@ Packages will be built one after another, with AI analysis applied to:
 
 func runBuildWatch(packageName string, cmd *cobra.Command) {
 	fmt.Println(utils.FormatHeader(fmt.Sprintf("👀 Watching Build: %s", packageName)))
-	
+
 	// Initialize monitor if needed
 	if globalBuildMonitor == nil {
 		cfg, _ := config.LoadUserConfig()
-		provider := initializeAIProvider(cfg)
+		provider := initializeModernAIProvider(cfg)
 		buildAgent := agent.NewBuildAgent(provider)
 		globalBuildMonitor = NewBuildMonitor(buildAgent)
 	}
@@ -205,7 +205,7 @@ func runBuildBackground(packageName string, cmd *cobra.Command) {
 	// Initialize monitor if needed
 	if globalBuildMonitor == nil {
 		cfg, _ := config.LoadUserConfig()
-		provider := initializeAIProvider(cfg)
+		provider := initializeModernAIProvider(cfg)
 		buildAgent := agent.NewBuildAgent(provider)
 		globalBuildMonitor = NewBuildMonitor(buildAgent)
 	}
@@ -233,16 +233,16 @@ func runBuildQueue(packages []string, cmd *cobra.Command) {
 	// Initialize monitor if needed
 	if globalBuildMonitor == nil {
 		cfg, _ := config.LoadUserConfig()
-		provider := initializeAIProvider(cfg)
+		provider := initializeModernAIProvider(cfg)
 		buildAgent := agent.NewBuildAgent(provider)
 		globalBuildMonitor = NewBuildMonitor(buildAgent)
 	}
 
 	fmt.Println(utils.FormatProgress("Analyzing build dependencies..."))
-	
+
 	// AI-powered build order optimization
 	optimizedOrder := optimizeBuildOrder(packages)
-	
+
 	fmt.Println(utils.FormatSubsection("🧠 AI-Optimized Build Order", ""))
 	for i, pkg := range optimizedOrder {
 		fmt.Printf("%d. %s\n", i+1, pkg)
@@ -258,7 +258,7 @@ func runBuildQueue(packages []string, cmd *cobra.Command) {
 			continue
 		}
 		buildIDs = append(buildIDs, buildID)
-		
+
 		// Small delay between starts to avoid overwhelming the system
 		time.Sleep(1 * time.Second)
 	}
@@ -272,10 +272,10 @@ func runBuildQueue(packages []string, cmd *cobra.Command) {
 func displayBuildProgress(process *BuildProcess) {
 	statusEmoji := getStatusEmoji(process.Status)
 	duration := time.Since(process.StartTime).Round(time.Second)
-	
-	fmt.Printf("\r%s %s | %s | Duration: %v | Errors: %d", 
+
+	fmt.Printf("\r%s %s | %s | Duration: %v | Errors: %d",
 		statusEmoji, process.Package, process.Status, duration, process.ErrorCount)
-	
+
 	// Show recent progress if available
 	select {
 	case progress := <-process.Progress:
@@ -293,7 +293,7 @@ func displayBuildProgress(process *BuildProcess) {
 func displayBuildSummary(buildID string, process *BuildProcess) {
 	statusEmoji := getStatusEmoji(process.Status)
 	duration := time.Since(process.StartTime).Round(time.Second)
-	
+
 	fmt.Printf("%s %s\n", statusEmoji, utils.FormatKeyValue("Build ID", buildID))
 	fmt.Printf("   %s\n", utils.FormatKeyValue("Package", process.Package))
 	fmt.Printf("   %s\n", utils.FormatKeyValue("Status", process.Status))
@@ -304,14 +304,14 @@ func displayBuildSummary(buildID string, process *BuildProcess) {
 func displayDetailedBuildStatus(process *BuildProcess) {
 	statusEmoji := getStatusEmoji(process.Status)
 	duration := time.Since(process.StartTime).Round(time.Second)
-	
+
 	fmt.Println()
 	fmt.Printf("%s %s\n", statusEmoji, utils.FormatKeyValue("Package", process.Package))
 	fmt.Printf("   %s\n", utils.FormatKeyValue("Status", process.Status))
 	fmt.Printf("   %s\n", utils.FormatKeyValue("Started", process.StartTime.Format("15:04:05")))
 	fmt.Printf("   %s\n", utils.FormatKeyValue("Duration", duration.String()))
 	fmt.Printf("   %s\n", utils.FormatKeyValue("Errors", fmt.Sprintf("%d", process.ErrorCount)))
-	
+
 	if len(process.Output) > 0 {
 		fmt.Println()
 		fmt.Println(utils.FormatSubsection("📄 Recent Output", ""))
@@ -327,7 +327,7 @@ func displayDetailedBuildStatus(process *BuildProcess) {
 
 func displayFinalStatus(process *BuildProcess) {
 	fmt.Println(utils.FormatDivider())
-	
+
 	duration := time.Since(process.StartTime)
 	switch process.Status {
 	case "completed":
@@ -360,13 +360,35 @@ func getStatusEmoji(status string) string {
 func optimizeBuildOrder(packages []string) []string {
 	// Simple implementation - in production this would use AI analysis
 	// to determine optimal build order based on dependencies, build times, etc.
-	
+
 	// For now, just return packages in the order they were provided
 	// Real implementation would analyze package dependencies and optimize
 	optimized := make([]string, len(packages))
 	copy(optimized, packages)
-	
+
 	return optimized
+}
+
+// initializeModernAIProvider creates an AI provider that implements the ai.Provider interface
+func initializeModernAIProvider(cfg *config.UserConfig) ai.Provider {
+	switch cfg.AIProvider {
+	case "ollama":
+		return ai.NewOllamaProvider(cfg.AIModel)
+	case "gemini":
+		geminiClient := ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
+		return ai.NewLegacyProviderAdapter(geminiClient)
+	case "openai":
+		openaiClient := ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+		return ai.NewLegacyProviderAdapter(openaiClient)
+	case "custom":
+		if cfg.CustomAI.BaseURL != "" {
+			customClient := ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
+			return ai.NewLegacyProviderAdapter(customClient)
+		}
+		return ai.NewOllamaProvider("llama3")
+	default:
+		return ai.NewOllamaProvider("llama3")
+	}
 }
 
 // Initialize enhanced build commands
@@ -377,7 +399,7 @@ func initEnhancedBuildCommands() {
 	enhancedBuildCmd.AddCommand(buildStopCmd)
 	enhancedBuildCmd.AddCommand(buildBackgroundCmd)
 	enhancedBuildCmd.AddCommand(buildQueueCmd)
-	
+
 	// Add flags
 	buildWatchCmd.Flags().Bool("flake", false, "Use flake for building")
 	buildBackgroundCmd.Flags().Bool("flake", false, "Use flake for building")

@@ -338,7 +338,7 @@ func runBuildRetry(cmd *cobra.Command) {
 	strategies, err := recoverySystem.AnalyzeAndRecover(request)
 	if err != nil {
 		fmt.Println(utils.FormatWarning("Recovery system analysis failed, falling back to basic AI analysis"))
-		
+
 		// Fallback to basic AI analysis
 		retryPrompt := buildRetryPrompt(lastFailure)
 		fixes, aiErr := aiProvider.Query(retryPrompt)
@@ -368,14 +368,14 @@ func runBuildRetry(cmd *cobra.Command) {
 	success := applyFixesAndRetry(lastFailure)
 	if success {
 		fmt.Println(utils.FormatSuccess("✅ Retry successful!"))
-		
+
 		// Report success to recovery system for learning
 		if len(strategies) > 0 {
 			recoverySystem.ReportRecoveryResult(strategies[0].ID, true, "")
 		}
 	} else {
 		fmt.Println(utils.FormatError("❌ Retry failed. Manual intervention may be required."))
-		
+
 		// Report failure to recovery system for learning
 		if len(strategies) > 0 {
 			recoverySystem.ReportRecoveryResult(strategies[0].ID, false, "Retry attempt failed")
@@ -1176,7 +1176,7 @@ func init() {
 	enhancedBuildCmd.AddCommand(buildCacheMissCmd)
 	enhancedBuildCmd.AddCommand(buildSandboxDebugCmd)
 	enhancedBuildCmd.AddCommand(buildProfileCmd)
-	
+
 	// Add enhanced monitoring and management commands
 	enhancedBuildCmd.AddCommand(buildWatchCmd)
 	enhancedBuildCmd.AddCommand(buildStatusCmd)
@@ -1190,4 +1190,66 @@ func init() {
 	enhancedBuildCmd.Flags().Bool("verbose", false, "Show verbose build output")
 	enhancedBuildCmd.Flags().String("out-link", "", "Path where the symlink to the output will be stored")
 	buildProfileCmd.Flags().String("package", "", "Specific package to profile")
+}
+
+// extractPackageFromFailure attempts to extract the package name from build failure output
+func extractPackageFromFailure(output string) string {
+	lines := strings.Split(output, "\n")
+
+	// Look for common patterns in Nix build output
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Pattern: "building '/nix/store/...package-name..."
+		if strings.Contains(line, "building") && strings.Contains(line, "/nix/store/") {
+			// Extract package name from store path
+			parts := strings.Split(line, "/")
+			for _, part := range parts {
+				if strings.Contains(part, "-") && !strings.HasPrefix(part, "nix") {
+					// Remove hash prefix and version suffix
+					nameParts := strings.Split(part, "-")
+					if len(nameParts) > 1 {
+						return nameParts[1]
+					}
+				}
+			}
+		}
+
+		// Pattern: "error: builder for '/nix/store/...package-name..."
+		if strings.Contains(line, "error: builder for") {
+			// Extract from store path in error message
+			start := strings.Index(line, "/nix/store/")
+			if start != -1 {
+				storePath := line[start:]
+				end := strings.Index(storePath, "'")
+				if end != -1 {
+					storePath = storePath[:end]
+					parts := strings.Split(storePath, "/")
+					if len(parts) > 3 {
+						// Extract package name from store path
+						nameParts := strings.Split(parts[3], "-")
+						if len(nameParts) > 1 {
+							return nameParts[1]
+						}
+					}
+				}
+			}
+		}
+
+		// Pattern: package name in flake output
+		if strings.Contains(line, "error:") && strings.Contains(line, ".#") {
+			start := strings.Index(line, ".#")
+			if start != -1 {
+				packagePart := line[start+2:]
+				end := strings.IndexAny(packagePart, " \t'\"")
+				if end != -1 {
+					return packagePart[:end]
+				}
+				return packagePart
+			}
+		}
+	}
+
+	// Fallback: return "unknown" if no package can be extracted
+	return "unknown"
 }

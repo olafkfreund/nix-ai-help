@@ -335,17 +335,17 @@ func (brs *BuildRecoverySystem) AnalyzeAndRecover(request BuildRecoveryRequest) 
 	// Check cache for existing strategies
 	cacheKey := brs.generateCacheKey(request.ErrorOutput)
 	if strategies, exists := brs.recoveryCache[cacheKey]; exists {
-		brs.logger.Info(fmt.Sprintf("Using cached recovery strategies for package %s (%d strategies)", 
+		brs.logger.Info(fmt.Sprintf("Using cached recovery strategies for package %s (%d strategies)",
 			request.Package, len(strategies)))
 		return strategies, nil
 	}
 
 	// Generate new strategies using AI function
 	result, err := brs.buildFunction.Execute(context.Background(), map[string]interface{}{
-		"operation": "troubleshoot",
-		"package": request.Package,
+		"operation":  "troubleshoot",
+		"package":    request.Package,
 		"error_logs": request.ErrorOutput,
-		"system": request.BuildSystem,
+		"system":     request.BuildSystem,
 	}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to analyze error: %w", err)
@@ -363,13 +363,13 @@ func (brs *BuildRecoverySystem) AnalyzeAndRecover(request BuildRecoveryRequest) 
 	}
 
 	strategies := brs.parseStrategiesFromResponse(responseText, request.ErrorOutput)
-	
+
 	// Cache the strategies
 	brs.recoveryCache[cacheKey] = strategies
-	
-	brs.logger.Info(fmt.Sprintf("Generated %d new recovery strategies for package %s", 
+
+	brs.logger.Info(fmt.Sprintf("Generated %d new recovery strategies for package %s",
 		len(strategies), request.Package))
-	
+
 	return strategies, nil
 }
 
@@ -381,12 +381,12 @@ func (brs *BuildRecoverySystem) ReportRecoveryResult(strategyID string, success 
 			if strategy.ID == strategyID {
 				brs.recoveryCache[cacheKey][i].Success = success
 				brs.recoveryCache[cacheKey][i].AppliedAt = time.Now()
-				
+
 				if success {
-					brs.logger.Info(fmt.Sprintf("Recovery strategy '%s' (ID: %s) succeeded", 
+					brs.logger.Info(fmt.Sprintf("Recovery strategy '%s' (ID: %s) succeeded",
 						strategy.Name, strategyID))
 				} else {
-					brs.logger.Warn(fmt.Sprintf("Recovery strategy '%s' (ID: %s) failed: %s", 
+					brs.logger.Warn(fmt.Sprintf("Recovery strategy '%s' (ID: %s) failed: %s",
 						strategy.Name, strategyID, errorMessage))
 				}
 				return
@@ -398,17 +398,17 @@ func (brs *BuildRecoverySystem) ReportRecoveryResult(strategyID string, success 
 // parseStrategiesFromResponse parses AI response into recovery strategies
 func (brs *BuildRecoverySystem) parseStrategiesFromResponse(response string, errorPattern string) []RecoveryStrategy {
 	strategies := []RecoveryStrategy{}
-	
+
 	// Simple parsing - in production this would be more sophisticated
 	lines := strings.Split(response, "\n")
 	var currentStrategy *RecoveryStrategy
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
 		}
-		
+
 		// Check for strategy headers
 		if strings.Contains(line, "Strategy") && strings.Contains(line, ":") {
 			if currentStrategy != nil {
@@ -431,12 +431,12 @@ func (brs *BuildRecoverySystem) parseStrategiesFromResponse(response string, err
 			}
 		}
 	}
-	
+
 	// Add the last strategy
 	if currentStrategy != nil {
 		strategies = append(strategies, *currentStrategy)
 	}
-	
+
 	// If no strategies were parsed, create a generic one
 	if len(strategies) == 0 {
 		strategies = append(strategies, RecoveryStrategy{
@@ -448,7 +448,7 @@ func (brs *BuildRecoverySystem) parseStrategiesFromResponse(response string, err
 			AppliedAt:    time.Now(),
 		})
 	}
-	
+
 	return strategies
 }
 
