@@ -104,7 +104,7 @@
     // {
       # System-independent modules
       nixosModules.default = import ./modules/nixos.nix;
-      homeModules.default = import ./modules/home-manager.nix;
+      homeManagerModules.default = import ./modules/home-manager.nix;
 
       # Flake-level overlays - provide nixai package for each system
       overlays.default = final: prev: {
