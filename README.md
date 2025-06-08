@@ -83,7 +83,7 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 ### 🧩 Development & Package Management
 
 - **Flake Management**: Complete flake lifecycle with `nixai flake` commands
-- **Package Repository Analysis**: `nixai package-repo <repo>` for AI-generated derivations
+- **Enhanced Package Repository Analysis**: `nixai package-repo <repo>` with intelligent language detection, template system, and confidence scoring
 - **Development Environments**: `nixai devenv` for project-specific dev shells
 - **Build System Integration**: Smart build commands with error analysis
 
@@ -160,6 +160,7 @@ nixai community --agent community-guide
 nixai build system
 nixai build .#my-machine --agent build-specialist
 nixai package-repo https://github.com/user/project --role packager
+# Enhanced with intelligent language detection and template system
 ```
 
 **Multi-machine and template management:**
