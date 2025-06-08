@@ -76,14 +76,18 @@ func (e *CommandExecutor) isNixAICommand(cmdName string) bool {
 // executeNixAICommand executes a nixai command using the existing command system
 func (e *CommandExecutor) executeNixAICommand(cmdName string, args []string, startTime time.Time) panels.CommandExecutionResultMsg {
 	// Use the existing RunDirectCommand function from the CLI package
-	output, err := cli.RunDirectCommand(cmdName, args)
+	var outputBuffer strings.Builder
+	success, err := cli.RunDirectCommand(cmdName, args, &outputBuffer)
 
 	duration := time.Since(startTime)
 	exitCode := 0
 	errorMsg := ""
+	output := outputBuffer.String()
 
 	if err != nil {
 		errorMsg = err.Error()
+		exitCode = 1
+	} else if !success {
 		exitCode = 1
 	}
 
