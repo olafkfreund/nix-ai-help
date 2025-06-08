@@ -492,21 +492,13 @@ func runBuildProfile(packageName string, cmd *cobra.Command) {
 
 // initializeAIProvider creates the appropriate AI provider based on configuration
 func initializeAIProvider(cfg *config.UserConfig) ai.AIProvider {
-	switch cfg.AIProvider {
-	case "ollama":
-		return ai.NewOllamaLegacyProvider(cfg.AIModel)
-	case "gemini":
-		return ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
-	case "openai":
-		return ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-	case "custom":
-		if cfg.CustomAI.BaseURL != "" {
-			return ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
-		}
-		return ai.NewOllamaLegacyProvider("llama3")
-	default:
+	// Use the new ProviderManager system
+	provider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+	if err != nil {
+		// Fall back to ollama legacy provider on error
 		return ai.NewOllamaLegacyProvider("llama3")
 	}
+	return provider
 }
 
 func attemptBuild(packageName string, verbose bool) (string, error) {

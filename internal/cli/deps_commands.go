@@ -10,6 +10,7 @@ import (
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/nixos"
+	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
 	"github.com/charmbracelet/glamour"
@@ -592,16 +593,10 @@ func generateDependencyGraph(cfgPath string, isFlake bool) (*nixos.DependencyGra
 func getAIInsights(prompt string, userCfg *config.UserConfig) (string, error) {
 	fmt.Println(utils.FormatProgress("Getting AI insights..."))
 
-	// Initialize AI provider using the same pattern as other commands
-	var provider ai.AIProvider
-	switch userCfg.AIProvider {
-	case "ollama":
-		provider = ai.NewOllamaLegacyProvider(userCfg.AIModel)
-	case "gemini":
-		provider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
-	case "openai":
-		provider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-	default:
+	// Use the new ProviderManager system
+	provider, err := GetLegacyAIProvider(userCfg, logger.NewLogger())
+	if err != nil {
+		// Fall back to ollama legacy provider on error
 		provider = ai.NewOllamaLegacyProvider("llama3")
 	}
 

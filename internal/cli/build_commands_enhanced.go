@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -10,6 +9,7 @@ import (
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/ai/agent"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 )
 
@@ -371,24 +371,30 @@ func optimizeBuildOrder(packages []string) []string {
 
 // initializeModernAIProvider creates an AI provider that implements the ai.Provider interface
 func initializeModernAIProvider(cfg *config.UserConfig) ai.Provider {
-	switch cfg.AIProvider {
-	case "ollama":
-		return ai.NewOllamaProvider(cfg.AIModel)
-	case "gemini":
-		geminiClient := ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
-		return ai.NewLegacyProviderAdapter(geminiClient)
-	case "openai":
-		openaiClient := ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		return ai.NewLegacyProviderAdapter(openaiClient)
-	case "custom":
-		if cfg.CustomAI.BaseURL != "" {
-			customClient := ai.NewCustomProvider(cfg.CustomAI.BaseURL, cfg.CustomAI.Headers)
-			return ai.NewLegacyProviderAdapter(customClient)
-		}
-		return ai.NewOllamaProvider("llama3")
-	default:
-		return ai.NewOllamaProvider("llama3")
+	// Use the new ProviderManager system
+	manager := ai.NewProviderManager(cfg, logger.NewLogger())
+
+	// Get the configured default provider or fall back to ollama
+	defaultProvider := cfg.AIModels.SelectionPreferences.DefaultProvider
+	if defaultProvider == "" {
+		defaultProvider = "ollama"
 	}
+
+	provider, err := manager.GetProvider(defaultProvider)
+	if err != nil {
+		// Fall back to ollama provider on error
+		fallbackProvider, fallbackErr := manager.GetProvider("ollama")
+		if fallbackErr != nil {
+			// If even ollama fails, log errors and return nil
+			log := logger.NewLogger()
+			log.Error("Failed to initialize AI provider: " + err.Error())
+			log.Error("Ollama fallback also failed: " + fallbackErr.Error())
+			return nil
+		}
+		return fallbackProvider
+	}
+
+	return provider
 }
 
 // Initialize enhanced build commands

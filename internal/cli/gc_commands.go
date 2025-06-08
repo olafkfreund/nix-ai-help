@@ -115,17 +115,11 @@ This command provides:
 		log := logger.NewLoggerWithLevel(cfg.LogLevel)
 		gcm := NewGCManager(log)
 
-		// Initialize AI provider
-		var aiProvider ai.AIProvider
-		switch cfg.AIProvider {
-		case "ollama":
-			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		default:
-			aiProvider = ai.NewOllamaLegacyProvider("llama3")
+		// Use the new ProviderManager system
+		aiProvider, err := GetLegacyAIProvider(cfg, log)
+		if err != nil {
+			fmt.Println(utils.FormatError("Error getting AI provider: " + err.Error()))
+			os.Exit(1)
 		}
 
 		// Perform analysis
@@ -174,17 +168,11 @@ This command:
 		log := logger.NewLoggerWithLevel(cfg.LogLevel)
 		gcm := NewGCManager(log)
 
-		// Initialize AI provider
-		var aiProvider ai.AIProvider
-		switch cfg.AIProvider {
-		case "ollama":
-			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		default:
-			aiProvider = ai.NewOllamaLegacyProvider("llama3")
+		// Use the new ProviderManager system
+		aiProvider, err := GetLegacyAIProvider(cfg, log)
+		if err != nil {
+			fmt.Println(utils.FormatError("Error getting AI provider: " + err.Error()))
+			os.Exit(1)
 		}
 
 		// Perform safe cleanup
@@ -224,17 +212,11 @@ This command analyzes:
 		log := logger.NewLoggerWithLevel(cfg.LogLevel)
 		gcm := NewGCManager(log)
 
-		// Initialize AI provider
-		var aiProvider ai.AIProvider
-		switch cfg.AIProvider {
-		case "ollama":
-			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		default:
-			aiProvider = ai.NewOllamaLegacyProvider("llama3")
+		// Use the new ProviderManager system
+		aiProvider, err := GetLegacyAIProvider(cfg, log)
+		if err != nil {
+			fmt.Println(utils.FormatError("Error getting AI provider: " + err.Error()))
+			os.Exit(1)
 		}
 
 		// Compare generations
@@ -272,17 +254,11 @@ Shows:
 		log := logger.NewLoggerWithLevel(cfg.LogLevel)
 		gcm := NewGCManager(log)
 
-		// Initialize AI provider
-		var aiProvider ai.AIProvider
-		switch cfg.AIProvider {
-		case "ollama":
-			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		default:
-			aiProvider = ai.NewOllamaLegacyProvider("llama3")
+		// Use the new ProviderManager system
+		aiProvider, err := GetLegacyAIProvider(cfg, log)
+		if err != nil {
+			fmt.Println(utils.FormatError("Error getting AI provider: " + err.Error()))
+			os.Exit(1)
 		}
 
 		// Analyze disk usage

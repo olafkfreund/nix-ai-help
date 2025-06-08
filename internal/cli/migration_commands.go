@@ -504,16 +504,13 @@ Return only the flake.nix content without explanations.`, string(configContent))
 
 // Helper functions for AI provider and MCP client initialization
 func getAIProvider(cfg *config.UserConfig, log *logger.Logger) ai.AIProvider {
-	switch cfg.AIProvider {
-	case "ollama":
-		return ai.NewOllamaLegacyProvider(cfg.AIModel)
-	case "gemini":
-		return ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
-	case "openai":
-		return ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-	default:
+	// Use the new ProviderManager system
+	provider, err := GetLegacyAIProvider(cfg, log)
+	if err != nil {
+		// Fall back to ollama legacy provider on error
 		return ai.NewOllamaLegacyProvider("llama3")
 	}
+	return provider
 }
 
 func getMCPClient(cfg *config.UserConfig, log *logger.Logger) *mcp.MCPClient {

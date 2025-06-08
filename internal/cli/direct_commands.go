@@ -9,6 +9,7 @@ import (
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/mcp"
 	"nix-ai-help/internal/nixos"
+	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
 	"github.com/spf13/cobra"
@@ -407,16 +408,9 @@ func runLogsCmd(args []string, out io.Writer) {
 		if providerName == "" {
 			providerName = "ollama"
 		}
-		var aiProvider interface{ Query(string) (string, error) }
-		switch providerName {
-		case "ollama":
-			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-		default:
-			_, _ = fmt.Fprintln(out, utils.FormatError("Unknown AI provider: "+providerName))
+		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+		if err != nil {
+			_, _ = fmt.Fprintln(out, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 			return
 		}
 		prompt := "You are a NixOS log analysis expert. Analyze the following log and provide a summary of issues, root causes, and recommended fixes. Format as markdown.\n\nLog:\n" + string(data)
@@ -912,21 +906,16 @@ func runSearchCmd(args []string, out io.Writer) {
 		_, _ = fmt.Fprintln(out, pkgOut)
 	}
 
+	aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
+		return
+	}
+
+	// Get provider name for context
 	providerName := cfg.AIProvider
 	if providerName == "" {
 		providerName = "ollama"
-	}
-	var aiProvider ai.AIProvider
-	switch providerName {
-	case "ollama":
-		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-	case "openai":
-		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-	case "gemini":
-		aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-	default:
-		_, _ = fmt.Fprintln(out, utils.FormatError("Unknown AI provider: "+providerName))
-		return
 	}
 
 	var docExcerpts []string
@@ -1006,20 +995,9 @@ func runAskCmd(args []string, out io.Writer) {
 		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to load config: "+err.Error()))
 		return
 	}
-	providerName := cfg.AIProvider
-	if providerName == "" {
-		providerName = "ollama"
-	}
-	var aiProvider ai.AIProvider
-	switch providerName {
-	case "ollama":
-		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-	case "openai":
-		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-	case "gemini":
-		aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-	default:
-		_, _ = fmt.Fprintln(out, utils.FormatError("Unknown AI provider: "+providerName))
+	aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 		return
 	}
 	_, _ = fmt.Fprint(out, utils.FormatInfo("Querying AI provider... "))
