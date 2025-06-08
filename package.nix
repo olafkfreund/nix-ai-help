@@ -13,7 +13,7 @@ buildGoModule rec {
   pname = "nixai";
   inherit version src;
 
-  vendorHash = "sha256-pGyNwzTkHuOzEDOjmkzx0sfb1jHsqb/1FcojsCGR6CY=";
+  vendorHash = null;
   doCheck = false;
 
   subPackages = ["cmd/nixai"];
