@@ -13,13 +13,15 @@ stdenv.mkDerivation rec {
 
   nativeBuildInputs = [ cmake ];
 
-{{- if .BuildInputs}}
   buildInputs = [
+{{- if .BuildInputs}}
 {{- range .BuildInputs}}
     {{.}}
 {{- end}}
-  ];
+{{- else}}
+    # Add any runtime dependencies here
 {{- end}}
+  ];
 
 {{- if .ConfigureFlags}}
   cmakeFlags = [

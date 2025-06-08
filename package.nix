@@ -14,8 +14,6 @@ buildGoModule rec {
   inherit version src;
 
   vendorHash = null;
-  modVendor = true;
-  proxyVendor = true;
   doCheck = false;
 
   subPackages = ["cmd/nixai"];

@@ -8,31 +8,31 @@ import (
 
 // Embedded template files - these will be included in the binary when built with Nix flakes
 //
-//go:embed templates/javascript-npm.nix
+//go:embed templates/javascript-npm.nix.tmpl
 var javascriptNpmTemplate string
 
-//go:embed templates/typescript-npm.nix
+//go:embed templates/typescript-npm.nix.tmpl
 var typescriptNpmTemplate string
 
-//go:embed templates/python-pip.nix
+//go:embed templates/python-pip.nix.tmpl
 var pythonPipTemplate string
 
-//go:embed templates/python-poetry.nix
+//go:embed templates/python-poetry.nix.tmpl
 var pythonPoetryTemplate string
 
-//go:embed templates/rust-cargo.nix
+//go:embed templates/rust-cargo.nix.tmpl
 var rustCargoTemplate string
 
-//go:embed templates/go-modules.nix
+//go:embed templates/go-modules.nix.tmpl
 var goModulesTemplate string
 
-//go:embed templates/c-cmake.nix
+//go:embed templates/c-cmake.nix.tmpl
 var cCmakeTemplate string
 
-//go:embed templates/cpp-cmake.nix
+//go:embed templates/cpp-cmake.nix.tmpl
 var cppCmakeTemplate string
 
-//go:embed templates/default.nix
+//go:embed templates/default.nix.tmpl
 var defaultTemplate string
 
 // Template function map for use in templates
