@@ -8,6 +8,7 @@ import (
 
 	"nix-ai-help/internal/ai/agent"
 	"nix-ai-help/internal/ai/functionbase"
+	"nix-ai-help/internal/hardware"
 	"nix-ai-help/pkg/logger"
 )
 
@@ -230,82 +231,152 @@ func (f *HardwareFunction) executeHardwareOperation(ctx context.Context, req *Ha
 func (f *HardwareFunction) detectHardware(ctx context.Context, req *HardwareRequest, response *HardwareResponse) (*HardwareResponse, error) {
 	f.logger.Info("Detecting hardware components")
 
-	// Mock hardware detection since agent methods don't exist
-	mockHardware := []HardwareComponent{
-		{
-			Type:      "CPU",
-			Name:      "Intel Core i7-12700K",
-			Vendor:    "Intel",
-			Model:     "i7-12700K",
-			Driver:    "intel_pstate",
-			Supported: true,
-			Status:    "active",
-			Configuration: map[string]string{
-				"kernelModules": "boot.initrd.kernelModules = [ \"intel_pstate\" ];",
-				"options":       "boot.kernelParams = [ \"intel_pstate=active\" ];",
+	// Use real hardware detection
+	hardwareInfo, err := hardware.DetectHardwareComponents()
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect hardware: %v", err)
+	}
+
+	// Convert HardwareInfo to HardwareComponent list
+	var components []HardwareComponent
+
+	// Add CPU component
+	if hardwareInfo.CPU != "" {
+		vendor := extractVendor(hardwareInfo.CPU)
+		config := map[string]string{}
+
+		// Set microcode based on vendor
+		if vendor == "AMD" {
+			config["microcode"] = "hardware.cpu.amd.updateMicrocode = true;"
+		} else if vendor == "Intel" {
+			config["microcode"] = "hardware.cpu.intel.updateMicrocode = true;"
+		}
+
+		components = append(components, HardwareComponent{
+			Type:          "CPU",
+			Name:          hardwareInfo.CPU,
+			Vendor:        vendor,
+			Model:         extractModel(hardwareInfo.CPU),
+			Driver:        "kernel_default",
+			Supported:     true,
+			Status:        "active",
+			Configuration: config,
+			Metadata: map[string]string{
+				"architecture": hardwareInfo.Architecture,
 			},
-			Metadata: map[string]string{"cores": "12", "threads": "20"},
-		},
-		{
-			Type:      "GPU",
-			Name:      "NVIDIA GeForce RTX 3080",
-			Vendor:    "NVIDIA",
-			Model:     "RTX 3080",
-			Driver:    "nvidia",
-			Supported: true,
-			Status:    "active",
-			Configuration: map[string]string{
-				"videoDrivers": "services.xserver.videoDrivers = [ \"nvidia\" ];",
-				"hardware":     "hardware.opengl.enable = true;",
-			},
-			Metadata: map[string]string{"memory": "10GB", "cuda": "true"},
-		},
-		{
+		})
+	}
+
+	// Add GPU components
+	for _, gpu := range hardwareInfo.GPU {
+		if strings.TrimSpace(gpu) != "" {
+			vendor := extractVendor(gpu)
+			driver := "kernel_default"
+			config := map[string]string{}
+
+			if strings.Contains(strings.ToLower(gpu), "nvidia") {
+				driver = "nvidia"
+				config["videoDrivers"] = "services.xserver.videoDrivers = [ \"nvidia\" ];"
+				config["hardware"] = "hardware.opengl.enable = true;"
+			} else if strings.Contains(strings.ToLower(gpu), "amd") || strings.Contains(strings.ToLower(gpu), "radeon") {
+				driver = "amdgpu"
+				config["videoDrivers"] = "services.xserver.videoDrivers = [ \"amdgpu\" ];"
+				config["hardware"] = "hardware.opengl.enable = true;"
+			} else if strings.Contains(strings.ToLower(gpu), "intel") {
+				driver = "intel"
+				config["videoDrivers"] = "services.xserver.videoDrivers = [ \"intel\" ];"
+				config["hardware"] = "hardware.opengl.enable = true;"
+			}
+
+			components = append(components, HardwareComponent{
+				Type:          "GPU",
+				Name:          gpu,
+				Vendor:        vendor,
+				Model:         extractModel(gpu),
+				Driver:        driver,
+				Supported:     true,
+				Status:        "active",
+				Configuration: config,
+				Metadata: map[string]string{
+					"display_server": hardwareInfo.DisplayServer,
+				},
+			})
+		}
+	}
+
+	// Add Audio component
+	if hardwareInfo.Audio != "" {
+		components = append(components, HardwareComponent{
 			Type:      "Audio",
-			Name:      "Intel HDA Audio",
-			Vendor:    "Intel",
-			Model:     "HDA",
+			Name:      hardwareInfo.Audio,
+			Vendor:    extractVendor(hardwareInfo.Audio),
+			Model:     extractModel(hardwareInfo.Audio),
 			Driver:    "snd_hda_intel",
 			Supported: true,
 			Status:    "active",
 			Configuration: map[string]string{
-				"sound": "sound.enable = true;",
-				"pulse": "hardware.pulseaudio.enable = true;",
+				"sound":      "sound.enable = true;",
+				"pulseaudio": "hardware.pulseaudio.enable = true;",
 			},
-			Metadata: map[string]string{"channels": "8"},
-		},
+		})
 	}
 
-	// Filter by component type if specified
-	if req.ComponentType != "" && req.ComponentType != "all" {
-		var filtered []HardwareComponent
-		for _, comp := range mockHardware {
-			if strings.ToLower(comp.Type) == strings.ToLower(req.ComponentType) {
-				filtered = append(filtered, comp)
-			}
+	// Add Network components (filter out virtual interfaces)
+	for _, network := range hardwareInfo.Network {
+		networkName := strings.TrimSpace(network)
+		// Skip loopback, virtual, and container interfaces
+		if networkName != "" && networkName != "lo" &&
+			!strings.HasPrefix(networkName, "virbr") &&
+			!strings.HasPrefix(networkName, "br-") &&
+			!strings.HasPrefix(networkName, "docker") &&
+			!strings.HasPrefix(networkName, "veth") &&
+			!strings.Contains(networkName, "@if") {
+
+			components = append(components, HardwareComponent{
+				Type:      "Network",
+				Name:      networkName,
+				Driver:    "kernel_default",
+				Supported: true,
+				Status:    "active",
+				Configuration: map[string]string{
+					"networking": "networking.networkmanager.enable = true;",
+				},
+			})
 		}
-		mockHardware = filtered
 	}
 
-	response.Hardware = mockHardware
+	// Add Storage components
+	for _, storage := range hardwareInfo.Storage {
+		if strings.TrimSpace(storage) != "" {
+			components = append(components, HardwareComponent{
+				Type:      "Storage",
+				Name:      storage,
+				Driver:    "kernel_default",
+				Supported: true,
+				Status:    "active",
+				Configuration: map[string]string{
+					"filesystem": "boot.supportedFilesystems = [ \"ext4\" \"btrfs\" ];",
+				},
+			})
+		}
+	}
 
-	// Generate recommendations
-	response.Recommendations = f.generateHardwareRecommendations(response.Hardware)
+	response.Hardware = components
 
-	// Check for issues
-	response.Issues = f.detectHardwareIssues(response.Hardware)
+	// Add recommendations
+	response.Recommendations = []string{
+		"Use 'nixai hardware --operation=generate-config' to create hardware configuration.",
+	}
 
-	// Generate configuration if requested
-	if req.Generate {
-		var configParts []string
+	// If specific component requested, filter results
+	if req.ComponentType != "all" && req.ComponentType != "" {
+		var filteredComponents []HardwareComponent
 		for _, comp := range response.Hardware {
-			if len(comp.Configuration) > 0 {
-				for _, configLine := range comp.Configuration {
-					configParts = append(configParts, configLine)
-				}
+			if strings.ToLower(comp.Type) == strings.ToLower(req.ComponentType) {
+				filteredComponents = append(filteredComponents, comp)
 			}
 		}
-		response.Configuration = strings.Join(configParts, "\n")
+		response.Hardware = filteredComponents
 	}
 
 	f.logger.Info(fmt.Sprintf("Detected %d hardware components", len(response.Hardware)))
@@ -317,57 +388,116 @@ func (f *HardwareFunction) detectHardware(ctx context.Context, req *HardwareRequ
 func (f *HardwareFunction) generateConfig(ctx context.Context, req *HardwareRequest, response *HardwareResponse) (*HardwareResponse, error) {
 	f.logger.Info("Generating hardware configuration")
 
-	// Mock hardware components for configuration generation
-	mockComponents := []HardwareComponent{
-		{
-			Type:      "CPU",
-			Name:      "Intel Core i7-12700K",
-			Vendor:    "Intel",
-			Model:     "i7-12700K",
-			Driver:    "intel_pstate",
-			Supported: true,
-			Status:    "active",
-			Configuration: map[string]string{
-				"kernelModules": "boot.initrd.kernelModules = [ \"intel_pstate\" ];",
-				"options":       "boot.kernelParams = [ \"intel_pstate=active\" ];",
-			},
-		},
-		{
-			Type:      "GPU",
-			Name:      "NVIDIA GeForce RTX 3080",
-			Vendor:    "NVIDIA",
-			Model:     "RTX 3080",
-			Driver:    "nvidia",
-			Supported: true,
-			Status:    "active",
-			Configuration: map[string]string{
-				"videoDrivers": "services.xserver.videoDrivers = [ \"nvidia\" ];",
-				"hardware":     "hardware.opengl.enable = true;",
-			},
-		},
+	// First detect hardware components
+	detectResponse, err := f.detectHardware(ctx, req, &HardwareResponse{
+		Context:   req.Context,
+		Operation: "detect",
+		Status:    "success",
+		Hardware:  []HardwareComponent{},
+		Issues:    []HardwareIssue{},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect hardware for config generation: %v", err)
 	}
 
-	// Generate mock configuration based on format
+	// Generate configuration based on detected hardware
 	var configParts []string
 	switch req.Format {
 	case "nix":
 		configParts = append(configParts, "{ config, pkgs, ... }:", "{")
-		for _, comp := range mockComponents {
+
+		// Use a map to track unique configuration lines and organize by category
+		configMap := make(map[string]bool)
+		hardwareSettings := []string{}
+		bootSettings := []string{}
+		serviceSettings := []string{}
+		networkingSettings := []string{}
+
+		for _, comp := range detectResponse.Hardware {
 			for _, configLine := range comp.Configuration {
-				configParts = append(configParts, "  "+configLine)
+				if !configMap[configLine] {
+					configMap[configLine] = true
+
+					// Categorize configuration lines
+					if strings.Contains(configLine, "hardware.") {
+						hardwareSettings = append(hardwareSettings, configLine)
+					} else if strings.Contains(configLine, "boot.") {
+						bootSettings = append(bootSettings, configLine)
+					} else if strings.Contains(configLine, "services.") {
+						serviceSettings = append(serviceSettings, configLine)
+					} else if strings.Contains(configLine, "networking.") {
+						networkingSettings = append(networkingSettings, configLine)
+					} else if strings.Contains(configLine, "sound.") {
+						hardwareSettings = append(hardwareSettings, configLine)
+					}
+				}
 			}
 		}
+
+		// Add organized configuration sections
+		if len(hardwareSettings) > 0 {
+			configParts = append(configParts, "  # Hardware Configuration")
+			for _, setting := range hardwareSettings {
+				configParts = append(configParts, "  "+setting)
+			}
+			configParts = append(configParts, "")
+		}
+
+		if len(bootSettings) > 0 {
+			configParts = append(configParts, "  # Boot Configuration")
+			for _, setting := range bootSettings {
+				configParts = append(configParts, "  "+setting)
+			}
+			configParts = append(configParts, "")
+		}
+
+		if len(serviceSettings) > 0 {
+			configParts = append(configParts, "  # Service Configuration")
+			for _, setting := range serviceSettings {
+				configParts = append(configParts, "  "+setting)
+			}
+			configParts = append(configParts, "")
+		}
+
+		if len(networkingSettings) > 0 {
+			configParts = append(configParts, "  # Networking Configuration")
+			for _, setting := range networkingSettings {
+				configParts = append(configParts, "  "+setting)
+			}
+		}
+
 		configParts = append(configParts, "}")
 	case "json":
 		configParts = append(configParts, "{")
 		configParts = append(configParts, "  \"hardware\": {")
-		configParts = append(configParts, "    \"opengl\": { \"enable\": true },")
-		configParts = append(configParts, "    \"nvidia\": { \"enable\": true }")
+		// Extract key configuration settings
+		hasOpenGL := false
+		hasAMD := false
+		hasNvidia := false
+		for _, comp := range detectResponse.Hardware {
+			if comp.Type == "GPU" {
+				hasOpenGL = true
+				if comp.Driver == "amdgpu" {
+					hasAMD = true
+				} else if comp.Driver == "nvidia" {
+					hasNvidia = true
+				}
+			}
+		}
+		if hasOpenGL {
+			configParts = append(configParts, "    \"opengl\": { \"enable\": true }")
+		}
+		if hasAMD {
+			configParts = append(configParts, "    \"amdgpu\": { \"enable\": true }")
+		}
+		if hasNvidia {
+			configParts = append(configParts, "    \"nvidia\": { \"enable\": true }")
+		}
 		configParts = append(configParts, "  }")
 		configParts = append(configParts, "}")
 	default:
 		configParts = append(configParts, "# Generated hardware configuration")
-		for _, comp := range mockComponents {
+		for _, comp := range detectResponse.Hardware {
 			for _, configLine := range comp.Configuration {
 				configParts = append(configParts, configLine)
 			}
@@ -376,12 +506,12 @@ func (f *HardwareFunction) generateConfig(ctx context.Context, req *HardwareRequ
 
 	response.Configuration = strings.Join(configParts, "\n")
 
-	// Include hardware details
-	response.Hardware = mockComponents
+	// Include hardware details from detection
+	response.Hardware = detectResponse.Hardware
 
 	// Generate recommendations for configuration
 	response.Recommendations = []string{
-		fmt.Sprintf("Generated %s configuration for %d hardware components", req.Format, len(mockComponents)),
+		fmt.Sprintf("Generated %s configuration for %d hardware components", req.Format, len(response.Hardware)),
 		"Review the configuration before applying to your system",
 		"Consider backing up your current configuration first",
 		"Test the configuration in a virtual machine if possible",
@@ -854,4 +984,47 @@ func (f *HardwareFunction) detectHardwareIssues(hardware []HardwareComponent) []
 	}
 
 	return issues
+}
+
+// extractVendor extracts vendor information from hardware description
+func extractVendor(description string) string {
+	desc := strings.ToLower(description)
+	if strings.Contains(desc, "intel") {
+		return "Intel"
+	}
+	if strings.Contains(desc, "amd") {
+		return "AMD"
+	}
+	if strings.Contains(desc, "nvidia") {
+		return "NVIDIA"
+	}
+	if strings.Contains(desc, "qualcomm") {
+		return "Qualcomm"
+	}
+	if strings.Contains(desc, "broadcom") {
+		return "Broadcom"
+	}
+	if strings.Contains(desc, "realtek") {
+		return "Realtek"
+	}
+	return "Unknown"
+}
+
+// extractModel extracts model information from hardware description
+func extractModel(description string) string {
+	// Simple model extraction - could be enhanced
+	parts := strings.Fields(description)
+	if len(parts) > 2 {
+		// Try to find model part (usually after vendor)
+		for i, part := range parts {
+			if i > 0 && (strings.Contains(strings.ToLower(part), "core") ||
+				strings.Contains(strings.ToLower(part), "geforce") ||
+				strings.Contains(strings.ToLower(part), "radeon") ||
+				strings.Contains(strings.ToLower(part), "hda")) {
+				// Return rest of string after vendor
+				return strings.Join(parts[i:], " ")
+			}
+		}
+	}
+	return strings.TrimSpace(description)
 }
