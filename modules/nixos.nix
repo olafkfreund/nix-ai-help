@@ -1,8 +1,6 @@
 # nixai NixOS Module
 # Provides systemd services and configuration for the nixai application.
 # This module enables system-wide nixai installation with MCP server support.
-{nixaiPackage ? null}:
-# Accept optional nixai package parameter
 {
   config,
   lib,
@@ -11,33 +9,6 @@
 }:
 with lib; let
   cfg = config.services.nixai;
-
-  # Use provided package or try to find nixai in pkgs, fallback to placeholder
-  defaultNixaiPackage =
-    if nixaiPackage != null
-    then nixaiPackage
-    else if pkgs ? nixai
-    then pkgs.nixai
-    else
-      pkgs.stdenv.mkDerivation {
-        pname = "nixai-placeholder";
-        version = "0.0.0";
-        src = pkgs.writeText "placeholder" "";
-        dontUnpack = true;
-        installPhase = ''
-                    mkdir -p $out/bin
-                    cat > $out/bin/nixai << 'EOF'
-          #!/bin/sh
-          echo "nixai placeholder: Please install nixai package or build from flake"
-          echo "See: https://github.com/olafkfreund/nix-ai-help#installation"
-          exit 1
-          EOF
-                    chmod +x $out/bin/nixai
-        '';
-        meta = {
-          description = "Placeholder package for nixai (not properly installed)";
-        };
-      };
 in {
   options.services.nixai = {
     enable = mkEnableOption "nixai service";
@@ -47,7 +18,10 @@ in {
 
       package = mkOption {
         type = types.package;
-        default = defaultNixaiPackage;
+        default =
+          if (pkgs ? nixai)
+          then pkgs.nixai
+          else pkgs.callPackage ../package.nix {inherit (pkgs) lib buildGoModule;};
         description = "The nixai package to use";
       };
 

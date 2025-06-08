@@ -16,7 +16,75 @@ See the full [nixai User Manual](docs/MANUAL.md) for comprehensive documentation
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Installation
+
+### 📦 Flake-based Installation (Recommended)
+
+**Prerequisites:**
+- Nix (with flakes enabled)
+- git
+
+**1. Build and run directly:**
+
+```zsh
+nix run github:olafkfreund/nix-ai-help -- --help
+```
+
+**2. Install system-wide via flake:**
+
+```zsh
+# Clone and install
+git clone https://github.com/olafkfreund/nix-ai-help.git
+cd nix-ai-help
+nix profile install .
+
+# Or install directly from GitHub
+nix profile install github:olafkfreund/nix-ai-help
+```
+
+**3. Add to your NixOS/Home Manager configuration:**
+
+See the [modules README](modules/README.md) for complete integration examples.
+
+### 🏗️ Traditional Package Installation (Non-flake Users)
+
+**Using callPackage (Most Common):**
+
+```nix
+# In your configuration.nix or home.nix
+{ config, pkgs, ... }:
+
+let
+  nixai = pkgs.callPackage (builtins.fetchGit {
+    url = "https://github.com/olafkfreund/nix-ai-help.git";
+    ref = "main";
+  } + "/package.nix") {};
+in {
+  environment.systemPackages = [ nixai ];  # For NixOS
+  # OR
+  home.packages = [ nixai ];  # For Home Manager
+}
+```
+
+**Using standalone package.nix:**
+
+```zsh
+# Clone the repository
+git clone https://github.com/olafkfreund/nix-ai-help.git
+cd nix-ai-help
+
+# Build using package.nix
+nix-build package.nix
+
+# Install the result
+nix-env -i ./result
+```
+
+**Submit to nixpkgs:**
+
+The `package.nix` is nixpkgs-compliant and ready for submission. To add nixai to the official nixpkgs repository, you can submit a pull request to [NixOS/nixpkgs](https://github.com/NixOS/nixpkgs).
+
+### 🛠️ Development Installation
 
 **Prerequisites:**
 
@@ -35,6 +103,8 @@ ollama pull llama3
 **Build and run nixai:**
 
 ```zsh
+git clone https://github.com/olafkfreund/nix-ai-help.git
+cd nix-ai-help
 just build
 ./nixai --help
 ```

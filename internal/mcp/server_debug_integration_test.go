@@ -41,10 +41,10 @@ func TestHandleQuery_DebugLogging(t *testing.T) {
 
 	logOutput := buf.String()
 
-	if !strings.Contains(logOutput, "DEBUG: Querying documentation source") {
+	if !strings.Contains(logOutput, "handleDocQuery: processing source") {
 		t.Errorf("expected debug log for source query, got: %s", logOutput)
 	}
-	if !strings.Contains(logOutput, "DEBUG: Structured doc found") {
+	if !strings.Contains(logOutput, "handleDocQuery: found result in NixOS options endpoint") {
 		t.Errorf("expected debug log for structured doc, got: %s", logOutput)
 	}
 }
