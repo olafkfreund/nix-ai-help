@@ -2,21 +2,76 @@
   lib,
   buildGoModule,
   installShellFiles,
+  fetchFromGitHub,
   # Optional parameters for version/commit overrides
   version ? "0.1.0",
-  src ? ./.,
+  srcOverride ? null,
   rev ? null,
   gitCommit ? null,
   buildDate ? "1970-01-01T00:00:00Z",
 }:
 buildGoModule rec {
   pname = "nixai";
-  inherit version src;
+  inherit version;
+
+  # Use provided src or fetch from GitHub
+  src =
+    if srcOverride != null
+    then srcOverride
+    else
+      fetchFromGitHub {
+        owner = "olafkfreund";
+        repo = "nix-ai-help";
+        rev =
+          if rev != null
+          then rev
+          else "main"; # Use main branch instead of tag for latest code
+        sha256 = lib.fakeSha256; # This will need to be updated with actual hash
+      };
 
   vendorHash = "sha256-pGyNwzTkHuOzEDOjmkzx0sfb1jHsqb/1FcojsCGR6CY=";
   doCheck = false;
 
+  # Force Go to use modules instead of vendor
+  buildFlagsArray = ["-mod=readonly"];
+
   subPackages = ["cmd/nixai"];
+
+  # Handle source directory structure for standalone installations
+  preBuild = ''
+    echo "=== Build Environment Debug ==="
+    echo "Current directory: $(pwd)"
+    echo "Source directory contents:"
+    ls -la
+
+    # Check if go.mod exists in current directory
+    if [ -f go.mod ]; then
+      echo "✓ Found go.mod in current directory"
+      echo "Module: $(head -1 go.mod)"
+    else
+      echo "go.mod not found in current directory, searching..."
+      GOMOD_PATH=$(find . -name "go.mod" -type f | head -1)
+      if [ -n "$GOMOD_PATH" ]; then
+        GOMOD_DIR=$(dirname "$GOMOD_PATH")
+        echo "Found go.mod in: $GOMOD_DIR"
+        echo "Changing to source directory: $GOMOD_DIR"
+        cd "$GOMOD_DIR"
+        echo "Now in: $(pwd)"
+        echo "Module: $(head -1 go.mod)"
+      else
+        echo "Error: Cannot find go.mod file in source tree"
+        echo "Full directory structure:"
+        find . -type f -name "*.go" -o -name "go.*" | head -20
+        exit 1
+      fi
+    fi
+
+    # Force remove vendor directory if it exists anywhere
+    echo "Removing any vendor directories..."
+    find . -name "vendor" -type d -exec rm -rf {} + 2>/dev/null || true
+
+    echo "=== Build Environment Ready ==="
+  '';
 
   nativeBuildInputs = [installShellFiles];
 

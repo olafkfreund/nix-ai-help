@@ -18,7 +18,7 @@
       packages.default = self.packages.${system}.nixai;
       packages.nixai = pkgs.callPackage ./package.nix {
         version = "0.1.0";
-        src = ./.;
+        srcOverride = ./.;
         rev = self.rev or null;
         gitCommit =
           if (self ? rev && self.rev != null)
