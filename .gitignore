@@ -7,7 +7,6 @@ main
 
 # Go modules and vendor
 /go/
-vendor/ # Vendor directory is managed by Nix build process
 
 # Nix build results
 /result
