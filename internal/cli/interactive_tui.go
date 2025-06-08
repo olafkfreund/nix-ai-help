@@ -286,16 +286,21 @@ func getAvailableCommands() []commandItem {
 		},
 		{
 			name:        "doctor",
-			description: "Run NixOS health checks",
+			description: "Run comprehensive NixOS health checks and get AI-powered diagnostics",
 			icon:        "🩻",
 			needsInput:  false,
-			options:     []commandOption{},
+			options: []commandOption{
+				{name: "Verbose", flag: "verbose", description: "Show detailed output and progress information", required: false, hasValue: false, optionType: "bool"},
+			},
 			subcommands: []subcommandItem{
-				{name: "full", description: "Full system health check", options: []commandOption{}},
-				{name: "quick", description: "Quick health check", options: []commandOption{}},
-				{name: "store", description: "Check Nix store health", options: []commandOption{}},
-				{name: "config", description: "Check configuration", options: []commandOption{}},
-				{name: "security", description: "Security audit", options: []commandOption{}},
+				{name: "system", description: "Core system health checks", options: []commandOption{}},
+				{name: "nixos", description: "NixOS-specific configuration checks", options: []commandOption{}},
+				{name: "packages", description: "Package and store integrity checks", options: []commandOption{}},
+				{name: "services", description: "System service status checks", options: []commandOption{}},
+				{name: "storage", description: "Storage and filesystem checks", options: []commandOption{}},
+				{name: "network", description: "Network connectivity checks", options: []commandOption{}},
+				{name: "security", description: "Security configuration checks", options: []commandOption{}},
+				{name: "all", description: "Run all available checks (default)", options: []commandOption{}},
 			},
 		},
 		{

@@ -1,10 +1,16 @@
 package cli
 
 import (
+	"bufio"
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"strings"
 
 	"nix-ai-help/internal/ai"
+	"nix-ai-help/internal/ai/agent"
+	"nix-ai-help/internal/ai/function/hardware"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/pkg/utils"
 
@@ -26,12 +32,14 @@ Commands:
   drivers                 - Auto-configure drivers and firmware
   compare                 - Compare current vs optimal settings
   laptop                  - Laptop-specific optimizations
+  function                - Use hardware function calling interface
 
 Examples:
   nixai hardware detect
   nixai hardware optimize --dry-run
   nixai hardware drivers --auto-install
-  nixai hardware laptop --power-save`,
+  nixai hardware laptop --power-save
+  nixai hardware function --operation detect`,
 	Run: func(cmd *cobra.Command, args []string) {
 		_ = cmd.Help()
 	},
@@ -67,33 +75,72 @@ This command identifies:
 		case "ollama":
 			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
 		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
+			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
 		case "openai":
 			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
 		default:
 			aiProvider = ai.NewOllamaLegacyProvider("llama3")
 		}
 
-		// Perform basic hardware detection
+		// Initialize Hardware Agent with legacy provider adapter
+		hardwareProvider := ai.NewLegacyProviderAdapter(aiProvider)
+		hardwareAgent := agent.NewHardwareAgent(hardwareProvider)
+
+		// Perform comprehensive hardware detection
 		fmt.Println(utils.FormatProgress("Detecting hardware components..."))
 
-		// Get AI analysis for hardware optimization
-		prompt := `Analyze the current system hardware for NixOS optimization. Provide recommendations for:
-1. Hardware capability assessment
-2. NixOS-specific optimization opportunities  
-3. Driver and firmware recommendations
-4. Performance tuning suggestions
-5. Power management recommendations
-6. Security considerations
+		// Detect hardware components
+		hardwareInfo, err := detectHardwareComponents()
+		if err != nil {
+			fmt.Println(utils.FormatError("Hardware detection failed: " + err.Error()))
+			return
+		}
 
-Focus on NixOS-specific configuration and provide actionable advice.`
+		// Create hardware context for the agent
+		hwContext := &agent.HardwareContext{
+			SystemInfo:         fmt.Sprintf("Architecture: %s", hardwareInfo.Architecture),
+			CPUInfo:            hardwareInfo.CPU,
+			GPUInfo:            strings.Join(hardwareInfo.GPU, "\n"),
+			MemoryInfo:         hardwareInfo.Memory,
+			StorageInfo:        strings.Join(hardwareInfo.Storage, "\n"),
+			NetworkInfo:        strings.Join(hardwareInfo.Network, "\n"),
+			AudioInfo:          hardwareInfo.Audio,
+			USBDevices:         hardwareInfo.USB,
+			PCIDevices:         hardwareInfo.PCI,
+			BIOS_UEFI:          hardwareInfo.Firmware,
+			Architecture:       hardwareInfo.Architecture,
+			VirtualizationInfo: hardwareInfo.Virtualization,
+		}
 
-		analysis, err := aiProvider.Query(prompt)
+		// Set context in the agent
+		hardwareAgent.SetContext(hwContext)
+
+		// Display detected hardware
+		displayDetectedHardware(hardwareInfo)
+
+		// Ask for confirmation
+		if !confirmHardwareDetection() {
+			fmt.Println(utils.FormatInfo("Hardware detection cancelled by user"))
+			return
+		}
+
+		// Get AI analysis for hardware optimization using the HardwareAgent
+		fmt.Println(utils.FormatProgress("Analyzing hardware for NixOS optimization..."))
+
+		ctx := context.Background()
+		analysisQuery := "Analyze the detected hardware and provide comprehensive NixOS configuration recommendations for optimal performance, compatibility, and power management."
+
+		analysis, err := hardwareAgent.Query(ctx, analysisQuery)
 		if err != nil {
 			fmt.Println(utils.FormatWarning("Could not get AI analysis: " + err.Error()))
+			// Fallback to legacy provider for basic configuration suggestions
+			generateConfigurationSuggestions(hardwareInfo, aiProvider)
 		} else {
 			fmt.Println(utils.FormatSubsection("🤖 AI Hardware Analysis", ""))
 			fmt.Println(utils.RenderMarkdown(analysis))
+
+			// Generate additional component-specific suggestions using agent context
+			generateAgentBasedSuggestions(hardwareInfo, hardwareAgent)
 		}
 
 		fmt.Println()
@@ -131,7 +178,7 @@ This command provides:
 			fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
 			cfg = &config.UserConfig{AIProvider: "ollama", AIModel: "llama3"}
 		}
-		aiProvider := initializeAIProvider(cfg)
+		aiProvider := InitializeAIProvider(cfg)
 
 		// Get optimization recommendations
 		fmt.Println(utils.FormatProgress("Analyzing hardware for optimization opportunities..."))
@@ -213,7 +260,7 @@ This command handles:
 			fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
 			cfg = &config.UserConfig{AIProvider: "ollama", AIModel: "llama3"}
 		}
-		aiProvider := initializeAIProvider(cfg)
+		aiProvider := InitializeAIProvider(cfg)
 
 		// Get driver configuration recommendations
 		fmt.Println(utils.FormatProgress("Analyzing hardware drivers and firmware..."))
@@ -294,7 +341,7 @@ This command analyzes:
 			fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
 			cfg = &config.UserConfig{AIProvider: "ollama", AIModel: "llama3"}
 		}
-		aiProvider := initializeAIProvider(cfg)
+		aiProvider := InitializeAIProvider(cfg)
 
 		// Get comparison analysis
 		fmt.Println(utils.FormatProgress("Analyzing current configuration vs optimal settings..."))
@@ -385,7 +432,7 @@ This command provides:
 			fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
 			cfg = &config.UserConfig{AIProvider: "ollama", AIModel: "llama3"}
 		}
-		aiProvider := initializeAIProvider(cfg)
+		aiProvider := InitializeAIProvider(cfg)
 
 		// Get laptop-specific recommendations
 		fmt.Println(utils.FormatProgress("Analyzing laptop hardware for optimization..."))
@@ -446,6 +493,88 @@ Provide actual NixOS configuration snippets optimized for %s mode.`, mode, mode,
 	},
 }
 
+// Hardware function command - uses the function calling interface
+var hardwareFunctionCmd = &cobra.Command{
+	Use:   "function",
+	Short: "Use hardware function calling interface",
+	Long: `Execute hardware operations using the function calling interface.
+
+This command demonstrates integration with the hardware function system and provides
+structured hardware operations with standardized input/output formats.
+
+Available operations:
+  detect          - Detect hardware components
+  scan            - Perform comprehensive hardware scan  
+  test            - Test hardware functionality
+  diagnose        - Diagnose hardware issues
+  generate-config - Generate NixOS configuration
+  list-drivers    - List available drivers
+
+Examples:
+  nixai hardware function --operation detect
+  nixai hardware function --operation scan --component gpu
+  nixai hardware function --operation generate-config --format nix
+  nixai hardware function --operation diagnose --detailed`,
+	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(utils.FormatHeader("🔧 Hardware Function Interface"))
+		fmt.Println()
+
+		operation, _ := cmd.Flags().GetString("operation")
+		component, _ := cmd.Flags().GetString("component")
+		format, _ := cmd.Flags().GetString("format")
+		detailed, _ := cmd.Flags().GetBool("detailed")
+		includeDrivers, _ := cmd.Flags().GetBool("include-drivers")
+
+		fmt.Println(utils.FormatProgress("Initializing hardware function interface..."))
+
+		// Create hardware function instance
+		hardwareFunction := hardware.NewHardwareFunction()
+
+		// Prepare function parameters
+		params := map[string]interface{}{
+			"operation":       operation,
+			"component":       component,
+			"detailed":        detailed,
+			"include_drivers": includeDrivers,
+		}
+
+		if format != "" {
+			params["format"] = format
+		}
+
+		// Execute hardware function
+		ctx := context.Background()
+		fmt.Println(utils.FormatProgress(fmt.Sprintf("Executing hardware operation: %s", operation)))
+
+		result, err := hardwareFunction.Execute(ctx, params, nil)
+		if err != nil {
+			fmt.Println(utils.FormatError("Hardware function execution failed: " + err.Error()))
+			return
+		}
+
+		// Display results
+		if !result.Success {
+			fmt.Println(utils.FormatError("Hardware operation failed: " + result.Error))
+			return
+		}
+
+		fmt.Println(utils.FormatSubsection("🎯 Function Results", ""))
+
+		// The result.Data should contain HardwareResponse
+		if response, ok := result.Data.(*hardware.HardwareResponse); ok {
+			displayHardwareFunctionResults(response)
+		} else {
+			// Fallback display
+			fmt.Printf("Operation completed successfully in %v\n", result.Duration)
+			fmt.Printf("Response: %+v\n", result.Data)
+		}
+
+		fmt.Println()
+		fmt.Println(utils.FormatTip("Use different --operation values to explore hardware function capabilities"))
+		fmt.Println(utils.FormatTip("Add --detailed for comprehensive analysis"))
+	},
+}
+
 // Add commands to CLI in init function
 func init() {
 	// Add hardware subcommands
@@ -454,12 +583,18 @@ func init() {
 	hardwareCmd.AddCommand(hardwareDriversCmd)
 	hardwareCmd.AddCommand(hardwareCompareCmd)
 	hardwareCmd.AddCommand(hardwareLaptopCmd)
+	hardwareCmd.AddCommand(hardwareFunctionCmd)
 
 	// Add flags for hardware commands
 	hardwareOptimizeCmd.Flags().Bool("dry-run", false, "Show optimization recommendations without applying changes")
 	hardwareDriversCmd.Flags().Bool("auto-install", false, "Provide installation commands for recommended drivers")
 	hardwareLaptopCmd.Flags().Bool("power-save", false, "Optimize for maximum battery life")
 	hardwareLaptopCmd.Flags().Bool("performance", false, "Optimize for maximum performance")
+	hardwareFunctionCmd.Flags().String("operation", "", "Specify the hardware operation to perform")
+	hardwareFunctionCmd.Flags().String("component", "", "Specify the hardware component for the operation")
+	hardwareFunctionCmd.Flags().String("format", "", "Specify the output format for the operation")
+	hardwareFunctionCmd.Flags().Bool("detailed", false, "Enable detailed output for the operation")
+	hardwareFunctionCmd.Flags().Bool("include-drivers", false, "Include driver information in the operation")
 }
 
 // NewHardwareCmd constructor
@@ -475,7 +610,689 @@ func NewHardwareCmd() *cobra.Command {
 	cmd.AddCommand(hardwareDriversCmd)
 	cmd.AddCommand(hardwareCompareCmd)
 	cmd.AddCommand(hardwareLaptopCmd)
+	cmd.AddCommand(hardwareFunctionCmd)
 	cmd.PersistentFlags().AddFlagSet(hardwareCmd.PersistentFlags())
 	cmd.Flags().AddFlagSet(hardwareCmd.Flags())
 	return cmd
+}
+
+// HardwareInfo represents detected hardware information
+type HardwareInfo struct {
+	CPU            string
+	GPU            []string
+	Memory         string
+	Storage        []string
+	Network        []string
+	Audio          string
+	USB            []string
+	PCI            []string
+	Firmware       string
+	DisplayServer  string // X11 or Wayland
+	Architecture   string
+	Virtualization string // VM detection and virtualization capabilities
+}
+
+// detectHardwareComponents performs comprehensive hardware detection
+func detectHardwareComponents() (*HardwareInfo, error) {
+	info := &HardwareInfo{}
+
+	// Detect CPU
+	if cpu, err := runCommand("lscpu | grep 'Model name' | cut -d':' -f2 | xargs"); err == nil {
+		info.CPU = cpu
+	}
+
+	// Detect GPU devices with more detailed information
+	if gpu, err := runCommand("lspci | grep -i vga"); err == nil && gpu != "" {
+		info.GPU = strings.Split(gpu, "\n")
+	}
+	if gpu3d, err := runCommand("lspci | grep -i '3d'"); err == nil && gpu3d != "" {
+		info.GPU = append(info.GPU, strings.Split(gpu3d, "\n")...)
+	}
+	// Detect additional display controllers
+	if display, err := runCommand("lspci | grep -i 'display\\|graphics'"); err == nil && display != "" {
+		for _, line := range strings.Split(display, "\n") {
+			if line != "" && !sliceContains(info.GPU, line) {
+				info.GPU = append(info.GPU, line)
+			}
+		}
+	}
+
+	// Detect memory with more details
+	if mem, err := runCommand("free -h | head -2 | tail -1 | awk '{print $2}'"); err == nil {
+		memTotal := strings.TrimSpace(mem)
+		// Get additional memory info
+		if memInfo, err := runCommand("dmidecode -t memory 2>/dev/null | grep -E 'Size|Speed|Type:' | head -3"); err == nil && memInfo != "" {
+			info.Memory = fmt.Sprintf("Total RAM: %s\nDetails:\n%s", memTotal, memInfo)
+		} else {
+			info.Memory = fmt.Sprintf("Total RAM: %s", memTotal)
+		}
+	}
+
+	// Detect storage
+	if storage, err := runCommand("lsblk -d -o name,size,type | grep disk"); err == nil {
+		info.Storage = strings.Split(storage, "\n")
+	}
+
+	// Detect network interfaces
+	if network, err := runCommand("ip link show | grep -E '^[0-9]+:' | cut -d':' -f2 | xargs"); err == nil {
+		info.Network = strings.Split(network, " ")
+	}
+
+	// Detect audio
+	if audio, err := runCommand("lspci | grep -i audio"); err == nil {
+		info.Audio = audio
+	}
+
+	// Detect USB devices
+	if usb, err := runCommand("lsusb"); err == nil {
+		info.USB = strings.Split(usb, "\n")
+	}
+
+	// Detect PCI devices
+	if pci, err := runCommand("lspci"); err == nil {
+		info.PCI = strings.Split(pci, "\n")
+	}
+
+	// Detect firmware type
+	if _, err := os.Stat("/sys/firmware/efi"); err == nil {
+		info.Firmware = "UEFI"
+	} else {
+		info.Firmware = "BIOS"
+	}
+
+	// Detect display server
+	if os.Getenv("WAYLAND_DISPLAY") != "" {
+		info.DisplayServer = "Wayland"
+	} else if os.Getenv("DISPLAY") != "" {
+		info.DisplayServer = "X11"
+	} else {
+		info.DisplayServer = "Unknown/Console"
+	}
+
+	// Detect architecture
+	if arch, err := runCommand("uname -m"); err == nil {
+		info.Architecture = strings.TrimSpace(arch)
+	}
+
+	// Detect virtualization
+	var virtInfo []string
+
+	// Check if running in a VM
+	if virt, err := runCommand("systemd-detect-virt 2>/dev/null"); err == nil && virt != "none" {
+		virtInfo = append(virtInfo, fmt.Sprintf("Running in: %s", virt))
+	}
+
+	// Check CPU virtualization support
+	if cpuVirt, err := runCommand("lscpu | grep -E 'Virtualization|VT-x|AMD-V'"); err == nil && cpuVirt != "" {
+		virtInfo = append(virtInfo, fmt.Sprintf("CPU Features: %s", cpuVirt))
+	}
+
+	// Check for hypervisor
+	if hyper, err := runCommand("lscpu | grep 'Hypervisor vendor'"); err == nil && hyper != "" {
+		virtInfo = append(virtInfo, hyper)
+	}
+
+	if len(virtInfo) > 0 {
+		info.Virtualization = strings.Join(virtInfo, "\n")
+	} else {
+		info.Virtualization = "Native/Unknown"
+	}
+
+	return info, nil
+}
+
+// runCommand executes a shell command and returns its output
+func runCommand(command string) (string, error) {
+	cmd := exec.Command("sh", "-c", command)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+// sliceContains checks if a slice contains a string
+func sliceContains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+// runCommandWithSudo executes a command with sudo after asking for permission
+func runCommandWithSudo(command string) (string, error) {
+	fmt.Printf("This command requires sudo privileges: %s\n", command)
+	fmt.Print("Do you want to proceed? (y/N): ")
+
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+
+	response = strings.ToLower(strings.TrimSpace(response))
+	if response != "y" && response != "yes" {
+		return "", fmt.Errorf("operation cancelled by user")
+	}
+
+	cmd := exec.Command("sudo", "sh", "-c", command)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+// displayDetectedHardware shows the detected hardware components
+func displayDetectedHardware(info *HardwareInfo) {
+	fmt.Println(utils.FormatSubsection("💻 Detected Hardware", ""))
+
+	if info.CPU != "" {
+		fmt.Println(utils.FormatKeyValue("CPU", info.CPU))
+	}
+
+	if len(info.GPU) > 0 {
+		fmt.Println(utils.FormatKeyValue("GPU", ""))
+		for _, gpu := range info.GPU {
+			if strings.TrimSpace(gpu) != "" {
+				fmt.Printf("  • %s\n", strings.TrimSpace(gpu))
+			}
+		}
+	}
+
+	if info.Memory != "" {
+		fmt.Println(utils.FormatKeyValue("Memory", info.Memory))
+	}
+
+	if len(info.Storage) > 0 {
+		fmt.Println(utils.FormatKeyValue("Storage", ""))
+		for _, storage := range info.Storage {
+			if strings.TrimSpace(storage) != "" {
+				fmt.Printf("  • %s\n", strings.TrimSpace(storage))
+			}
+		}
+	}
+
+	if len(info.Network) > 0 {
+		fmt.Println(utils.FormatKeyValue("Network", strings.Join(info.Network, ", ")))
+	}
+
+	if info.Audio != "" {
+		fmt.Println(utils.FormatKeyValue("Audio", info.Audio))
+	}
+
+	fmt.Println(utils.FormatKeyValue("Firmware", info.Firmware))
+	fmt.Println(utils.FormatKeyValue("Display Server", info.DisplayServer))
+	fmt.Println(utils.FormatKeyValue("Architecture", info.Architecture))
+
+	if info.Virtualization != "" {
+		fmt.Println(utils.FormatKeyValue("Virtualization", info.Virtualization))
+	}
+
+	fmt.Println()
+}
+
+// confirmHardwareDetection asks user to confirm the detected hardware
+func confirmHardwareDetection() bool {
+	fmt.Print("Is this hardware detection correct? (Y/n): ")
+
+	reader := bufio.NewReader(os.Stdin)
+	response, err := reader.ReadString('\n')
+	if err != nil {
+		return false
+	}
+
+	response = strings.ToLower(strings.TrimSpace(response))
+	return response == "" || response == "y" || response == "yes"
+}
+
+// buildHardwareAnalysisPrompt creates a detailed prompt for AI analysis
+func buildHardwareAnalysisPrompt(info *HardwareInfo) string {
+	prompt := "Analyze the following hardware configuration for NixOS optimization:\n\n"
+
+	prompt += "**System Overview:**\n"
+	prompt += fmt.Sprintf("- Architecture: %s\n", info.Architecture)
+	prompt += fmt.Sprintf("- Firmware: %s\n", info.Firmware)
+	prompt += fmt.Sprintf("- Display Server: %s\n", info.DisplayServer)
+	prompt += "\n"
+
+	if info.CPU != "" {
+		prompt += fmt.Sprintf("**CPU:** %s\n\n", info.CPU)
+	}
+
+	if len(info.GPU) > 0 {
+		prompt += "**GPU:**\n"
+		for _, gpu := range info.GPU {
+			if strings.TrimSpace(gpu) != "" {
+				prompt += fmt.Sprintf("- %s\n", strings.TrimSpace(gpu))
+			}
+		}
+		prompt += "\n"
+	}
+
+	if info.Memory != "" {
+		prompt += fmt.Sprintf("**Memory:** %s\n\n", info.Memory)
+	}
+
+	if len(info.Storage) > 0 {
+		prompt += "**Storage:**\n"
+		for _, storage := range info.Storage {
+			if strings.TrimSpace(storage) != "" {
+				prompt += fmt.Sprintf("- %s\n", strings.TrimSpace(storage))
+			}
+		}
+		prompt += "\n"
+	}
+
+	prompt += `
+Please provide comprehensive NixOS configuration recommendations for:
+
+1. **Hardware-specific optimizations:**
+   - CPU optimizations and microcode
+   - GPU driver configuration for ` + info.DisplayServer + ` display server
+   - Memory and storage optimizations
+   - Network interface optimization
+
+2. **Driver Configuration:**
+   - Required drivers and firmware packages
+   - Kernel modules and parameters
+   - Hardware acceleration settings
+
+3. **Performance Tuning:**
+   - CPU governor and scaling settings
+   - I/O schedulers for storage devices
+   - Network performance optimizations
+   - Power management (if laptop)
+
+4. **NixOS Configuration Snippets:**
+   - Provide actual configuration.nix or hardware-configuration.nix snippets
+   - Include package installations and system settings
+   - Consider ` + info.DisplayServer + ` specific configurations
+
+5. **Security Considerations:**
+   - Secure boot compatibility
+   - Microcode updates
+   - Hardware security features
+
+Focus on practical, tested NixOS configurations that improve performance and stability.`
+
+	return prompt
+}
+
+// generateConfigurationSuggestions creates specific NixOS configuration suggestions
+func generateConfigurationSuggestions(info *HardwareInfo, aiProvider ai.AIProvider) {
+	fmt.Println(utils.FormatSubsection("⚙️ Configuration Suggestions", ""))
+
+	// Generate GPU-specific suggestions
+	if len(info.GPU) > 0 {
+		generateGPUSuggestions(info, aiProvider)
+	}
+
+	// Generate CPU-specific suggestions
+	if info.CPU != "" {
+		generateCPUSuggestions(info, aiProvider)
+	}
+
+	// Generate storage suggestions
+	if len(info.Storage) > 0 {
+		generateStorageSuggestions(info, aiProvider)
+	}
+
+	// Generate network suggestions
+	if len(info.Network) > 0 {
+		generateNetworkSuggestions(info, aiProvider)
+	}
+}
+
+// generateGPUSuggestions provides GPU-specific configuration suggestions
+func generateGPUSuggestions(info *HardwareInfo, aiProvider ai.AIProvider) {
+	fmt.Println(utils.FormatKeyValue("🎮 GPU Configuration", ""))
+
+	prompt := fmt.Sprintf(`Generate NixOS GPU configuration for %s display server with the following GPUs:
+%s
+
+Provide specific configuration for:
+1. Driver installation and setup
+2. Hardware acceleration
+3. OpenGL/Vulkan support
+4. %s-specific optimizations
+5. Gaming and compute optimizations (if applicable)
+
+Include actual NixOS configuration snippets.`,
+		info.DisplayServer,
+		strings.Join(info.GPU, "\n"),
+		info.DisplayServer)
+
+	response, err := aiProvider.Query(prompt)
+	if err != nil {
+		fmt.Printf("  • Error generating GPU suggestions: %v\n", err)
+		return
+	}
+
+	fmt.Println(utils.RenderMarkdown(response))
+	fmt.Println()
+}
+
+// generateCPUSuggestions provides CPU-specific configuration suggestions
+func generateCPUSuggestions(info *HardwareInfo, aiProvider ai.AIProvider) {
+	fmt.Println(utils.FormatKeyValue("🔧 CPU Configuration", ""))
+
+	prompt := fmt.Sprintf(`Generate NixOS CPU optimization configuration for: %s
+
+Provide specific configuration for:
+1. CPU microcode updates
+2. Performance scaling and governors
+3. CPU-specific optimizations
+4. Kernel parameters
+5. Power management settings
+
+Include actual NixOS configuration snippets.`, info.CPU)
+
+	response, err := aiProvider.Query(prompt)
+	if err != nil {
+		fmt.Printf("  • Error generating CPU suggestions: %v\n", err)
+		return
+	}
+
+	fmt.Println(utils.RenderMarkdown(response))
+	fmt.Println()
+}
+
+// generateStorageSuggestions provides storage-specific configuration suggestions
+func generateStorageSuggestions(info *HardwareInfo, aiProvider ai.AIProvider) {
+	fmt.Println(utils.FormatKeyValue("💾 Storage Configuration", ""))
+
+	prompt := fmt.Sprintf(`Generate NixOS storage optimization configuration for:
+%s
+
+Provide specific configuration for:
+1. I/O schedulers for different storage types
+2. SSD optimizations (TRIM, etc.)
+3. Filesystem recommendations
+4. Mount options for performance
+5. Swap configuration
+
+Include actual NixOS configuration snippets.`, strings.Join(info.Storage, "\n"))
+
+	response, err := aiProvider.Query(prompt)
+	if err != nil {
+		fmt.Printf("  • Error generating storage suggestions: %v\n", err)
+		return
+	}
+
+	fmt.Println(utils.RenderMarkdown(response))
+	fmt.Println()
+}
+
+// generateNetworkSuggestions provides network-specific configuration suggestions
+func generateNetworkSuggestions(info *HardwareInfo, aiProvider ai.AIProvider) {
+	fmt.Println(utils.FormatKeyValue("🌐 Network Configuration", ""))
+
+	prompt := fmt.Sprintf(`Generate NixOS network optimization configuration for interfaces:
+%s
+
+Provide specific configuration for:
+1. Network interface optimization
+2. WiFi power management
+3. Network performance tuning
+4. Driver-specific settings
+5. Security configurations
+
+Include actual NixOS configuration snippets.`, strings.Join(info.Network, ", "))
+
+	response, err := aiProvider.Query(prompt)
+	if err != nil {
+		fmt.Printf("  • Error generating network suggestions: %v\n", err)
+		return
+	}
+
+	fmt.Println(utils.RenderMarkdown(response))
+	fmt.Println()
+}
+
+// generateAgentBasedSuggestions provides AI agent-powered hardware configuration suggestions
+func generateAgentBasedSuggestions(info *HardwareInfo, hardwareAgent *agent.HardwareAgent) {
+	ctx := context.Background()
+
+	fmt.Println(utils.FormatSubsection("🔧 Component-Specific Recommendations", ""))
+
+	// CPU-specific recommendations
+	if info.CPU != "" {
+		fmt.Println(utils.FormatKeyValue("⚙️ CPU Optimization", ""))
+		cpuQuery := fmt.Sprintf("Provide specific NixOS configuration for CPU optimization based on: %s. Include microcode updates, performance scaling, and thermal management.", info.CPU)
+		if cpuResponse, err := hardwareAgent.Query(ctx, cpuQuery); err == nil {
+			fmt.Println(utils.RenderMarkdown(cpuResponse))
+		} else {
+			fmt.Printf("  • Error generating CPU suggestions: %v\n", err)
+		}
+		fmt.Println()
+	}
+
+	// GPU-specific recommendations with X11/Wayland considerations
+	if len(info.GPU) > 0 {
+		fmt.Println(utils.FormatKeyValue("🎮 GPU Configuration", ""))
+		displayServer := info.DisplayServer
+		if displayServer == "" {
+			displayServer = "both X11 and Wayland"
+		}
+
+		gpuQuery := fmt.Sprintf(`Provide comprehensive NixOS GPU configuration for:
+%s
+
+Display Server: %s
+
+Include:
+1. Driver installation and configuration
+2. Hardware acceleration setup
+3. Performance optimizations
+4. Power management
+5. Multi-GPU configuration if applicable
+6. %s-specific configurations
+
+Provide actual NixOS configuration snippets.`, strings.Join(info.GPU, "\n"), displayServer, displayServer)
+
+		if gpuResponse, err := hardwareAgent.Query(ctx, gpuQuery); err == nil {
+			fmt.Println(utils.RenderMarkdown(gpuResponse))
+		} else {
+			fmt.Printf("  • Error generating GPU suggestions: %v\n", err)
+		}
+		fmt.Println()
+	}
+
+	// Storage optimization with modern filesystem recommendations
+	if len(info.Storage) > 0 {
+		fmt.Println(utils.FormatKeyValue("💾 Advanced Storage Configuration", ""))
+		storageQuery := fmt.Sprintf(`Provide advanced NixOS storage configuration for:
+%s
+
+Include:
+1. Modern filesystem recommendations (ZFS, Btrfs, ext4)
+2. SSD optimizations and TRIM scheduling
+3. I/O scheduler selection
+4. Advanced mount options
+5. Swap configuration and zRAM
+6. Storage security (LUKS encryption)
+7. Performance monitoring setup
+
+Provide complete NixOS configuration examples.`, strings.Join(info.Storage, "\n"))
+
+		if storageResponse, err := hardwareAgent.Query(ctx, storageQuery); err == nil {
+			fmt.Println(utils.RenderMarkdown(storageResponse))
+		} else {
+			fmt.Printf("  • Error generating storage suggestions: %v\n", err)
+		}
+		fmt.Println()
+	}
+
+	// Network and connectivity optimization
+	if len(info.Network) > 0 {
+		fmt.Println(utils.FormatKeyValue("🌐 Network Optimization", ""))
+		networkQuery := fmt.Sprintf(`Provide comprehensive NixOS network configuration for:
+%s
+
+Include:
+1. Network interface optimization
+2. WiFi power management and roaming
+3. Network security and firewall
+4. Performance tuning parameters
+5. Network monitoring and diagnostics
+6. VPN and remote access setup
+
+Provide practical NixOS configuration examples.`, strings.Join(info.Network, "\n"))
+
+		if networkResponse, err := hardwareAgent.Query(ctx, networkQuery); err == nil {
+			fmt.Println(utils.RenderMarkdown(networkResponse))
+		} else {
+			fmt.Printf("  • Error generating network suggestions: %v\n", err)
+		}
+		fmt.Println()
+	}
+
+	// System-wide optimization recommendations
+	fmt.Println(utils.FormatKeyValue("🏗️ System-Wide Optimizations", ""))
+	systemQuery := fmt.Sprintf(`Based on the complete hardware profile:
+- Architecture: %s
+- CPU: %s
+- Memory: %s
+- Display Server: %s
+
+Provide system-wide NixOS optimizations including:
+1. Kernel selection and parameters
+2. System service optimizations
+3. Power management strategies
+4. Security hardening
+5. Performance monitoring setup
+6. Backup and maintenance recommendations
+
+Include a complete system configuration example.`,
+		info.Architecture, info.CPU, info.Memory, info.DisplayServer)
+
+	if systemResponse, err := hardwareAgent.Query(ctx, systemQuery); err == nil {
+		fmt.Println(utils.RenderMarkdown(systemResponse))
+	} else {
+		fmt.Printf("  • Error generating system suggestions: %v\n", err)
+	}
+	fmt.Println()
+}
+
+// displayHardwareFunctionResults displays the results from hardware function execution
+func displayHardwareFunctionResults(response *hardware.HardwareResponse) {
+	fmt.Println(utils.FormatKeyValue("Status", response.Status))
+	fmt.Println(utils.FormatKeyValue("Operation", response.Operation))
+
+	if response.ExecutionTime > 0 {
+		fmt.Println(utils.FormatKeyValue("Execution Time", response.ExecutionTime.String()))
+	}
+
+	// Display error if any
+	if response.ErrorMessage != "" {
+		fmt.Println()
+		fmt.Println(utils.FormatError("Error: " + response.ErrorMessage))
+		return
+	}
+
+	// Display hardware components
+	if len(response.Hardware) > 0 {
+		fmt.Println()
+		fmt.Println(utils.FormatSubsection("🔧 Hardware Components", ""))
+		for _, component := range response.Hardware {
+			displayHardwareComponent(component)
+		}
+	}
+
+	// Display configuration
+	if response.Configuration != "" {
+		fmt.Println()
+		fmt.Println(utils.FormatSubsection("⚙️ Generated Configuration", ""))
+		fmt.Println(utils.RenderMarkdown("```nix\n" + response.Configuration + "\n```"))
+	}
+
+	// Display recommendations
+	if len(response.Recommendations) > 0 {
+		fmt.Println()
+		fmt.Println(utils.FormatSubsection("💡 Recommendations", ""))
+		for i, rec := range response.Recommendations {
+			fmt.Printf("  %d. %s\n", i+1, rec)
+		}
+	}
+
+	// Display issues
+	if len(response.Issues) > 0 {
+		fmt.Println()
+		fmt.Println(utils.FormatSubsection("⚠️ Hardware Issues", ""))
+		for _, issue := range response.Issues {
+			displayHardwareIssue(issue)
+		}
+	}
+}
+
+// displayHardwareComponent displays a hardware component in formatted output
+func displayHardwareComponent(component hardware.HardwareComponent) {
+	fmt.Printf("  • %s: %s\n", component.Type, component.Name)
+
+	if component.Vendor != "" {
+		fmt.Printf("    Vendor: %s\n", component.Vendor)
+	}
+	if component.Model != "" {
+		fmt.Printf("    Model: %s\n", component.Model)
+	}
+	if component.Driver != "" {
+		fmt.Printf("    Driver: %s\n", component.Driver)
+	}
+
+	supportedIcon := "❌"
+	if component.Supported {
+		supportedIcon = "✅"
+	}
+	fmt.Printf("    Supported: %s %t\n", supportedIcon, component.Supported)
+	fmt.Printf("    Status: %s\n", component.Status)
+
+	// Display configuration if available
+	if len(component.Configuration) > 0 {
+		fmt.Printf("    Configuration:\n")
+		for key, value := range component.Configuration {
+			fmt.Printf("      %s: %s\n", key, value)
+		}
+	}
+
+	// Display metadata if available
+	if len(component.Metadata) > 0 {
+		fmt.Printf("    Metadata:\n")
+		for key, value := range component.Metadata {
+			fmt.Printf("      %s: %s\n", key, value)
+		}
+	}
+
+	fmt.Println()
+}
+
+// displayHardwareIssue displays a hardware issue in formatted output
+func displayHardwareIssue(issue hardware.HardwareIssue) {
+	severityIcon := "⚠️"
+	switch strings.ToLower(issue.Severity) {
+	case "critical", "high":
+		severityIcon = "🔴"
+	case "medium":
+		severityIcon = "🟡"
+	case "low":
+		severityIcon = "🔵"
+	}
+
+	fmt.Printf("  %s %s [%s]\n", severityIcon, issue.Component, strings.ToUpper(issue.Severity))
+	fmt.Printf("    Issue: %s\n", issue.Description)
+
+	if issue.Solution != "" {
+		fmt.Printf("    Solution: %s\n", issue.Solution)
+	}
+
+	if len(issue.Resources) > 0 {
+		fmt.Printf("    Resources:\n")
+		for _, resource := range issue.Resources {
+			fmt.Printf("      • %s\n", resource)
+		}
+	}
+
+	fmt.Println()
 }
