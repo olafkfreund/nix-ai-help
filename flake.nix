@@ -42,11 +42,11 @@
         subPackages = ["cmd/nixai"];
         ldflags = let
           version =
-            if (self ? rev)
+            if (self ? rev && self.rev != null)
             then self.rev
-            else "dirty";
+            else "dev-${toString (self.lastModified or 0)}";
           gitCommit =
-            if (self ? rev)
+            if (self ? rev && self.rev != null)
             then builtins.substring 0 7 self.rev
             else "unknown";
           buildDate = "1970-01-01T00:00:00Z";
