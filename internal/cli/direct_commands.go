@@ -316,12 +316,8 @@ func showDoctorOptions(out io.Writer) {
 
 // runDoctorCmd executes the doctor command directly
 func runDoctorCmd(args []string, out io.Writer) {
-	if len(args) == 0 {
-		showDoctorOptions(out)
-		return
-	}
-	_, _ = fmt.Fprintln(out, "Running doctor check:", args[0])
-	_, _ = fmt.Fprintln(out, "All checks passed.")
+	// Use the comprehensive enhanced doctor implementation
+	runCobraCommand(doctorCmd, args, out)
 }
 
 // Flake helper functions

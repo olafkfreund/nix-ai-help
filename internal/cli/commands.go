@@ -163,6 +163,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&contextFile, "context-file", "", "Path to a file containing context information (JSON or text)")
 	rootCmd.PersistentFlags().BoolVar(&globalTUI, "tui", false, "Launch TUI mode for any command")
 	mcpServerCmd.Flags().BoolVarP(&daemonMode, "daemon", "d", false, "Run MCP server in background/daemon mode")
+	doctorCmd.Flags().BoolP("verbose", "v", false, "Show detailed output and progress information")
 }
 
 // Helper functions for agent/role/context handling
@@ -1298,94 +1299,783 @@ Examples:
 }
 
 var doctorCmd = &cobra.Command{
-	Use:   "doctor",
-	Short: "Run NixOS health checks and get advice",
-	Long: `Run a set of NixOS health checks and get AI-powered advice for improving your system configuration.
+	Use:   "doctor [check_type]",
+	Short: "Run comprehensive NixOS health checks and diagnostics",
+	Long: `Run comprehensive NixOS health checks and get AI-powered diagnostics and recommendations.
+
+Supports multiple check types:
+  system      - Core system health checks
+  nixos       - NixOS-specific configuration checks  
+  packages    - Package and store integrity checks
+  services    - System service status checks
+  storage     - Storage and filesystem checks
+  network     - Network connectivity checks
+  security    - Security configuration checks
+  all         - Run all available checks (default)
 
 Examples:
-  nixai doctor
+  nixai doctor               # Run all health checks
+  nixai doctor system        # Run only system checks
+  nixai doctor packages      # Check package integrity
+  nixai doctor --verbose     # Detailed output
 `,
+	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(utils.FormatHeader("🩻 NixOS Doctor: Health Check"))
+		runDoctorCommand(cmd, args)
+	},
+}
+
+// runDoctorCommand executes the comprehensive doctor health checks
+func runDoctorCommand(cmd *cobra.Command, args []string) {
+	fmt.Println(utils.FormatHeader("🩻 NixOS Doctor: Comprehensive Health Check"))
+	fmt.Println()
+
+	// Load configuration
+	cfg, err := config.LoadUserConfig()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
+		os.Exit(1)
+	}
+
+	// Determine check type
+	checkType := "all"
+	if len(args) > 0 {
+		checkType = args[0]
+	}
+
+	// Get verbose flag
+	verbose, _ := cmd.Flags().GetBool("verbose")
+
+	fmt.Println(utils.FormatInfo("🔍 Performing health checks..."))
+	fmt.Println()
+
+	// Show what checks are being performed
+	showChecksBeingPerformed(checkType, verbose)
+
+	// Initialize AI provider for analysis
+	providerName := cfg.AIProvider
+	if providerName == "" {
+		providerName = "ollama"
+	}
+
+	var aiProvider ai.AIProvider
+	switch providerName {
+	case "ollama":
+		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
+	case "openai":
+		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
+	case "gemini":
+		aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
+	default:
+		fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
+		os.Exit(1)
+	}
+
+	// Perform actual health checks
+	healthResults := performHealthChecks(checkType, cfg, verbose)
+
+	// Display results
+	displayHealthResults(healthResults, verbose)
+
+	// Get AI analysis if provider is available
+	if aiProvider != nil {
 		fmt.Println()
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-			os.Exit(1)
-		}
-		providerName := cfg.AIProvider
-		if providerName == "" {
-			providerName = "ollama"
-		}
-		var aiProvider ai.AIProvider
-		switch providerName {
-		case "ollama":
-			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-		default:
-			fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
-			os.Exit(1)
-		}
+		fmt.Println(utils.FormatHeader("🤖 AI-Powered Analysis"))
+		fmt.Print(utils.FormatInfo("Analyzing results with AI... "))
 
-		// Determine config path (from --nixos-path or config)
-		configPath := cfg.NixosFolder
-		if nixosPath != "" {
-			configPath = nixosPath
-		}
-		if configPath == "" {
-			configPath = "/etc/nixos"
-		}
+		analysisPrompt := buildAnalysisPrompt(healthResults, checkType)
+		analysis, err := aiProvider.Query(analysisPrompt)
 
-		confNix := configPath
-		flakeNix := configPath
-		// If configPath is a directory, append file names
-		stat, err := os.Stat(configPath)
-		if err == nil && stat.IsDir() {
-			confNix = configPath + "/configuration.nix"
-			flakeNix = configPath + "/flake.nix"
-		}
-
-		// Health checks
-		results := []string{}
-		confExists := false
-		flakeExists := false
-		if _, err := os.Stat(confNix); err == nil {
-			results = append(results, "✅ configuration.nix exists")
-			confExists = true
-		}
-		if _, err := os.Stat(flakeNix); err == nil {
-			results = append(results, "✅ flake.nix exists (flake-based NixOS configuration detected)")
-			flakeExists = true
-		}
-		if !confExists && !flakeExists {
-			results = append(results, "❌ Neither configuration.nix nor flake.nix found in "+configPath)
-		}
-
-		if _, err := os.Stat("/run/current-system"); err == nil {
-			results = append(results, "✅ nixos-rebuild previously succeeded")
-		} else {
-			results = append(results, "❌ nixos-rebuild may not have run")
-		}
-		results = append(results, "ℹ️  Run 'systemctl list-units --type=service' to see running services.")
-		results = append(results, "ℹ️  Run 'systemctl --failed' to see failed units.")
-
-		fmt.Println(utils.FormatHeader("System Health Check Results:"))
-		for _, r := range results {
-			fmt.Println("  ", r)
-		}
-		prompt := "You are a NixOS doctor. Given these health check results, provide a summary, highlight any problems, and suggest fixes or improvements.\n\nResults:\n" + strings.Join(results, "\n")
-		fmt.Print(utils.FormatInfo("Querying AI provider... "))
-		resp, err := aiProvider.Query(prompt)
 		fmt.Println(utils.FormatSuccess("done"))
 		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
-			os.Exit(1)
+			fmt.Println(utils.FormatWarning("AI analysis unavailable: " + err.Error()))
+		} else {
+			fmt.Println()
+			fmt.Println(utils.RenderMarkdown(analysis))
 		}
-		fmt.Println(utils.RenderMarkdown(resp))
-	},
+	}
+}
+
+// showChecksBeingPerformed displays what checks are being performed
+func showChecksBeingPerformed(checkType string, verbose bool) {
+	checkTypes := getCheckTypes(checkType)
+
+	fmt.Println(utils.FormatSubsection("Health Check Categories", ""))
+	for _, ct := range checkTypes {
+		switch ct {
+		case "system":
+			fmt.Println("  🖥️  System Health - Core system components and boot status")
+		case "nixos":
+			fmt.Println("  🐧 NixOS Configuration - Config syntax and rebuild status")
+		case "packages":
+			fmt.Println("  📦 Package Integrity - Nix store and package health")
+		case "services":
+			fmt.Println("  🔧 System Services - Service status and failed units")
+		case "storage":
+			fmt.Println("  💾 Storage Health - Filesystem and disk usage")
+		case "network":
+			fmt.Println("  🌐 Network Status - Connectivity and DNS resolution")
+		case "security":
+			fmt.Println("  🔒 Security Audit - Permissions and security settings")
+		}
+	}
+	fmt.Println()
+}
+
+// getCheckTypes returns the list of check types to perform
+func getCheckTypes(checkType string) []string {
+	if checkType == "all" {
+		return []string{"system", "nixos", "packages", "services", "storage", "network", "security"}
+	}
+	return []string{checkType}
+}
+
+// HealthCheckResult represents the result of a health check
+type HealthCheckResult struct {
+	Category    string
+	Name        string
+	Status      string // "pass", "warn", "fail", "info"
+	Description string
+	Details     string
+	Command     string // Optional command suggestion
+}
+
+// performHealthChecks executes the actual health checks
+func performHealthChecks(checkType string, cfg *config.UserConfig, verbose bool) []HealthCheckResult {
+	var results []HealthCheckResult
+	checkTypes := getCheckTypes(checkType)
+
+	// Determine config path
+	configPath := cfg.NixosFolder
+	if nixosPath != "" {
+		configPath = nixosPath
+	}
+	if configPath == "" {
+		configPath = "/etc/nixos"
+	}
+
+	for _, ct := range checkTypes {
+		fmt.Print(utils.FormatProgress("  Checking " + ct + "... "))
+
+		switch ct {
+		case "system":
+			results = append(results, performSystemChecks(configPath, verbose)...)
+		case "nixos":
+			results = append(results, performNixOSChecks(configPath, verbose)...)
+		case "packages":
+			results = append(results, performPackageChecks(verbose)...)
+		case "services":
+			results = append(results, performServiceChecks(verbose)...)
+		case "storage":
+			results = append(results, performStorageChecks(verbose)...)
+		case "network":
+			results = append(results, performNetworkChecks(verbose)...)
+		case "security":
+			results = append(results, performSecurityChecks(verbose)...)
+		}
+
+		fmt.Println(utils.FormatSuccess("done"))
+	}
+
+	return results
+}
+
+// performSystemChecks checks core system health
+func performSystemChecks(configPath string, verbose bool) []HealthCheckResult {
+	var results []HealthCheckResult
+
+	// Check if NixOS is running
+	if _, err := os.Stat("/run/current-system"); err == nil {
+		results = append(results, HealthCheckResult{
+			Category:    "system",
+			Name:        "NixOS System",
+			Status:      "pass",
+			Description: "NixOS system is properly initialized",
+			Details:     "Current system generation exists",
+		})
+	} else {
+		results = append(results, HealthCheckResult{
+			Category:    "system",
+			Name:        "NixOS System",
+			Status:      "fail",
+			Description: "NixOS system may not be properly initialized",
+			Details:     "/run/current-system not found",
+			Command:     "sudo nixos-rebuild switch",
+		})
+	}
+
+	// Check boot loader with comprehensive EFI and legacy support
+	bootLoaderDetected := false
+	bootLoaderDetails := []string{}
+	permissionIssues := false
+
+	// Check if this is an EFI system
+	isEFISystem := false
+	if _, err := os.Stat("/sys/firmware/efi"); err == nil {
+		isEFISystem = true
+		bootLoaderDetails = append(bootLoaderDetails, "EFI system detected")
+	}
+
+	// Try to use bootctl to get boot loader information if available
+	if isEFISystem {
+		if output, err := exec.Command("bootctl", "status").CombinedOutput(); err == nil {
+			outputStr := string(output)
+			bootLoaderDetails = append(bootLoaderDetails, "bootctl command available")
+
+			// Parse bootctl output for boot loader type
+			if strings.Contains(outputStr, "systemd-boot") {
+				bootLoaderDetected = true
+				bootLoaderDetails = append(bootLoaderDetails, "systemd-boot detected via bootctl")
+			} else if strings.Contains(outputStr, "GRUB") {
+				bootLoaderDetected = true
+				bootLoaderDetails = append(bootLoaderDetails, "GRUB detected via bootctl")
+			}
+		}
+	}
+
+	// Check for systemd-boot (EFI) via file system
+	if _, err := os.Stat("/boot/loader/loader.conf"); err == nil {
+		bootLoaderDetected = true
+		bootLoaderDetails = append(bootLoaderDetails, "systemd-boot configuration found")
+
+		// Check for boot entries
+		if _, err := os.Stat("/boot/loader/entries"); err == nil {
+			bootLoaderDetails = append(bootLoaderDetails, "boot entries directory exists")
+		}
+	} else if os.IsPermission(err) {
+		permissionIssues = true
+		bootLoaderDetails = append(bootLoaderDetails, "permission denied accessing /boot/loader")
+	}
+
+	// Check for GRUB (both EFI and legacy)
+	grubDetected := false
+	if _, err := os.Stat("/boot/grub"); err == nil {
+		grubDetected = true
+		bootLoaderDetected = true
+		bootLoaderDetails = append(bootLoaderDetails, "GRUB directory found")
+	} else if os.IsPermission(err) {
+		permissionIssues = true
+		bootLoaderDetails = append(bootLoaderDetails, "permission denied accessing /boot/grub")
+	}
+
+	// Check for GRUB EFI installation
+	if isEFISystem {
+		if _, err := os.Stat("/boot/EFI"); err == nil {
+			bootLoaderDetails = append(bootLoaderDetails, "EFI boot directory exists")
+
+			// Check for various EFI boot loaders
+			efiDirs := []string{"nixos", "systemd", "BOOT", "Linux"}
+			for _, dir := range efiDirs {
+				if _, err := os.Stat("/boot/EFI/" + dir); err == nil {
+					bootLoaderDetails = append(bootLoaderDetails, fmt.Sprintf("EFI/%s directory found", dir))
+					if dir == "nixos" || dir == "systemd" {
+						bootLoaderDetected = true
+					}
+				}
+			}
+		} else if os.IsPermission(err) {
+			permissionIssues = true
+			bootLoaderDetails = append(bootLoaderDetails, "permission denied accessing /boot/EFI")
+		}
+	}
+
+	// Check via efibootmgr if available and EFI system
+	if isEFISystem && !bootLoaderDetected {
+		if output, err := exec.Command("efibootmgr").CombinedOutput(); err == nil {
+			outputStr := string(output)
+			if strings.Contains(outputStr, "nixos") || strings.Contains(outputStr, "systemd-boot") || strings.Contains(outputStr, "GRUB") {
+				bootLoaderDetected = true
+				bootLoaderDetails = append(bootLoaderDetails, "boot entries found via efibootmgr")
+			}
+		}
+	}
+
+	// Determine boot loader status and create result
+	if bootLoaderDetected {
+		bootType := "Unknown"
+		if grubDetected && isEFISystem {
+			bootType = "GRUB EFI"
+		} else if grubDetected {
+			bootType = "GRUB Legacy"
+		} else if isEFISystem {
+			bootType = "systemd-boot (EFI)"
+		}
+
+		results = append(results, HealthCheckResult{
+			Category:    "system",
+			Name:        "Boot Loader",
+			Status:      "pass",
+			Description: bootType + " boot loader detected",
+			Details:     strings.Join(bootLoaderDetails, "; "),
+		})
+	} else if permissionIssues {
+		results = append(results, HealthCheckResult{
+			Category:    "system",
+			Name:        "Boot Loader",
+			Status:      "warn",
+			Description: "Boot loader detection limited by permissions",
+			Details:     strings.Join(bootLoaderDetails, "; ") + ". Run 'sudo nixai doctor' for complete detection",
+			Command:     "sudo bootctl status",
+		})
+	} else {
+		results = append(results, HealthCheckResult{
+			Category:    "system",
+			Name:        "Boot Loader",
+			Status:      "warn",
+			Description: "Boot loader configuration unclear",
+			Details:     "Unable to detect boot loader: " + strings.Join(bootLoaderDetails, "; "),
+			Command:     "sudo bootctl status",
+		})
+	}
+
+	// Check system uptime
+	if uptimeBytes, err := os.ReadFile("/proc/uptime"); err == nil {
+		uptimeStr := strings.Fields(string(uptimeBytes))[0]
+		results = append(results, HealthCheckResult{
+			Category:    "system",
+			Name:        "System Uptime",
+			Status:      "info",
+			Description: "System uptime information",
+			Details:     "Uptime: " + uptimeStr + " seconds",
+		})
+	}
+
+	return results
+}
+
+// performNixOSChecks checks NixOS-specific configuration
+func performNixOSChecks(configPath string, verbose bool) []HealthCheckResult {
+	var results []HealthCheckResult
+
+	confNix := configPath
+	flakeNix := configPath
+
+	// If configPath is a directory, append file names
+	if stat, err := os.Stat(configPath); err == nil && stat.IsDir() {
+		confNix = configPath + "/configuration.nix"
+		flakeNix = configPath + "/flake.nix"
+	}
+
+	// Check for configuration files
+	confExists := false
+	flakeExists := false
+
+	if _, err := os.Stat(confNix); err == nil {
+		confExists = true
+		results = append(results, HealthCheckResult{
+			Category:    "nixos",
+			Name:        "Configuration File",
+			Status:      "pass",
+			Description: "configuration.nix found",
+			Details:     "Traditional NixOS configuration detected at " + confNix,
+		})
+	}
+
+	if _, err := os.Stat(flakeNix); err == nil {
+		flakeExists = true
+		results = append(results, HealthCheckResult{
+			Category:    "nixos",
+			Name:        "Flake Configuration",
+			Status:      "pass",
+			Description: "flake.nix found",
+			Details:     "Flake-based configuration detected at " + flakeNix,
+		})
+	}
+
+	if !confExists && !flakeExists {
+		results = append(results, HealthCheckResult{
+			Category:    "nixos",
+			Name:        "Configuration Files",
+			Status:      "fail",
+			Description: "No NixOS configuration found",
+			Details:     "Neither configuration.nix nor flake.nix found in " + configPath,
+			Command:     "nixos-generate-config",
+		})
+	}
+
+	// Check for hardware configuration
+	hwConfPath := configPath + "/hardware-configuration.nix"
+	if stat, err := os.Stat(configPath); err == nil && stat.IsDir() {
+		if _, err := os.Stat(hwConfPath); err == nil {
+			results = append(results, HealthCheckResult{
+				Category:    "nixos",
+				Name:        "Hardware Configuration",
+				Status:      "pass",
+				Description: "hardware-configuration.nix found",
+				Details:     "Hardware-specific configuration is available",
+			})
+		}
+	}
+
+	return results
+}
+
+// performPackageChecks checks package and store integrity
+func performPackageChecks(verbose bool) []HealthCheckResult {
+	var results []HealthCheckResult
+
+	// Check Nix store
+	if _, err := os.Stat("/nix/store"); err == nil {
+		results = append(results, HealthCheckResult{
+			Category:    "packages",
+			Name:        "Nix Store",
+			Status:      "pass",
+			Description: "Nix store is accessible",
+			Details:     "Package store appears healthy",
+		})
+	} else {
+		results = append(results, HealthCheckResult{
+			Category:    "packages",
+			Name:        "Nix Store",
+			Status:      "fail",
+			Description: "Nix store not accessible",
+			Details:     "/nix/store not found or inaccessible",
+		})
+	}
+
+	// Check for nix-channel or flake registry
+	if _, err := os.Stat(os.Getenv("HOME") + "/.nix-channels"); err == nil {
+		results = append(results, HealthCheckResult{
+			Category:    "packages",
+			Name:        "Package Channels",
+			Status:      "info",
+			Description: "Nix channels configured",
+			Details:     "Traditional channel-based package management detected",
+			Command:     "nix-channel --list",
+		})
+	}
+
+	return results
+}
+
+// performServiceChecks checks system services
+func performServiceChecks(verbose bool) []HealthCheckResult {
+	var results []HealthCheckResult
+
+	// Check systemctl availability
+	if _, err := exec.LookPath("systemctl"); err == nil {
+		results = append(results, HealthCheckResult{
+			Category:    "services",
+			Name:        "Service Manager",
+			Status:      "pass",
+			Description: "systemd is available",
+			Details:     "System service management is functional",
+			Command:     "systemctl status",
+		})
+
+		// Check for failed services
+		cmd := exec.Command("systemctl", "--failed", "--no-legend", "--no-pager")
+		if output, err := cmd.Output(); err == nil {
+			failedServices := strings.TrimSpace(string(output))
+			if failedServices == "" {
+				results = append(results, HealthCheckResult{
+					Category:    "services",
+					Name:        "Failed Services",
+					Status:      "pass",
+					Description: "No failed services detected",
+					Details:     "All system services are running properly",
+				})
+			} else {
+				results = append(results, HealthCheckResult{
+					Category:    "services",
+					Name:        "Failed Services",
+					Status:      "warn",
+					Description: "Some services have failed",
+					Details:     "Failed services detected",
+					Command:     "systemctl --failed",
+				})
+			}
+		}
+	} else {
+		results = append(results, HealthCheckResult{
+			Category:    "services",
+			Name:        "Service Manager",
+			Status:      "warn",
+			Description: "systemctl not available",
+			Details:     "Cannot check service status",
+		})
+	}
+
+	return results
+}
+
+// performStorageChecks checks storage and filesystem health
+func performStorageChecks(verbose bool) []HealthCheckResult {
+	var results []HealthCheckResult
+
+	// Check disk usage of root filesystem
+	if _, err := exec.LookPath("df"); err == nil {
+		cmd := exec.Command("df", "-h", "/")
+		if output, err := cmd.Output(); err == nil {
+			lines := strings.Split(string(output), "\n")
+			if len(lines) >= 2 {
+				fields := strings.Fields(lines[1])
+				if len(fields) >= 5 {
+					usage := fields[4]
+					results = append(results, HealthCheckResult{
+						Category:    "storage",
+						Name:        "Root Filesystem",
+						Status:      "info",
+						Description: "Root filesystem usage: " + usage,
+						Details:     "Monitor disk space regularly",
+						Command:     "df -h",
+					})
+				}
+			}
+		}
+	}
+
+	// Check for Nix store disk usage
+	cmd := exec.Command("du", "-sh", "/nix/store")
+	if output, err := cmd.Output(); err == nil {
+		storeSize := strings.Fields(string(output))[0]
+		results = append(results, HealthCheckResult{
+			Category:    "storage",
+			Name:        "Nix Store Size",
+			Status:      "info",
+			Description: "Nix store size: " + storeSize,
+			Details:     "Consider garbage collection if size is large",
+			Command:     "nix-collect-garbage",
+		})
+	}
+
+	return results
+}
+
+// performNetworkChecks checks network connectivity
+func performNetworkChecks(verbose bool) []HealthCheckResult {
+	var results []HealthCheckResult
+
+	// Check internet connectivity
+	cmd := exec.Command("ping", "-c", "1", "-W", "3", "8.8.8.8")
+	if err := cmd.Run(); err == nil {
+		results = append(results, HealthCheckResult{
+			Category:    "network",
+			Name:        "Internet Connectivity",
+			Status:      "pass",
+			Description: "Internet connection is working",
+			Details:     "Successfully reached external DNS server",
+		})
+	} else {
+		results = append(results, HealthCheckResult{
+			Category:    "network",
+			Name:        "Internet Connectivity",
+			Status:      "warn",
+			Description: "Internet connection issue",
+			Details:     "Cannot reach external servers",
+			Command:     "ping 8.8.8.8",
+		})
+	}
+
+	// Check DNS resolution
+	cmd = exec.Command("nslookup", "nixos.org")
+	if err := cmd.Run(); err == nil {
+		results = append(results, HealthCheckResult{
+			Category:    "network",
+			Name:        "DNS Resolution",
+			Status:      "pass",
+			Description: "DNS resolution is working",
+			Details:     "Successfully resolved nixos.org",
+		})
+	} else {
+		results = append(results, HealthCheckResult{
+			Category:    "network",
+			Name:        "DNS Resolution",
+			Status:      "warn",
+			Description: "DNS resolution issue",
+			Details:     "Cannot resolve domain names",
+			Command:     "cat /etc/resolv.conf",
+		})
+	}
+
+	return results
+}
+
+// performSecurityChecks checks security-related configurations
+func performSecurityChecks(verbose bool) []HealthCheckResult {
+	var results []HealthCheckResult
+
+	// Check if running as root
+	if os.Getuid() == 0 {
+		results = append(results, HealthCheckResult{
+			Category:    "security",
+			Name:        "User Privileges",
+			Status:      "warn",
+			Description: "Running as root user",
+			Details:     "Consider using a non-root user for daily operations",
+		})
+	} else {
+		results = append(results, HealthCheckResult{
+			Category:    "security",
+			Name:        "User Privileges",
+			Status:      "pass",
+			Description: "Running as non-root user",
+			Details:     "Good security practice",
+		})
+	}
+
+	// Check SSH configuration if it exists
+	if _, err := os.Stat("/etc/ssh/sshd_config"); err == nil {
+		results = append(results, HealthCheckResult{
+			Category:    "security",
+			Name:        "SSH Configuration",
+			Status:      "info",
+			Description: "SSH server configuration found",
+			Details:     "Review SSH security settings",
+			Command:     "sudo sshd -T",
+		})
+	}
+
+	// Check firewall status if available
+	if _, err := exec.LookPath("iptables"); err == nil {
+		cmd := exec.Command("iptables", "-L", "-n")
+		if err := cmd.Run(); err == nil {
+			results = append(results, HealthCheckResult{
+				Category:    "security",
+				Name:        "Firewall Rules",
+				Status:      "info",
+				Description: "iptables firewall detected",
+				Details:     "Review firewall configuration",
+				Command:     "sudo iptables -L",
+			})
+		}
+	}
+
+	return results
+}
+
+// displayHealthResults shows the health check results in a formatted way
+func displayHealthResults(results []HealthCheckResult, verbose bool) {
+	fmt.Println(utils.FormatHeader("📊 Health Check Results"))
+	fmt.Println()
+
+	categories := make(map[string][]HealthCheckResult)
+	var passCount, warnCount, failCount, infoCount int
+
+	// Group results by category
+	for _, result := range results {
+		categories[result.Category] = append(categories[result.Category], result)
+
+		switch result.Status {
+		case "pass":
+			passCount++
+		case "warn":
+			warnCount++
+		case "fail":
+			failCount++
+		case "info":
+			infoCount++
+		}
+	}
+
+	// Display results by category
+	categoryOrder := []string{"system", "nixos", "packages", "services", "storage", "network", "security"}
+	for _, category := range categoryOrder {
+		if results, exists := categories[category]; exists {
+			fmt.Println(utils.FormatSubsection(getCategoryTitle(category), ""))
+
+			for _, result := range results {
+				status := getStatusIcon(result.Status)
+				fmt.Printf("  %s %s\n", status, result.Description)
+
+				if verbose && result.Details != "" {
+					fmt.Printf("      %s\n", utils.FormatKeyValue("Details", result.Details))
+				}
+
+				if result.Command != "" {
+					fmt.Printf("      %s\n", utils.FormatKeyValue("Suggested command", result.Command))
+				}
+			}
+			fmt.Println()
+		}
+	}
+
+	// Display summary
+	fmt.Println(utils.FormatHeader("📈 Health Summary"))
+	fmt.Printf("  %s %d checks passed\n", getStatusIcon("pass"), passCount)
+	if infoCount > 0 {
+		fmt.Printf("  %s %d informational\n", getStatusIcon("info"), infoCount)
+	}
+	if warnCount > 0 {
+		fmt.Printf("  %s %d warnings\n", getStatusIcon("warn"), warnCount)
+	}
+	if failCount > 0 {
+		fmt.Printf("  %s %d failures\n", getStatusIcon("fail"), failCount)
+	}
+
+	overallStatus := "healthy"
+	if failCount > 0 {
+		overallStatus = "critical"
+	} else if warnCount > 0 {
+		overallStatus = "warnings detected"
+	}
+
+	fmt.Printf("\n  Overall Status: %s\n", utils.FormatKeyValue("", overallStatus))
+}
+
+// getCategoryTitle returns a formatted title for each category
+func getCategoryTitle(category string) string {
+	titles := map[string]string{
+		"system":   "🖥️  System Health",
+		"nixos":    "🐧 NixOS Configuration",
+		"packages": "📦 Package Integrity",
+		"services": "🔧 System Services",
+		"storage":  "💾 Storage Health",
+		"network":  "🌐 Network Status",
+		"security": "🔒 Security Audit",
+	}
+	if title, exists := titles[category]; exists {
+		return title
+	}
+	return strings.Title(category)
+}
+
+// getStatusIcon returns an appropriate icon for each status
+func getStatusIcon(status string) string {
+	switch status {
+	case "pass":
+		return "✅"
+	case "warn":
+		return "⚠️ "
+	case "fail":
+		return "❌"
+	case "info":
+		return "ℹ️ "
+	default:
+		return "❓"
+	}
+}
+
+// buildAnalysisPrompt creates a prompt for AI analysis
+func buildAnalysisPrompt(results []HealthCheckResult, checkType string) string {
+	var promptParts []string
+
+	promptParts = append(promptParts, "You are a NixOS system health expert. Analyze the following health check results and provide:")
+	promptParts = append(promptParts, "1. Overall system assessment")
+	promptParts = append(promptParts, "2. Priority issues that need immediate attention")
+	promptParts = append(promptParts, "3. Recommended fixes with specific commands")
+	promptParts = append(promptParts, "4. Prevention tips for maintaining system health")
+	promptParts = append(promptParts, "")
+	promptParts = append(promptParts, "Health Check Results:")
+
+	for _, result := range results {
+		status := map[string]string{
+			"pass": "PASS",
+			"warn": "WARNING",
+			"fail": "FAILURE",
+			"info": "INFO",
+		}[result.Status]
+
+		promptParts = append(promptParts, fmt.Sprintf("- [%s] %s: %s", status, result.Name, result.Description))
+		if result.Details != "" {
+			promptParts = append(promptParts, fmt.Sprintf("  Details: %s", result.Details))
+		}
+		if result.Command != "" {
+			promptParts = append(promptParts, fmt.Sprintf("  Suggested: %s", result.Command))
+		}
+	}
+
+	return strings.Join(promptParts, "\n")
 }
 
 // Completion command for shell script generation

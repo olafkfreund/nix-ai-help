@@ -32,6 +32,12 @@ Available subcommands:
   cache-miss         - Analyze cache miss reasons and optimization opportunities
   sandbox-debug      - Debug sandbox-related build issues
   profile           - Build performance analysis and optimization
+  
+  watch <package>     - Monitor builds in real-time with AI insights
+  status [build-id]   - Check status of background builds
+  stop <build-id>     - Cancel a running background build
+  background <pkg>    - Start a build in the background
+  queue <pkg1> <pkg2> - Build multiple packages sequentially
 
 Basic usage:
   nixai build                        # Run basic nix build with AI assistance
@@ -42,7 +48,13 @@ Advanced usage:
   nixai build retry                  # Retry failed build with AI fixes
   nixai build cache-miss             # Analyze why builds aren't using cache
   nixai build sandbox-debug          # Debug sandbox permission issues
-  nixai build profile --package vim  # Profile vim build performance`,
+  nixai build profile --package vim  # Profile vim build performance
+
+Enhanced monitoring:
+  nixai build watch firefox          # Watch firefox build with real-time AI analysis
+  nixai build background firefox     # Start firefox build in background
+  nixai build status                 # Show all active builds
+  nixai build queue pkg1 pkg2 pkg3   # Build packages sequentially with AI optimization`,
 	Args: cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Check if this is a subcommand call first
@@ -299,6 +311,9 @@ func runBuildRetry(cmd *cobra.Command) {
 	// Initialize AI provider
 	aiProvider := initializeAIProvider(cfg)
 
+	// Initialize build recovery system
+	recoverySystem := NewBuildRecoverySystem()
+
 	// Check for previous build failure
 	lastFailure := getLastBuildFailure()
 	if lastFailure == "" {
@@ -310,28 +325,61 @@ func runBuildRetry(cmd *cobra.Command) {
 	fmt.Println(utils.FormatKeyValue("Last Failed Build", lastFailure))
 	fmt.Println()
 
-	fmt.Println(utils.FormatProgress("Analyzing failure and generating fixes..."))
+	fmt.Println(utils.FormatProgress("Analyzing failure with intelligent recovery system..."))
 
-	// Get AI recommendations for fixes
-	retryPrompt := buildRetryPrompt(lastFailure)
-	fixes, aiErr := aiProvider.Query(retryPrompt)
-	if aiErr != nil {
-		fmt.Println(utils.FormatError("Failed to get AI fixes: " + aiErr.Error()))
-		return
+	// Try intelligent recovery first
+	request := BuildRecoveryRequest{
+		Package:     extractPackageFromFailure(lastFailure),
+		ErrorOutput: lastFailure,
+		BuildSystem: "nix-build",
+		AttemptNum:  1,
 	}
 
-	fmt.Println(utils.FormatSubsection("🤖 AI-Suggested Fixes", ""))
-	fmt.Println(utils.RenderMarkdown(fixes))
+	strategies, err := recoverySystem.AnalyzeAndRecover(request)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Recovery system analysis failed, falling back to basic AI analysis"))
+		
+		// Fallback to basic AI analysis
+		retryPrompt := buildRetryPrompt(lastFailure)
+		fixes, aiErr := aiProvider.Query(retryPrompt)
+		if aiErr != nil {
+			fmt.Println(utils.FormatError("Failed to get AI fixes: " + aiErr.Error()))
+			return
+		}
+
+		fmt.Println(utils.FormatSubsection("🤖 AI-Suggested Fixes", ""))
+		fmt.Println(utils.RenderMarkdown(fixes))
+	} else {
+		fmt.Println(utils.FormatSubsection("🎯 Intelligent Recovery Strategies", ""))
+		for i, strategy := range strategies {
+			fmt.Printf("%d. %s\n", i+1, utils.FormatKeyValue("Strategy", strategy.Name))
+			fmt.Printf("   %s\n", utils.FormatInfo(strategy.Description))
+			if len(strategy.Commands) > 0 {
+				fmt.Printf("   Commands: %s\n", strings.Join(strategy.Commands, " && "))
+			}
+			fmt.Println()
+		}
+	}
 
 	fmt.Println()
 	fmt.Println(utils.FormatProgress("Applying fixes and retrying build..."))
 
-	// Apply fixes and retry (implementation would apply actual fixes)
+	// Apply fixes and retry
 	success := applyFixesAndRetry(lastFailure)
 	if success {
 		fmt.Println(utils.FormatSuccess("✅ Retry successful!"))
+		
+		// Report success to recovery system for learning
+		if len(strategies) > 0 {
+			recoverySystem.ReportRecoveryResult(strategies[0].ID, true, "")
+		}
 	} else {
 		fmt.Println(utils.FormatError("❌ Retry failed. Manual intervention may be required."))
+		
+		// Report failure to recovery system for learning
+		if len(strategies) > 0 {
+			recoverySystem.ReportRecoveryResult(strategies[0].ID, false, "Retry attempt failed")
+		}
 	}
 }
 
@@ -1128,6 +1176,13 @@ func init() {
 	enhancedBuildCmd.AddCommand(buildCacheMissCmd)
 	enhancedBuildCmd.AddCommand(buildSandboxDebugCmd)
 	enhancedBuildCmd.AddCommand(buildProfileCmd)
+	
+	// Add enhanced monitoring and management commands
+	enhancedBuildCmd.AddCommand(buildWatchCmd)
+	enhancedBuildCmd.AddCommand(buildStatusCmd)
+	enhancedBuildCmd.AddCommand(buildStopCmd)
+	enhancedBuildCmd.AddCommand(buildBackgroundCmd)
+	enhancedBuildCmd.AddCommand(buildQueueCmd)
 
 	// Add flags
 	enhancedBuildCmd.Flags().Bool("flake", false, "Use flake mode for building")
