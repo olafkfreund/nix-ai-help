@@ -97,7 +97,7 @@ func NewDevenvCreateCmd() *cobra.Command {
 		Use:   "create <template> [project-name]",
 		Short: "Create a new development environment from a template",
 		Long:  "Create a new development environment using a specific template.\n\nThe command will create a new directory with the project name (if specified)\nor use the current directory, and generate a devenv.nix file along with\ntemplate-specific starter files.\n\nExamples:\n  nixai devenv create python myapp\n  nixai devenv create rust --with-wasm --services postgres\n  nixai devenv create nodejs --framework nextjs --directory ./my-web-app\n  nixai devenv create golang --with-grpc --services redis,postgres",
-		Args:  cobra.RangeArgs(1, 2),
+		Args:  conditionalRangeArgsValidator(1, 2),
 		Run: func(cmd *cobra.Command, args []string) {
 			templateName := args[0]
 			projectName := ""
@@ -202,7 +202,7 @@ func NewDevenvSuggestCmd() *cobra.Command {
 		Use:   "suggest <description>",
 		Short: "Get AI-powered template suggestions",
 		Long:  `Use AI to suggest the most appropriate development environment template\nbased on your project description.\n\nExamples:\n  nixai devenv suggest "web application with database"\n  nixai devenv suggest "machine learning project with jupyter"\n  nixai devenv suggest "microservice in rust"\n  nixai devenv suggest "react frontend with typescript"`,
-		Args:  cobra.MinimumNArgs(1),
+		Args:  conditionalArgsValidator(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			description := strings.Join(args, " ")
 			cfg, err := config.LoadUserConfig()

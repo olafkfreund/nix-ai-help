@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/ai/roles"
@@ -276,23 +277,23 @@ func (a *NeovimSetupAgent) SetContext(ctx interface{}) error {
 		a.context = neovimCtx
 		return nil
 	}
-	return fmt.Errorf("invalid context type for NeovimSetupAgent")
+	return fmt.Errorf("invalid context type for NeovimSetupAgent, expected *NeovimSetupContext")
 }
 
 // formatContext returns a formatted string representation of the current context.
 func (a *NeovimSetupAgent) formatContext() string {
 	return fmt.Sprintf(`Configuration Type: %s
 Plugin Manager: %s
-Languages: %v
-LSP Servers: %v
+Languages: %s
+LSP Servers: %s
 Workflow Type: %s
 System: %s
-Performance Goals: %v`,
+Performance Goals: %s`,
 		a.context.ConfigType,
 		a.context.PluginManager,
-		a.context.Languages,
-		a.context.LSPServers,
+		strings.Join(a.context.Languages, ", "),
+		strings.Join(a.context.LSPServers, ", "),
 		a.context.WorkflowType,
 		a.context.SystemOS,
-		a.context.PerformanceGoals)
+		strings.Join(a.context.PerformanceGoals, ", "))
 }

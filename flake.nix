@@ -11,26 +11,22 @@
     nixpkgs,
     flake-utils,
     ...
-  }: let
-    # System-dependent NixOS modules (using eachDefaultSystemPassThrough)
-    nixosModules = flake-utils.lib.eachDefaultSystemPassThrough (system: {
-      default = import ./modules/nixos.nix;
-    });
-    nixosModule = nixosModules.default;
-
-    # System-dependent Home Manager modules (using eachDefaultSystemPassThrough)
-    homeManagerModules = flake-utils.lib.eachDefaultSystemPassThrough (system: {
-      default = import ./modules/home-manager.nix;
-    });
-    homeManagerModule = homeManagerModules.default;
-  in
+  }:
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {inherit system;};
-      nixai = pkgs.callPackage ./package.nix { inherit (pkgs) lib buildGoModule; inherit (self) rev; };
     in {
-      packages = { inherit nixai; };
-      defaultPackage = self.packages.${system}.nixai;
-      overlays.default = final: prev: { inherit nixai; };
+      packages.default = self.packages.${system}.nixai;
+      packages.nixai = pkgs.callPackage ./package.nix {
+        version = "0.1.0";
+        src = ./.;
+        rev = self.rev or null;
+        gitCommit =
+          if (self ? rev && self.rev != null)
+          then builtins.substring 0 7 self.rev
+          else "unknown";
+        buildDate = "1970-01-01T00:00:00Z";
+      };
+      apps.default = self.apps.${system}.nixai;
       apps.nixai = {
         type = "app";
         program = "${self.packages.${system}.nixai}/bin/nixai";
@@ -38,7 +34,6 @@
           description = "Run nixai from the command line";
         };
       };
-      defaultApp = self.apps.${system}.nixai;
       devShells.default = pkgs.mkShell {
         buildInputs = with pkgs; [
           go
@@ -97,22 +92,22 @@
         pkgs.runCommand "golangci-lint" {
           buildInputs = [pkgs.golangci-lint pkgs.go];
         } ''
-          cd $PWD
-          golangci-lint run ./...
+          export HOME=$TMPDIR
+          export XDG_CACHE_HOME=$TMPDIR/.cache
+          mkdir -p $XDG_CACHE_HOME
+          cd ${./.}
+          ${pkgs.golangci-lint}/bin/golangci-lint run ./... --timeout=10m
           touch $out
         '';
     })
     // {
-      nixosModules = nixosModules;
-      nixosModule = nixosModule;
-      homeManagerModules = homeManagerModules;
-      homeManagerModule = homeManagerModule;
-      # Flake-level metadata
-      flakeMetadata = {
-        maintainers = ["olafkfreund"];
-        homepage = "https://github.com/olafkfreund/nix-ai-help";
-        license = "MIT";
-        platforms = ["x86_64-linux" "aarch64-linux"];
+      # System-independent modules
+      nixosModules.default = import ./modules/nixos.nix;
+      homeManagerModules.default = import ./modules/home-manager.nix;
+
+      # Flake-level overlays - provide nixai package for each system
+      overlays.default = final: prev: {
+        nixai = self.packages.${prev.system}.nixai or (throw "nixai package not available for system ${prev.system}");
       };
     };
 }

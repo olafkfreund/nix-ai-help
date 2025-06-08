@@ -22,6 +22,7 @@ var (
 	depNixosHostname   string // NixOS hostname for flakes
 	depMaxDepth        int    // Maximum recursion depth
 	depDotOutputPath   string // Output path for DOT file
+	depCurrentSystem   bool   // Analyze current running system instead of configuration
 )
 
 // NewDepsCommand creates and returns the deps command and all subcommands
@@ -57,7 +58,7 @@ based on the detected dependencies.`,
 		Long: `Traces dependency paths to show all reasons why a specific package is included
 in your NixOS configuration. This helps understand complex dependency relationships
 and identify the root causes of package inclusion.`,
-		Args: cobra.ExactArgs(1),
+		Args: conditionalExactArgsValidator(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			runDepsWhy(args[0])
 		},
@@ -110,6 +111,8 @@ in DOT format, which can be used with tools like Graphviz to create visual diagr
 		"NixOS configuration hostname (for flakes, e.g., from flake.nix#nixosConfigurations.<hostname>). Auto-detected if not provided.")
 	depsCommand.PersistentFlags().IntVarP(&depMaxDepth, "depth", "d", 5,
 		"Maximum recursion depth for dependency analysis.")
+	depsCommand.PersistentFlags().BoolVarP(&depCurrentSystem, "current", "c", false,
+		"Analyze current running system (/run/current-system) instead of configuration files")
 
 	// Add graph-specific flags
 	graphCmd.Flags().StringVarP(&depDotOutputPath, "output", "o", "",
@@ -122,105 +125,7 @@ in DOT format, which can be used with tools like Graphviz to create visual diagr
 func runDepsAnalyze() {
 	fmt.Println(utils.FormatHeader("🛠️ NixOS Dependency Analyzer"))
 
-	// 1. Determine NixOS configuration path
-	cfgPath := depNixosConfigPath // From flag
-	if cfgPath == "" {
-		userCfg, err := config.LoadUserConfig()
-		if err == nil && userCfg.NixosFolder != "" {
-			cfgPath = userCfg.NixosFolder
-			fmt.Println(utils.FormatInfo(fmt.Sprintf("Using NixOS configuration path from user config: %s", cfgPath)))
-		}
-	}
-
-	if cfgPath == "" {
-		// Try to auto-detect common paths
-		commonPaths := []string{
-			"/etc/nixos/flake.nix",
-			"/etc/nixos/configuration.nix",
-			os.ExpandEnv("$HOME/.config/nixos/flake.nix"),
-			os.ExpandEnv("$HOME/.config/nixos/configuration.nix"),
-			"./flake.nix", // Check current directory
-		}
-		for _, p := range commonPaths {
-			if utils.IsFile(p) {
-				// If flake.nix is found, try to get its directory
-				if strings.HasSuffix(p, "flake.nix") {
-					cfgPath = filepath.Dir(p)
-				} else {
-					cfgPath = p
-				}
-				fmt.Println(utils.FormatInfo(fmt.Sprintf("Auto-detected NixOS configuration entrypoint: %s", p)))
-				fmt.Println(utils.FormatInfo(fmt.Sprintf("Using configuration directory/file: %s", cfgPath)))
-				break
-			}
-		}
-	}
-
-	if cfgPath == "" {
-		fmt.Fprintln(os.Stderr, utils.FormatError("NixOS configuration path not found."))
-		fmt.Fprintln(os.Stderr, utils.FormatInfo("Please specify the path using the --nixos-path flag or set 'nixos_folder' in your nixai config."))
-		os.Exit(1)
-	}
-
-	if !utils.DirExists(cfgPath) && !utils.IsFile(cfgPath) {
-		fmt.Fprintln(os.Stderr, utils.FormatError(fmt.Sprintf("NixOS configuration file does not exist: %s", cfgPath)))
-		os.Exit(1)
-	}
-
-	fmt.Println(utils.FormatKeyValue("Configuration Path", cfgPath))
-	fmt.Println(utils.FormatDivider())
-
-	var depGraph *nixos.DependencyGraph
-	var err error
-
-	// Determine if it's a flake or legacy config
-	// If cfgPath is a directory, assume it's a flake and flake.nix is inside.
-	// If cfgPath is a file, check its name.
-	isFlake := false
-	actualConfigFile := cfgPath
-	if utils.IsDirectory(cfgPath) {
-		if utils.IsFile(filepath.Join(cfgPath, "flake.nix")) {
-			isFlake = true
-			actualConfigFile = filepath.Join(cfgPath, "flake.nix")
-		} else if utils.IsFile(filepath.Join(cfgPath, "configuration.nix")) {
-			actualConfigFile = filepath.Join(cfgPath, "configuration.nix")
-		} else {
-			fmt.Fprintln(os.Stderr, utils.FormatError(fmt.Sprintf("No flake.nix or configuration.nix found in directory: %s", cfgPath)))
-			os.Exit(1)
-		}
-	} else { // cfgPath is a file
-		if strings.HasSuffix(cfgPath, "flake.nix") {
-			isFlake = true
-			cfgPath = filepath.Dir(cfgPath) // for flake analysis, we need the directory
-		} else if !strings.HasSuffix(cfgPath, "configuration.nix") {
-			fmt.Fprintln(os.Stderr, utils.FormatWarning(fmt.Sprintf("Unsure if '%s' is a flake or legacy config. Assuming legacy based on name.", cfgPath)))
-		}
-	}
-
-	fmt.Println(utils.FormatInfo(fmt.Sprintf("Identified config file: %s", actualConfigFile)))
-
-	if isFlake {
-		fmt.Println(utils.FormatInfo("Analyzing as Flake-based configuration..."))
-		if depNixosHostname == "" {
-			// Attempt to get hostname from system
-			hn, herr := os.Hostname()
-			if herr == nil {
-				depNixosHostname = strings.Split(hn, ".")[0] // Use short hostname
-				fmt.Println(utils.FormatInfo(fmt.Sprintf("Auto-detected hostname: %s (use --hostname to override)", depNixosHostname)))
-			} else {
-				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to auto-detect hostname for flake analysis."))
-				fmt.Fprintln(os.Stderr, utils.FormatInfo("Please specify the NixOS configuration hostname using the --hostname flag (e.g., from flake.nix#nixosConfigurations.<hostname>)"))
-				os.Exit(1)
-			}
-		}
-		fmt.Println(utils.FormatInfo(fmt.Sprintf("Using max analysis depth: %d", depMaxDepth)))
-		depGraph, err = nixos.AnalyzeFlakeDependencies(cfgPath, depNixosHostname)
-	} else {
-		fmt.Println(utils.FormatInfo("Analyzing as legacy (configuration.nix)-based configuration..."))
-		fmt.Println(utils.FormatInfo(fmt.Sprintf("Using max analysis depth: %d", depMaxDepth)))
-		depGraph, err = nixos.AnalyzeLegacyDependencies(actualConfigFile)
-	}
-
+	depGraph, err := getDependencyGraph()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, utils.FormatError(fmt.Sprintf("Failed to analyze dependencies: %v", err)))
 		os.Exit(1)
@@ -269,21 +174,18 @@ func runDepsAnalyze() {
 func runDepsWhy(packageName string) {
 	fmt.Println(utils.FormatHeader(fmt.Sprintf("🔍 Why is '%s' installed?", packageName)))
 
-	// 1. Determine NixOS configuration path
-	cfgPath, isFlake := determineConfigPath()
-
-	// 2. Generate the dependency graph
-	depGraph, err := generateDependencyGraph(cfgPath, isFlake)
+	// Generate the dependency graph
+	depGraph, err := getDependencyGraph()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, utils.FormatError(fmt.Sprintf("Failed to generate dependency graph: %v", err)))
 		os.Exit(1)
 	}
 
-	// 3. Find dependency paths for the package
+	// Find dependency paths for the package
 	fmt.Println(utils.FormatProgress(fmt.Sprintf("Finding all dependency paths for '%s'...", packageName)))
 	paths := depGraph.FindWhyPackageInstalled(packageName)
 
-	// 4. Display results
+	// Display results
 	if len(paths) == 0 {
 		fmt.Println(utils.FormatWarning(fmt.Sprintf("No packages matching '%s' were found in the dependency tree.", packageName)))
 		fmt.Println(utils.FormatInfo("Suggestions:"))
@@ -316,7 +218,7 @@ func runDepsWhy(packageName string) {
 		}
 	}
 
-	// 5. Get AI insights on the dependencies
+	// Get AI insights on the dependencies
 	userCfg, configErr := config.LoadUserConfig()
 	if configErr == nil {
 		fmt.Println(utils.FormatDivider())
@@ -354,21 +256,18 @@ func runDepsWhy(packageName string) {
 func runDepsConflicts() {
 	fmt.Println(utils.FormatHeader("🛠️ Dependency Conflict Analysis"))
 
-	// 1. Determine NixOS configuration path
-	cfgPath, isFlake := determineConfigPath()
-
-	// 2. Generate the dependency graph
-	depGraph, err := generateDependencyGraph(cfgPath, isFlake)
+	// Generate the dependency graph
+	depGraph, err := getDependencyGraph()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, utils.FormatError(fmt.Sprintf("Failed to generate dependency graph: %v", err)))
 		os.Exit(1)
 	}
 
-	// 3. Find dependency conflicts
+	// Find dependency conflicts
 	fmt.Println(utils.FormatProgress("Analyzing dependency conflicts..."))
 	conflicts := depGraph.FindDependencyConflicts()
 
-	// 4. Display results
+	// Display results
 	if len(conflicts) == 0 {
 		fmt.Println(utils.FormatSuccess("No dependency conflicts detected! 🎉"))
 		fmt.Println(utils.FormatInfo("This means packages with the same name have consistent versions throughout your system."))
@@ -402,7 +301,7 @@ func runDepsConflicts() {
 		fmt.Println()
 	}
 
-	// 5. Get AI recommendations for conflict resolution
+	// Get AI recommendations for conflict resolution
 	userCfg, configErr := config.LoadUserConfig()
 	if configErr == nil {
 		fmt.Println(utils.FormatDivider())
@@ -444,21 +343,18 @@ func runDepsConflicts() {
 func runDepsOptimize() {
 	fmt.Println(utils.FormatHeader("🚀 Dependency Optimization Analysis"))
 
-	// 1. Determine NixOS configuration path
-	cfgPath, isFlake := determineConfigPath()
-
-	// 2. Generate the dependency graph
-	depGraph, err := generateDependencyGraph(cfgPath, isFlake)
+	// Generate the dependency graph
+	depGraph, err := getDependencyGraph()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, utils.FormatError(fmt.Sprintf("Failed to generate dependency graph: %v", err)))
 		os.Exit(1)
 	}
 
-	// 3. Analyze for optimization opportunities
+	// Analyze for optimization opportunities
 	fmt.Println(utils.FormatProgress("Analyzing dependency graph for optimization opportunities..."))
 	optimizations := depGraph.AnalyzeDependencyOptimizations()
 
-	// 4. Display results
+	// Display results
 	fmt.Println(utils.FormatSuccess(fmt.Sprintf("Found %d optimization opportunities:", len(optimizations))))
 	fmt.Println(utils.FormatDivider())
 
@@ -470,7 +366,7 @@ func runDepsOptimize() {
 		}
 	}
 
-	// 5. Get AI recommendations for optimization
+	// Get AI recommendations for optimization
 	userCfg, configErr := config.LoadUserConfig()
 	if configErr == nil {
 		fmt.Println(utils.FormatDivider())
@@ -512,21 +408,18 @@ func runDepsOptimize() {
 func runDepsGraph() {
 	fmt.Println(utils.FormatHeader("📊 NixOS Dependency Graph Generator"))
 
-	// 1. Determine NixOS configuration path
-	cfgPath, isFlake := determineConfigPath()
-
-	// 2. Generate the dependency graph
-	depGraph, err := generateDependencyGraph(cfgPath, isFlake)
+	// Generate the dependency graph
+	depGraph, err := getDependencyGraph()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, utils.FormatError(fmt.Sprintf("Failed to generate dependency graph: %v", err)))
 		os.Exit(1)
 	}
 
-	// 3. Generate DOT representation
+	// Generate DOT representation
 	fmt.Println(utils.FormatProgress("Generating DOT representation of dependency graph..."))
 	dotContent := depGraph.GenerateDependencyGraphDOT()
 
-	// 4. Save to file or display instructions
+	// Save to file or display instructions
 	if depDotOutputPath != "" {
 		// Ensure the file has a .dot extension
 		if !strings.HasSuffix(depDotOutputPath, ".dot") {
@@ -815,5 +708,87 @@ func displayDependencyGraph(nodes []*nixos.DependencyNode, prefix string) {
 		if len(node.Dependencies) > 0 {
 			displayDependencyGraph(node.Dependencies, childPrefix)
 		}
+	}
+}
+
+// getDependencyGraph is a helper function that handles getting the dependency graph
+// for all deps subcommands. It respects the --current flag and configuration paths.
+func getDependencyGraph() (*nixos.DependencyGraph, error) {
+	// Check if user wants to analyze current system
+	if depCurrentSystem {
+		return nixos.AnalyzeCurrentSystemDependencies()
+	}
+
+	// Original configuration-based analysis
+	// 1. Determine NixOS configuration path
+	cfgPath := depNixosConfigPath // From flag
+	if cfgPath == "" {
+		userCfg, err := config.LoadUserConfig()
+		if err == nil && userCfg.NixosFolder != "" {
+			cfgPath = userCfg.NixosFolder
+		}
+	}
+
+	if cfgPath == "" {
+		// Try to auto-detect common paths
+		commonPaths := []string{
+			"/etc/nixos/flake.nix",
+			"/etc/nixos/configuration.nix",
+			os.ExpandEnv("$HOME/.config/nixos/flake.nix"),
+			os.ExpandEnv("$HOME/.config/nixos/configuration.nix"),
+		}
+		for _, p := range commonPaths {
+			if utils.IsFile(p) {
+				// If flake.nix is found, try to get its directory
+				if strings.HasSuffix(p, "flake.nix") {
+					cfgPath = filepath.Dir(p)
+				} else {
+					cfgPath = p
+				}
+				break
+			}
+		}
+	}
+
+	if cfgPath == "" {
+		return nil, fmt.Errorf("NixOS configuration path not found. Please specify the path using the --nixos-path flag, set 'nixos_folder' in your nixai config, or use --current to analyze the running system")
+	}
+
+	if !utils.DirExists(cfgPath) && !utils.IsFile(cfgPath) {
+		return nil, fmt.Errorf("NixOS configuration file does not exist: %s", cfgPath)
+	}
+
+	// Determine if it's a flake or legacy config
+	isFlake := false
+	actualConfigFile := cfgPath
+	if utils.IsDirectory(cfgPath) {
+		if utils.IsFile(filepath.Join(cfgPath, "flake.nix")) {
+			isFlake = true
+			actualConfigFile = filepath.Join(cfgPath, "flake.nix")
+		} else if utils.IsFile(filepath.Join(cfgPath, "configuration.nix")) {
+			actualConfigFile = filepath.Join(cfgPath, "configuration.nix")
+		} else {
+			return nil, fmt.Errorf("no flake.nix or configuration.nix found in directory: %s", cfgPath)
+		}
+	} else { // cfgPath is a file
+		if strings.HasSuffix(cfgPath, "flake.nix") {
+			isFlake = true
+			cfgPath = filepath.Dir(cfgPath) // for flake analysis, we need the directory
+		}
+	}
+
+	if isFlake {
+		if depNixosHostname == "" {
+			// Attempt to get hostname from system
+			hn, herr := os.Hostname()
+			if herr == nil {
+				depNixosHostname = strings.Split(hn, ".")[0] // Use short hostname
+			} else {
+				return nil, fmt.Errorf("failed to auto-detect hostname for flake analysis. Please specify the NixOS configuration hostname using the --hostname flag")
+			}
+		}
+		return nixos.AnalyzeFlakeDependencies(cfgPath, depNixosHostname)
+	} else {
+		return nixos.AnalyzeLegacyDependencies(actualConfigFile)
 	}
 }

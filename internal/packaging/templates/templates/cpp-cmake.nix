@@ -1,0 +1,53 @@
+{ lib, stdenv, fetchFromGitHub, cmake }:
+
+stdenv.mkDerivation rec {
+  pname = "{{.ProjectName}}";
+  version = "{{.Version}}";
+
+  src = fetchFromGitHub {
+    owner = "{{.Owner}}";
+    repo = "{{.ProjectName}}";
+    rev = "v${version}";
+    sha256 = lib.fakeHash;
+  };
+
+  nativeBuildInputs = [ cmake ];
+
+{{- if .BuildInputs}}
+  buildInputs = [
+{{- range .BuildInputs}}
+    {{.}}
+{{- end}}
+  ];
+{{- end}}
+
+{{- if .ConfigureFlags}}
+  cmakeFlags = [
+{{- range .ConfigureFlags}}
+    "{{.}}"
+{{- end}}
+  ];
+{{- end}}
+
+{{- if .CheckPhase}}
+  doCheck = true;
+  checkPhase = ''
+{{.CheckPhase}}
+  '';
+{{- else}}
+  doCheck = true;
+  checkPhase = ''
+    make test
+  '';
+{{- end}}
+
+  meta = with lib; {
+    description = "{{.Description}}";
+    homepage = "{{.Homepage}}";
+{{- if .License}}
+    license = licenses.{{.License | lower}};
+{{- end}}
+    maintainers = with maintainers; [ ];
+    platforms = platforms.all;
+  };
+}

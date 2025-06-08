@@ -1,10 +1,14 @@
 package packaging
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"nix-ai-help/internal/packaging/detection"
+	"nix-ai-help/pkg/logger"
 )
 
 // BuildSystem represents different build systems
@@ -48,11 +52,17 @@ type RepoAnalysis struct {
 }
 
 // RepositoryAnalyzer analyzes Git repositories for packaging
-type RepositoryAnalyzer struct{}
+type RepositoryAnalyzer struct {
+	detector *detection.EnhancedDetector
+	logger   *logger.Logger
+}
 
 // NewRepositoryAnalyzer creates a new repository analyzer
-func NewRepositoryAnalyzer() *RepositoryAnalyzer {
-	return &RepositoryAnalyzer{}
+func NewRepositoryAnalyzer(log *logger.Logger) *RepositoryAnalyzer {
+	return &RepositoryAnalyzer{
+		detector: detection.NewEnhancedDetector(log),
+		logger:   log,
+	}
 }
 
 // AnalyzeRepository analyzes a repository for packaging information
@@ -175,6 +185,30 @@ func (ra *RepositoryAnalyzer) detectBuildSystem(repoPath string) (BuildSystem, [
 
 // detectLanguage attempts to detect the primary programming language
 func (ra *RepositoryAnalyzer) detectLanguage(repoPath string) (string, error) {
+	// Use enhanced detection system
+	ctx := context.Background()
+	opts := detection.DefaultAnalysisOptions()
+
+	results, err := ra.detector.DetectLanguages(ctx, repoPath, opts)
+	if err != nil {
+		ra.logger.Warn(fmt.Sprintf("Enhanced language detection failed, falling back to basic detection: %v", err))
+		return ra.detectLanguageBasic(repoPath)
+	}
+
+	// Return the highest confidence language
+	if len(results) > 0 {
+		primary := results[0] // Results are sorted by confidence
+		ra.logger.Debug(fmt.Sprintf("Enhanced language detection completed: %s (confidence: %.2f, evidence: %d)",
+			primary.Language, primary.Confidence, len(primary.Evidence)))
+		return primary.Language, nil
+	}
+
+	// Fallback to basic detection if no languages detected
+	return ra.detectLanguageBasic(repoPath)
+}
+
+// detectLanguageBasic provides basic language detection as fallback
+func (ra *RepositoryAnalyzer) detectLanguageBasic(repoPath string) (string, error) {
 	languageCount := make(map[string]int)
 
 	extensions := map[string]string{

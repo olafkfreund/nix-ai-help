@@ -40,7 +40,21 @@ Usage:
   nixai [command]`,
 	SilenceUsage: true,
 	Version:      version.Get().Version,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Check for global TUI flag and handle it for any command except interactive
+		if globalTUI && cmd.Name() != "interactive" {
+			// For non-interactive commands, launch TUI with the command pre-selected
+			return LaunchTUIMode(cmd, append([]string{cmd.Name()}, args...))
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Check for global TUI flag first
+		if globalTUI {
+			// If TUI mode is requested, launch the TUI with any provided args
+			return LaunchTUIMode(cmd, args)
+		}
+
 		if askQuestion != "" {
 			fmt.Println(utils.FormatHeader("🤖 AI Answer to your question:"))
 
@@ -139,6 +153,7 @@ var daemonMode bool
 var agentRole string
 var agentType string
 var contextFile string
+var globalTUI bool
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&askQuestion, "ask", "a", "", "Ask a question about NixOS configuration")
@@ -146,6 +161,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&agentRole, "role", "", "Specify the agent role (diagnoser, explainer, ask, build, etc.)")
 	rootCmd.PersistentFlags().StringVar(&agentType, "agent", "", "Specify the agent type (ollama, openai, gemini, etc.)")
 	rootCmd.PersistentFlags().StringVar(&contextFile, "context-file", "", "Path to a file containing context information (JSON or text)")
+	rootCmd.PersistentFlags().BoolVar(&globalTUI, "tui", false, "Launch TUI mode for any command")
 	mcpServerCmd.Flags().BoolVarP(&daemonMode, "daemon", "d", false, "Run MCP server in background/daemon mode")
 }
 
@@ -421,7 +437,7 @@ func buildExamplesOnlyPrompt(option, documentation, format, source, version stri
 var searchCmd = &cobra.Command{
 	Use:   "search [package]",
 	Short: "Search for NixOS packages/services and get config/AI tips",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  conditionalArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		query := strings.Join(args, " ")
 		cfg, err := config.LoadUserConfig()
@@ -513,7 +529,7 @@ var searchCmd = &cobra.Command{
 var explainHomeOptionCmd = &cobra.Command{
 	Use:   "explain-home-option <option>",
 	Short: "Explain a Home Manager option using AI and documentation",
-	Args:  cobra.ExactArgs(1),
+	Args:  conditionalExactArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		option := args[0]
 		fmt.Println(utils.FormatHeader("🏠 Home Manager Option: " + option))
@@ -595,7 +611,7 @@ func NewExplainOptionCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "explain-option <option>",
 		Short: "Explain a NixOS option using AI and documentation",
-		Args:  cobra.ExactArgs(1),
+		Args:  conditionalExactArgsValidator(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			option := args[0]
 			format, _ := cmd.Flags().GetString("format")
@@ -670,17 +686,29 @@ var interactiveCmd = &cobra.Command{
 	Long: `Start an interactive shell for NixOS troubleshooting, package search, option explanation, and more.
 
 Features:
-- Live MCP-powered option completion
-- Animated snowflake progress indicator
-- Multi-line input, contextual help, and advanced autocomplete
+- Modern TUI interface with two-panel layout
+- Live command search and filtering
+- Parameter input for commands that need it
+- Real-time command execution
 - All advanced features available in non-interactive mode
 
 Examples:
-  nixai interactive
+  nixai interactive              # Start modern TUI interface (default)
+  nixai interactive --classic    # Start classic interactive mode
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		InteractiveMode()
+		useClassic, _ := cmd.Flags().GetBool("classic")
+		if useClassic {
+			InteractiveMode()
+		} else {
+			InteractiveModeTUI()
+		}
 	},
+}
+
+func init() {
+	// Add the --classic flag to the interactive command (TUI is now default)
+	interactiveCmd.Flags().Bool("classic", false, "Launch classic interactive mode instead of modern TUI")
 }
 
 // Flake management command implementation
@@ -812,6 +840,58 @@ Examples:
 	},
 }
 
+// conditionalArgsValidator returns a validator that checks if TUI mode is requested
+// and bypasses argument validation if so
+func conditionalArgsValidator(minArgs int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		// If TUI mode is requested, don't validate args
+		if globalTUI {
+			return nil
+		}
+		// Otherwise, apply the minimum args validation
+		return cobra.MinimumNArgs(minArgs)(cmd, args)
+	}
+}
+
+// conditionalExactArgsValidator returns a validator that checks if TUI mode is requested
+// and bypasses exact argument validation if so
+func conditionalExactArgsValidator(exactArgs int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		// If TUI mode is requested, don't validate args
+		if globalTUI {
+			return nil
+		}
+		// Otherwise, apply the exact args validation
+		return cobra.ExactArgs(exactArgs)(cmd, args)
+	}
+}
+
+// conditionalRangeArgsValidator returns a validator that checks if TUI mode is requested
+// and bypasses range argument validation if so
+func conditionalRangeArgsValidator(min, max int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		// If TUI mode is requested, don't validate args
+		if globalTUI {
+			return nil
+		}
+		// Otherwise, apply the range args validation
+		return cobra.RangeArgs(min, max)(cmd, args)
+	}
+}
+
+// conditionalMaximumArgsValidator returns a validator that checks if TUI mode is requested
+// and bypasses maximum argument validation if so
+func conditionalMaximumArgsValidator(maxArgs int) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		// If TUI mode is requested, don't validate args
+		if globalTUI {
+			return nil
+		}
+		// Otherwise, apply the maximum args validation
+		return cobra.MaximumNArgs(maxArgs)(cmd, args)
+	}
+}
+
 // Stub commands for missing top-level commands
 var askCmd = &cobra.Command{
 	Use:   "ask [question]",
@@ -821,7 +901,7 @@ var askCmd = &cobra.Command{
 Examples:
   nixai ask "How do I configure nginx?"
   nixai ask "What is the difference between services.openssh.enable and programs.ssh.enable?"`,
-	Args: cobra.MinimumNArgs(1),
+	Args: conditionalArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		question := strings.Join(args, " ")
 		fmt.Println(utils.FormatHeader("🤖 AI Answer to your question:"))
@@ -970,10 +1050,21 @@ var configureCmd = &cobra.Command{
 
 Examples:
   nixai configure
+  nixai configure --search "web server nginx"
+  nixai configure --output my-config.nix
+  nixai configure --advanced --home --output home-config.nix
+  nixai configure --search "desktop" --advanced --output desktop-config.nix
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(utils.FormatHeader("🛠️  Interactive NixOS Configuration"))
 		fmt.Println()
+
+		// Get flag values
+		searchQuery, _ := cmd.Flags().GetString("search")
+		outputFile, _ := cmd.Flags().GetString("output")
+		isAdvanced, _ := cmd.Flags().GetBool("advanced")
+		isHome, _ := cmd.Flags().GetBool("home")
+
 		cfg, err := config.LoadUserConfig()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
@@ -995,15 +1086,28 @@ Examples:
 			fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
 			os.Exit(1)
 		}
-		fmt.Println(utils.FormatInfo("Describe what you want to configure (e.g. desktop, web server, user, etc):"))
+
 		var input string
-		fmt.Print("> ")
-		_, _ = fmt.Scanln(&input)
-		if input == "" {
-			fmt.Println(utils.FormatWarning("No input provided. Exiting."))
-			return
+		if searchQuery != "" {
+			input = searchQuery
+			fmt.Println(utils.FormatInfo("Using search query: " + searchQuery))
+		} else {
+			configType := "NixOS"
+			if isHome {
+				configType = "Home Manager"
+			}
+			fmt.Printf(utils.FormatInfo("Describe what you want to configure for %s (e.g. desktop, web server, development environment):\n"), configType)
+			fmt.Print("> ")
+			_, _ = fmt.Scanln(&input)
+			if input == "" {
+				fmt.Println(utils.FormatWarning("No input provided. Exiting."))
+				return
+			}
 		}
-		prompt := "You are a NixOS configuration assistant. Help the user generate a configuration.nix snippet for: " + input + "\nProvide a complete, copy-pasteable example and explain each part."
+
+		// Build the prompt based on configuration type and advanced options
+		prompt := buildConfigurePrompt(input, isHome, isAdvanced)
+
 		fmt.Print(utils.FormatInfo("Querying AI provider... "))
 		resp, err := aiProvider.Query(prompt)
 		fmt.Println(utils.FormatSuccess("done"))
@@ -1011,8 +1115,120 @@ Examples:
 			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
 			os.Exit(1)
 		}
-		fmt.Println(utils.RenderMarkdown(resp))
+
+		// Display or save the output
+		if outputFile != "" {
+			err := saveConfigurationToFile(resp, outputFile)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to save to file: "+err.Error()))
+				os.Exit(1)
+			}
+			fmt.Println(utils.FormatSuccess("✅ Configuration saved to: " + outputFile))
+			fmt.Println(utils.FormatTip("Review the generated configuration and customize as needed"))
+		} else {
+			fmt.Println(utils.RenderMarkdown(resp))
+		}
 	},
+}
+
+// buildConfigurePrompt builds an AI prompt for configuration generation
+func buildConfigurePrompt(input string, isHome bool, isAdvanced bool) string {
+	configType := "NixOS"
+	if isHome {
+		configType = "Home Manager"
+	}
+
+	var prompt strings.Builder
+
+	prompt.WriteString(fmt.Sprintf("You are an expert %s configuration assistant. ", configType))
+	prompt.WriteString(fmt.Sprintf("Generate a complete, production-ready %s configuration based on the following request:\n\n", configType))
+	prompt.WriteString(fmt.Sprintf("Request: %s\n\n", input))
+
+	if isHome {
+		prompt.WriteString("Generate Home Manager configuration that includes:\n")
+		prompt.WriteString("- Appropriate program configurations\n")
+		prompt.WriteString("- Service configurations if needed\n")
+		prompt.WriteString("- Package installations\n")
+		prompt.WriteString("- Dotfile management where relevant\n\n")
+	} else {
+		prompt.WriteString("Generate NixOS configuration that includes:\n")
+		prompt.WriteString("- System-level service configurations\n")
+		prompt.WriteString("- Hardware enablement where needed\n")
+		prompt.WriteString("- Security and networking settings\n")
+		prompt.WriteString("- Package installations\n")
+		prompt.WriteString("- User and group configurations where relevant\n\n")
+	}
+
+	if isAdvanced {
+		prompt.WriteString("Use advanced configuration options including:\n")
+		prompt.WriteString("- Detailed service configurations with all relevant options\n")
+		prompt.WriteString("- Security hardening configurations\n")
+		prompt.WriteString("- Performance optimizations\n")
+		prompt.WriteString("- Advanced networking and hardware configurations\n")
+		prompt.WriteString("- Modular configuration structure\n")
+		prompt.WriteString("- Comprehensive documentation and comments\n\n")
+	}
+
+	prompt.WriteString("Requirements:\n")
+	prompt.WriteString("- Provide complete, syntactically correct Nix configuration\n")
+	prompt.WriteString("- Include helpful comments explaining each section\n")
+	prompt.WriteString("- Use best practices and idiomatic Nix expressions\n")
+	prompt.WriteString("- Ensure compatibility with current NixOS/Home Manager versions\n")
+	prompt.WriteString("- Include error handling and fallbacks where appropriate\n")
+
+	if isAdvanced {
+		prompt.WriteString("- Provide detailed explanations for advanced configurations\n")
+		prompt.WriteString("- Include alternative configuration options as comments\n")
+		prompt.WriteString("- Add troubleshooting notes where relevant\n")
+	}
+
+	return prompt.String()
+}
+
+// saveConfigurationToFile saves the generated configuration to a file
+func saveConfigurationToFile(content, filename string) error {
+	// Clean the content to extract just the configuration
+	lines := strings.Split(content, "\n")
+	var configLines []string
+	inCodeBlock := false
+
+	for _, line := range lines {
+		// Look for code blocks
+		if strings.HasPrefix(line, "```nix") || strings.HasPrefix(line, "```") {
+			inCodeBlock = !inCodeBlock
+			continue
+		}
+
+		// Include lines that are inside code blocks or look like Nix configuration
+		if inCodeBlock || strings.Contains(line, "{") || strings.Contains(line, "}") ||
+			strings.Contains(line, "=") || strings.HasPrefix(strings.TrimSpace(line), "#") ||
+			strings.Contains(line, "enable") || strings.Contains(line, "programs.") ||
+			strings.Contains(line, "services.") || strings.Contains(line, "environment.") {
+			configLines = append(configLines, line)
+		}
+	}
+
+	// If we didn't find a proper code block, save the original content
+	if len(configLines) == 0 {
+		configLines = lines
+	}
+
+	finalContent := strings.Join(configLines, "\n")
+
+	// Ensure the file has a .nix extension
+	if !strings.HasSuffix(filename, ".nix") {
+		filename += ".nix"
+	}
+
+	return os.WriteFile(filename, []byte(finalContent), 0644)
+}
+
+func init() {
+	// Add flags for the configure command
+	configureCmd.Flags().StringP("search", "s", "", "Search query for configuration type (e.g., 'web server nginx', 'desktop')")
+	configureCmd.Flags().StringP("output", "o", "", "Output file path for generated configuration (will add .nix extension)")
+	configureCmd.Flags().Bool("advanced", false, "Generate advanced configuration with detailed options and optimizations")
+	configureCmd.Flags().Bool("home", false, "Generate Home Manager configuration instead of NixOS system configuration")
 }
 
 var diagnoseCmd = &cobra.Command{
@@ -1024,7 +1240,7 @@ Examples:
   nixai diagnose /var/log/messages
   journalctl -xe | nixai diagnose
 `,
-	Args: cobra.MaximumNArgs(1),
+	Args: conditionalMaximumArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(utils.FormatHeader("🩺 NixOS Diagnostics"))
 		fmt.Println()
@@ -1182,7 +1398,7 @@ Examples:
   nixai completion bash > /etc/bash_completion.d/nixai
   nixai completion zsh > ~/.zshrc
 `,
-	Args: cobra.ExactArgs(1),
+	Args: conditionalExactArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		switch args[0] {
 		case "bash":
@@ -2164,6 +2380,7 @@ func initializeCommands() {
 	rootCmd.AddCommand(snippetsCmd)
 	rootCmd.AddCommand(enhancedBuildCmd)
 	rootCmd.AddCommand(devenvCmd)
+	rootCmd.AddCommand(NewDepsCommand())
 	// Register stub commands for missing features
 	rootCmd.AddCommand(communityCmd)
 	rootCmd.AddCommand(configCmd)

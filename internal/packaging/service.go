@@ -40,7 +40,7 @@ type PackageResult struct {
 // NewPackagingService creates a new packaging service
 func NewPackagingService(aiProvider ai.AIProvider, mcpClient *mcp.MCPClient, tempDir string, logger *logger.Logger) *PackagingService {
 	return &PackagingService{
-		analyzer:  NewRepositoryAnalyzer(),
+		analyzer:  NewRepositoryAnalyzer(logger),
 		generator: NewDerivationGenerator(aiProvider, mcpClient),
 		cloner:    NewGitCloner(tempDir),
 		logger:    logger,

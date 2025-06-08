@@ -18,7 +18,10 @@ in {
 
       package = mkOption {
         type = types.package;
-        default = pkgs.callPackage ../package.nix { inherit (pkgs) lib buildGoModule; };
+        default =
+          if (pkgs ? nixai)
+          then pkgs.nixai
+          else pkgs.callPackage ../package.nix {inherit (pkgs) lib buildGoModule;};
         description = "The nixai package to use";
       };
 
