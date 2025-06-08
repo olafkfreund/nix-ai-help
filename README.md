@@ -274,4 +274,15 @@ nixai snippets search "graphics"
 
 ---
 
+## 🔧 Troubleshooting
+
+If you encounter build issues, especially "go.mod file not found" errors, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed solutions.
+
+Common issues:
+- **Source archive missing files**: Use the flake installation method
+- **Module import problems**: Ensure you're using the latest version
+- **Build failures**: Check that your Nix version is up to date
+
+---
+
 **For full command help, advanced usage, and troubleshooting, see the [User Manual](docs/MANUAL.md).**

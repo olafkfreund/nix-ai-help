@@ -21,7 +21,11 @@ in {
         default =
           if (pkgs ? nixai)
           then pkgs.nixai
-          else pkgs.callPackage ../package.nix {inherit (pkgs) lib buildGoModule;};
+          else
+            pkgs.callPackage ../package.nix {
+              # Explicitly pass the source from the module directory
+              src = lib.cleanSource ../.;
+            };
         description = "The nixai package to use";
       };
 
