@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"strings"
+
+	"nix-ai-help/internal/tui/components"
 	"nix-ai-help/internal/tui/models"
 	"nix-ai-help/internal/tui/panels"
 	"nix-ai-help/internal/tui/services"
@@ -28,6 +31,9 @@ type App struct {
 	executionPanel *panels.ExecutionPanel
 	statusBar      *panels.StatusBar
 
+	// Components
+	changelogPopup *components.ChangelogPopup
+
 	// State
 	focused  FocusedPanel
 	theme    *styles.Theme
@@ -50,6 +56,7 @@ func NewApp() *App {
 		commandsPanel:  panels.NewCommandsPanel(theme),
 		executionPanel: panels.NewExecutionPanel(theme),
 		statusBar:      panels.NewStatusBar(theme),
+		changelogPopup: components.NewChangelogPopup(theme),
 		focused:        CommandsPanel,
 		theme:          theme,
 		executor:       executor,
@@ -63,6 +70,7 @@ func (a *App) Init() tea.Cmd {
 		a.commandsPanel.Init(),
 		a.executionPanel.Init(),
 		a.statusBar.Init(),
+		a.changelogPopup.Init(),
 	)
 }
 
@@ -89,10 +97,25 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			a.switchFocusReverse()
 
 		case "f1", "ctrl+h":
-			// TODO: Show help overlay
+			// Toggle changelog popup
+			if a.changelogPopup.IsVisible() {
+				a.changelogPopup.Hide()
+			} else {
+				a.changelogPopup.Show()
+			}
 			return a, nil
 
 		default:
+			// If changelog popup is visible, route keys to it first
+			if a.changelogPopup.IsVisible() {
+				var cmd tea.Cmd
+				a.changelogPopup, cmd = a.changelogPopup.Update(msg)
+				if cmd != nil {
+					cmds = append(cmds, cmd)
+				}
+				return a, tea.Batch(cmds...)
+			}
+
 			// Route key messages to the focused panel
 			cmd := a.handleFocusedPanelInput(msg)
 			if cmd != nil {
@@ -103,6 +126,13 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	default:
 		// Handle command execution messages
 		switch msg := msg.(type) {
+		case panels.CommandSelectedMsg:
+			// Convert CommandSelectedMsg to CommandExecutionStartMsg
+			startMsg := panels.CommandExecutionStartMsg{
+				Command: msg.Command,
+			}
+			cmd := a.executor.ExecuteCommand(startMsg.Command)
+			cmds = append(cmds, cmd)
 		case panels.CommandExecutionStartMsg:
 			cmd := a.executor.ExecuteCommand(msg.Command)
 			cmds = append(cmds, cmd)
@@ -121,6 +151,11 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		a.statusBar, cmd = a.statusBar.Update(msg)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+
+		a.changelogPopup, cmd = a.changelogPopup.Update(msg)
 		if cmd != nil {
 			cmds = append(cmds, cmd)
 		}
@@ -183,6 +218,51 @@ func (a *App) View() string {
 		statusView,
 	)
 
+	// If changelog popup is visible, render it on top
+	if a.changelogPopup.IsVisible() {
+		popupView := a.changelogPopup.View()
+
+		// Calculate position to center the popup
+		popupWidth := int(float64(a.width) * 0.8)
+		popupHeight := int(float64(a.height) * 0.8)
+		xOffset := (a.width - popupWidth) / 2
+		yOffset := (a.height - popupHeight) / 2
+
+		// Simple overlay: place popup on top of content
+		if xOffset >= 0 && yOffset >= 0 {
+			lines := strings.Split(content, "\n")
+			popupLines := strings.Split(popupView, "\n")
+
+			// Ensure we have enough lines
+			for len(lines) < a.height {
+				lines = append(lines, "")
+			}
+
+			// Overlay popup lines
+			for i, popupLine := range popupLines {
+				lineIndex := yOffset + i
+				if lineIndex < len(lines) {
+					// Create line with popup content centered
+					line := lines[lineIndex]
+					if len(line) < a.width {
+						line += strings.Repeat(" ", a.width-len(line))
+					}
+
+					if xOffset+len(popupLine) <= len(line) {
+						runes := []rune(line)
+						popupRunes := []rune(popupLine)
+						copy(runes[xOffset:], popupRunes)
+						lines[lineIndex] = string(runes)
+					}
+				}
+			}
+			content = strings.Join(lines, "\n")
+		} else {
+			// Fallback: just show popup centered
+			content = lipgloss.Place(a.width, a.height, lipgloss.Center, lipgloss.Center, popupView)
+		}
+	}
+
 	return content
 }
 
@@ -238,6 +318,11 @@ func (a *App) updatePanelSizes() {
 	a.commandsPanel.SetSize(commandsPanelWidth, contentHeight)
 	a.executionPanel.SetSize(executionPanelWidth, contentHeight)
 	a.statusBar.SetSize(a.width, 2)
+
+	// Size changelog popup to take up most of the screen
+	popupWidth := int(float64(a.width) * 0.8)
+	popupHeight := int(float64(a.height) * 0.8)
+	a.changelogPopup.SetSize(popupWidth, popupHeight)
 }
 
 // Run starts the TUI application

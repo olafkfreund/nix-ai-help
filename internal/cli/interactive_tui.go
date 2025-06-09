@@ -62,10 +62,9 @@ func initialModelWithCommand(command string, args []string) tuiModel {
 
 // InteractiveModeTUI starts the modern TUI interface for nixai
 func InteractiveModeTUI() {
-	// Create the TUI application
+	// Create the TUI application without AltScreen to avoid terminal compatibility issues
 	app := tea.NewProgram(
 		initialModel(),
-		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)
 
@@ -100,7 +99,6 @@ type tuiModel struct {
 type commandItem struct {
 	name        string
 	description string
-	icon        string
 	needsInput  bool
 	options     []commandOption
 	subcommands []subcommandItem
@@ -200,7 +198,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "ask",
 			description: "Ask any NixOS question",
-			icon:        "🤖",
 			needsInput:  true,
 			options: []commandOption{
 				{name: "Question", flag: "question", description: "Your NixOS question", required: true, hasValue: true, optionType: "string"},
@@ -212,7 +209,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "search",
 			description: "Search for NixOS packages/services",
-			icon:        "🔍",
 			needsInput:  true,
 			options: []commandOption{
 				{name: "Package", flag: "package", description: "Package name to search", required: true, hasValue: true, optionType: "string"},
@@ -223,7 +219,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "explain-option",
 			description: "Explain a NixOS option",
-			icon:        "🖥️",
 			needsInput:  true,
 			options: []commandOption{
 				{name: "Option", flag: "option", description: "NixOS option to explain", required: true, hasValue: true, optionType: "string"},
@@ -235,7 +230,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "community",
 			description: "Community resources and support",
-			icon:        "🌐",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -249,7 +243,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "devenv",
 			description: "Create and manage development environments",
-			icon:        "🧪",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -261,7 +254,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "mcp-server",
 			description: "Start or manage the MCP server",
-			icon:        "🛰️",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -275,7 +267,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "machines",
 			description: "Manage configurations across multiple machines",
-			icon:        "🖧",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -287,7 +278,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "doctor",
 			description: "Run comprehensive NixOS health checks and get AI-powered diagnostics",
-			icon:        "🩻",
 			needsInput:  false,
 			options: []commandOption{
 				{name: "Verbose", flag: "verbose", description: "Show detailed output and progress information", required: false, hasValue: false, optionType: "bool"},
@@ -306,7 +296,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "flake",
 			description: "Nix flake utilities",
-			icon:        "🧊",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -321,7 +310,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "learn",
 			description: "NixOS learning and training commands",
-			icon:        "📚",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -336,7 +324,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "logs",
 			description: "Analyze and parse NixOS logs",
-			icon:        "📝",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -351,7 +338,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "templates",
 			description: "Manage NixOS configuration templates",
-			icon:        "📄",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -366,7 +352,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "snippets",
 			description: "Manage NixOS configuration snippets",
-			icon:        "🔖",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -380,7 +365,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "store",
 			description: "Manage, backup, and analyze the Nix store",
-			icon:        "💾",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -393,7 +377,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "deps",
 			description: "Analyze NixOS configuration dependencies",
-			icon:        "🔗",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -405,15 +388,15 @@ func getAvailableCommands() []commandItem {
 			},
 		},
 		// Simple commands without subcommands
-		{name: "build", description: "Enhanced build troubleshooting and optimization", icon: "🛠️", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "package-repo", description: "Analyze Git repos and generate Nix derivations", icon: "📦", needsInput: true, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "diagnose", description: "Diagnose NixOS issues", icon: "🩺", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "config", description: "Manage nixai configuration", icon: "⚙️", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "configure", description: "Configure NixOS interactively", icon: "🧑‍💻", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "gc", description: "AI-powered garbage collection analysis", icon: "🧹", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "hardware", description: "AI-powered hardware configuration optimizer", icon: "💻", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "migrate", description: "AI-powered migration assistant", icon: "🔀", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "neovim-setup", description: "Neovim integration setup", icon: "📝", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{name: "build", description: "Enhanced build troubleshooting and optimization", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{name: "package-repo", description: "Analyze Git repos and generate Nix derivations", needsInput: true, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{name: "diagnose", description: "Diagnose NixOS issues", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{name: "config", description: "Manage nixai configuration", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{name: "configure", description: "Configure NixOS interactively", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{name: "gc", description: "AI-powered garbage collection analysis", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{name: "hardware", description: "AI-powered hardware configuration optimizer", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{name: "migrate", description: "AI-powered migration assistant", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{name: "neovim-setup", description: "Neovim integration setup", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
 	}
 
 	return commands
@@ -1012,7 +995,7 @@ func (m tuiModel) renderCommandsPanel(width, height int) string {
 		inputHeader := fmt.Sprintf("Enter parameter for '%s':", m.selectedCmdName)
 		content.WriteString(inputHeader + "\n\n")
 
-		inputLine := fmt.Sprintf("📝 Input: %s_", m.parameterInput)
+		inputLine := fmt.Sprintf("Input: %s_", m.parameterInput)
 		if m.focused == focusInput {
 			inputLine = selectedStyle.Render(inputLine)
 		} else {
@@ -1022,7 +1005,7 @@ func (m tuiModel) renderCommandsPanel(width, height int) string {
 		content.WriteString("Press Enter to execute, Esc to cancel\n")
 	} else if m.searchMode {
 		// Add search bar if in search mode
-		searchBar := fmt.Sprintf("🔍 Search: %s_", m.searchQuery)
+		searchBar := fmt.Sprintf("Search: %s_", m.searchQuery)
 		content.WriteString(searchBar + "\n\n")
 	} else {
 		content.WriteString("Commands (Press / to search):\n\n")
@@ -1035,11 +1018,11 @@ func (m tuiModel) renderCommandsPanel(width, height int) string {
 
 		// Render command list
 		for i, cmd := range filteredCommands {
-			line := fmt.Sprintf("%s %s", cmd.icon, cmd.name)
+			line := cmd.name
 
 			// Add indicator for commands that need input
 			if cmd.needsInput {
-				line += " 📝"
+				line += " [INPUT]"
 			}
 
 			if i == m.selectedCommand && m.focused == focusCommands {
@@ -1091,7 +1074,7 @@ func (m tuiModel) renderOptionsPanel(width, height int) string {
 		// Show input mode for current option
 		if len(m.commandOptions) > 0 && m.selectedOption < len(m.commandOptions) {
 			opt := m.commandOptions[m.selectedOption]
-			content.WriteString(fmt.Sprintf("📝 Enter value for '%s':\n", opt.name))
+			content.WriteString(fmt.Sprintf("Enter value for '%s':\n", opt.name))
 			content.WriteString(fmt.Sprintf("Description: %s\n\n", opt.description))
 
 			inputDisplay := fmt.Sprintf("Value: %s█", m.parameterInput)
@@ -1141,7 +1124,7 @@ func (m tuiModel) renderOptionsPanel(width, height int) string {
 
 		// Add "Execute Command" option at the bottom
 		content.WriteString("\n")
-		executeOption := "🚀 Execute Command"
+		executeOption := "Execute Command"
 		if m.selectedOption == len(m.commandOptions) && m.focused == focusOptions {
 			executeOption = selectedStyle.Render(executeOption)
 		} else {
@@ -1227,9 +1210,9 @@ func (m tuiModel) renderStatusBar(width int) string {
 	case stateCommandList:
 		switch m.focused {
 		case focusCommands:
-			statusItems = append(statusItems, "📋 Commands")
+			statusItems = append(statusItems, "Commands")
 		case focusOutput:
-			statusItems = append(statusItems, "💻 Output")
+			statusItems = append(statusItems, "Output")
 		}
 		statusItems = append(statusItems, "Tab: Switch Panel")
 		statusItems = append(statusItems, "↑↓/Ctrl+jk: Navigate")
@@ -1240,11 +1223,11 @@ func (m tuiModel) renderStatusBar(width int) string {
 	case stateSubcommandSelection:
 		switch m.focused {
 		case focusCommands:
-			statusItems = append(statusItems, "📋 Commands")
+			statusItems = append(statusItems, "Commands")
 		case focusSubcommands:
-			statusItems = append(statusItems, "⚡ Subcommands")
+			statusItems = append(statusItems, "Subcommands")
 		case focusOutput:
-			statusItems = append(statusItems, "💻 Output")
+			statusItems = append(statusItems, "Output")
 		}
 		statusItems = append(statusItems, "Tab: Switch Panel")
 		statusItems = append(statusItems, "↑↓/Ctrl+jk: Navigate")
@@ -1255,13 +1238,13 @@ func (m tuiModel) renderStatusBar(width int) string {
 	case stateCommandOptions:
 		switch m.focused {
 		case focusCommands:
-			statusItems = append(statusItems, "📋 Commands (Enter: Execute)")
+			statusItems = append(statusItems, "Commands (Enter: Execute)")
 		case focusOptions:
-			statusItems = append(statusItems, "⚙️ Options (Enter: Configure)")
+			statusItems = append(statusItems, "Options (Enter: Configure)")
 		case focusOutput:
-			statusItems = append(statusItems, "💻 Output")
+			statusItems = append(statusItems, "Output")
 		case focusInput:
-			statusItems = append(statusItems, "📝 Input")
+			statusItems = append(statusItems, "Input")
 		}
 		if m.inputMode {
 			statusItems = append(statusItems, "Type text")

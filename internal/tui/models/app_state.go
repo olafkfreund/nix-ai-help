@@ -24,7 +24,6 @@ type AppState struct {
 // Command represents a nixai command with metadata
 type Command struct {
 	Name        string
-	Icon        string
 	Description string
 	Usage       string
 	Examples    []string

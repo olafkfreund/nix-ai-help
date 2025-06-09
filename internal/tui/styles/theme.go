@@ -90,20 +90,29 @@ func NewDefaultTheme() *Theme {
 	theme.CommandsPanel = PanelStyles{
 		Base: lipgloss.NewStyle().
 			Background(background).
-			Foreground(text),
+			Foreground(text).
+			Padding(1),
 		Header: lipgloss.NewStyle().
 			Foreground(primary).
 			Bold(true).
-			Padding(0, 1),
+			Background(secondary).
+			Padding(0, 2).
+			MarginBottom(1),
 		Content: lipgloss.NewStyle().
-			Foreground(text),
+			Foreground(text).
+			Padding(0, 2).
+			MarginLeft(1),
 		Selected: lipgloss.NewStyle().
 			Background(primary).
 			Foreground(background).
-			Bold(true),
+			Bold(true).
+			Padding(0, 2).
+			MarginLeft(1).
+			MarginRight(1),
 		Highlight: lipgloss.NewStyle().
 			Foreground(accent).
-			Bold(true),
+			Bold(true).
+			Padding(0, 1),
 	}
 
 	// Execution Panel

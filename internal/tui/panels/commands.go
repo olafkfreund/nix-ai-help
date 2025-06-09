@@ -110,7 +110,7 @@ func (p *CommandsPanel) View() string {
 	// Header
 	header := "Commands"
 	if p.searchMode || p.searchQuery != "" {
-		header = "🔍 Search Commands"
+		header = "Search Commands"
 	}
 	content.WriteString(p.theme.CommandsPanel.Header.Render(header))
 	content.WriteString("\n")
@@ -130,7 +130,7 @@ func (p *CommandsPanel) View() string {
 	content.WriteString("\n")
 
 	// Commands list
-	availableHeight := p.height - 4 // Account for header and spacing
+	availableHeight := p.height - 6 // Account for header, spacing, help, and scroll indicator
 	if p.searchMode || p.searchQuery != "" {
 		availableHeight -= 2 // Account for search box
 	}
@@ -138,11 +138,18 @@ func (p *CommandsPanel) View() string {
 	commandsView := p.renderCommandsList(availableHeight)
 	content.WriteString(commandsView)
 
+	// Scroll indicator
+	if len(p.filteredCommands) > 0 {
+		scrollInfo := p.renderScrollIndicator(availableHeight)
+		content.WriteString("\n")
+		content.WriteString(scrollInfo)
+	}
+
 	// Help text
 	if !p.searchMode {
 		helpText := p.theme.CommandsPanel.Base.
 			Foreground(p.theme.Muted).
-			Render("/ to search • ↑↓ navigate • Enter to execute")
+			Render("/ search • ↑↓ navigate • Enter execute • PgUp/PgDn scroll")
 		content.WriteString("\n")
 		content.WriteString(helpText)
 	}
@@ -155,13 +162,15 @@ func (p *CommandsPanel) renderCommandsList(height int) string {
 	if len(p.filteredCommands) == 0 {
 		return p.theme.CommandsPanel.Base.
 			Foreground(p.theme.Muted).
-			Render("No commands found")
+			Render("  No commands found")
 	}
 
 	var lines []string
 
 	start := p.scrollOffset
-	end := start + height
+	// Adjust for multi-line items - each command takes 2 lines now
+	maxItems := height / 2
+	end := start + maxItems
 	if end > len(p.filteredCommands) {
 		end = len(p.filteredCommands)
 	}
@@ -170,6 +179,11 @@ func (p *CommandsPanel) renderCommandsList(height int) string {
 		cmd := p.filteredCommands[i]
 		line := p.renderCommandItem(cmd, i == p.selected)
 		lines = append(lines, line)
+
+		// Add spacing between command items
+		if i < end-1 {
+			lines = append(lines, "")
+		}
 	}
 
 	return strings.Join(lines, "\n")
@@ -177,36 +191,66 @@ func (p *CommandsPanel) renderCommandsList(height int) string {
 
 // renderCommandItem renders a single command item
 func (p *CommandsPanel) renderCommandItem(cmd models.CommandMetadata, selected bool) string {
-	icon := cmd.Icon
-	if icon == "" {
-		icon = "•"
-	}
-
 	name := cmd.Name
+
+	// Create more prominent styling for commands
 	if selected {
-		name = p.theme.CommandsPanel.Selected.Render(fmt.Sprintf(" %s %s ", icon, name))
+		name = p.theme.CommandsPanel.Selected.Render(fmt.Sprintf("  %s  ", name))
 	} else {
-		name = p.theme.CommandsPanel.Base.Render(fmt.Sprintf(" %s %s", icon, name))
+		name = p.theme.CommandsPanel.Content.Render(fmt.Sprintf("  %s", name))
 	}
 
 	// Add description if there's space
-	if p.width > 20 && cmd.Description != "" {
-		maxDescLen := p.width - len(cmd.Name) - 8 // Account for icon and spacing
+	if p.width > 25 && cmd.Description != "" {
+		maxDescLen := p.width - len(cmd.Name) - 10 // Account for extra spacing
 		if maxDescLen > 0 {
 			desc := cmd.Description
 			if len(desc) > maxDescLen {
 				desc = desc[:maxDescLen-3] + "..."
 			}
 			if selected {
-				return name
+				// For selected items, show description below the name for better readability
+				descLine := p.theme.CommandsPanel.Base.
+					Foreground(p.theme.Muted).
+					Render(fmt.Sprintf("    %s", desc))
+				return name + "\n" + descLine
 			} else {
-				desc = p.theme.CommandsPanel.Base.Foreground(p.theme.Muted).Render(" - " + desc)
-				return name + desc
+				desc = p.theme.CommandsPanel.Base.
+					Foreground(p.theme.Muted).
+					Render(fmt.Sprintf("  %s", desc))
+				return name + "\n" + desc
 			}
 		}
 	}
 
 	return name
+}
+
+// renderScrollIndicator renders a text-based scroll position indicator
+func (p *CommandsPanel) renderScrollIndicator(availableHeight int) string {
+	if len(p.filteredCommands) == 0 {
+		return ""
+	}
+
+	maxVisibleItems := availableHeight / 3 // Account for multi-line items
+
+	// Calculate visible range
+	start := p.scrollOffset + 1
+	end := p.scrollOffset + maxVisibleItems
+	if end > len(p.filteredCommands) {
+		end = len(p.filteredCommands)
+	}
+
+	// Only show indicator if there are more items than can be displayed
+	if len(p.filteredCommands) <= maxVisibleItems {
+		return ""
+	}
+
+	scrollText := fmt.Sprintf("(%d-%d of %d)", start, end, len(p.filteredCommands))
+
+	return p.theme.CommandsPanel.Base.
+		Foreground(p.theme.Muted).
+		Render(fmt.Sprintf("  %s", scrollText))
 }
 
 // handleSearchInput handles input when in search mode
@@ -298,10 +342,13 @@ func (p *CommandsPanel) adjustScroll() {
 		visibleHeight -= 2
 	}
 
+	// Account for multi-line items (each command takes ~2-3 lines)
+	maxVisibleItems := visibleHeight / 3
+
 	if p.selected < p.scrollOffset {
 		p.scrollOffset = p.selected
-	} else if p.selected >= p.scrollOffset+visibleHeight {
-		p.scrollOffset = p.selected - visibleHeight + 1
+	} else if p.selected >= p.scrollOffset+maxVisibleItems {
+		p.scrollOffset = p.selected - maxVisibleItems + 1
 	}
 }
 
