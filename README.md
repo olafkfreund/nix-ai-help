@@ -21,6 +21,7 @@ See the full [nixai User Manual](docs/MANUAL.md) for comprehensive documentation
 ### 📦 Flake-based Installation (Recommended)
 
 **Prerequisites:**
+
 - Nix (with flakes enabled)
 - git
 
@@ -105,7 +106,7 @@ The `package.nix` is nixpkgs-compliant and ready for submission. To add nixai to
 **Prerequisites:**
 
 - Nix (with flakes enabled)
-- Go (if developing outside Nix shell)
+- Go (if developing outside Nix shell)  
 - just (for development tasks)
 - git
 - Ollama (for local LLM inference, recommended)
@@ -114,6 +115,16 @@ The `package.nix` is nixpkgs-compliant and ready for submission. To add nixai to
 
 ```zsh
 ollama pull llama3
+```
+
+**Alternative: Install LlamaCpp for CPU-only inference:**
+
+```zsh
+# Install llamacpp server
+nix run nixpkgs#llama-cpp
+
+# Or set environment variable for existing server
+export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
 ```
 
 **Build and run nixai:**
@@ -150,7 +161,7 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 - **Intelligent Agent Architecture**: Role-based AI behavior with specialized expertise domains
 - **Direct Question Interface**: `nixai -a "your question"` for instant AI-powered assistance
 - **Context-Aware Responses**: Commands adapt behavior based on role, context, and system state
-- **Multi-Provider AI Support**: Local Ollama (privacy-first), OpenAI, Gemini with intelligent fallback
+- **Multi-Provider AI Support**: Local Ollama (privacy-first), LlamaCpp (CPU-optimized), OpenAI, Gemini with intelligent fallback
 
 ### 🩺 System Management & Diagnostics
 
@@ -215,6 +226,195 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 - **Multiple AI Providers**: Support for Ollama, OpenAI, Gemini, and other LLM providers
 - **Modular Architecture**: Clean separation of concerns with testable, maintainable components
 - **Production Ready**: Comprehensive error handling, validation, and robust operation
+
+---
+
+## 🧠 AI Provider Management
+
+nixai features a **unified AI provider management system** that eliminates hardcoded model endpoints and provides flexible, configuration-driven AI provider selection.
+
+### ✨ AI Features
+
+- **🔧 Configuration-Driven**: All AI models and providers defined in YAML configuration
+- **🔄 Dynamic Provider Selection**: Switch between providers at runtime
+- **🛡️ Automatic Fallbacks**: Graceful degradation when providers are unavailable
+- **🔒 Privacy-First**: Defaults to local Ollama with optional cloud provider fallbacks
+- **⚡ Zero-Code Model Addition**: Add new models through configuration, not code changes
+
+### 🎯 Supported Providers
+
+| Provider | Models | Capabilities |
+|----------|--------|-------------|
+| **Ollama** (Default) | llama3, codestral, custom | Local inference, privacy-first |
+| **LlamaCpp** | llama-2-7b-chat, custom models | CPU-optimized local inference |
+| **Google Gemini** | gemini-2.5-pro, gemini-2.0, gemini-flash | Advanced reasoning, multimodal |
+| **OpenAI** | gpt-4o, gpt-4-turbo, gpt-3.5-turbo | Industry-leading performance |
+| **Custom** | User-defined | Bring your own endpoint |
+
+### ⚙️ Configuration
+
+All AI provider settings are managed through `configs/default.yaml`:
+
+```yaml
+ai:
+  provider: "gemini"                    # Default provider
+  model: "gemini-2.5-pro"              # Default model
+  fallback_provider: "ollama"          # Fallback if primary fails
+  
+  providers:
+    gemini:
+      base_url: "https://generativelanguage.googleapis.com/v1beta"
+      api_key_env: "GEMINI_API_KEY"
+      models:
+        gemini-2.5-pro:
+          endpoint: "/models/gemini-2.5-pro-latest:generateContent"
+          display_name: "Gemini 2.5 Pro (Latest)"
+          capabilities: ["text", "code", "reasoning"]
+          context_limit: 1000000
+    
+    ollama:
+      base_url: "http://localhost:11434"
+      models:
+        llama3:
+          model_name: "llama3"
+          display_name: "Llama 3 (8B)"
+          capabilities: ["text", "code"]
+    
+    llamacpp:
+      base_url: "http://localhost:8080"
+      env_var: "LLAMACPP_ENDPOINT"
+      models:
+        llama-2-7b-chat:
+          name: "Llama 2 7B Chat"
+          display_name: "CPU-optimized Llama 2"
+          capabilities: ["text", "code"]
+          context_limit: 4096
+```
+
+### 🚀 Usage Examples
+
+**Using default configured provider:**
+
+```zsh
+nixai -a "How do I configure Nginx in NixOS?"
+```
+
+**Using LlamaCpp provider:**
+
+```zsh
+# Set LlamaCpp as default provider
+ai_provider: llamacpp
+ai_model: llama-2-7b-chat
+
+# Configure custom endpoint via environment variable
+export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
+nixai -a "Help me troubleshoot my NixOS build"
+
+# Remote LlamaCpp server
+export LLAMACPP_ENDPOINT="http://192.168.1.100:8080/completion"
+nixai diagnose --context-file /etc/nixos/configuration.nix
+```
+
+**Provider selection (future enhancement):**
+
+```zsh
+# These commands are planned for future implementation
+nixai --provider openai -a "Complex reasoning task"
+nixai --provider ollama -a "Private local assistance"
+nixai config set-provider gemini
+```
+
+### 🏗️ Architecture
+
+The system includes three core components:
+
+1. **ProviderManager**: Centralized provider instantiation and management
+2. **ModelRegistry**: Configuration-driven model lookup and validation  
+3. **Legacy Adapter**: Backward compatibility with existing CLI commands
+
+This architecture eliminated 25+ hardcoded switch statements and enables adding new providers through configuration alone.
+
+### 🖥️ LlamaCpp Setup Guide
+
+**LlamaCpp** provides CPU-optimized local inference without requiring GPU hardware, making it perfect for privacy-focused deployments on any hardware.
+
+#### Quick Setup
+
+1. **Install LlamaCpp server:**
+
+```bash
+# Using Nix
+nix run nixpkgs#llama-cpp
+
+# Using package manager
+# Ubuntu/Debian: apt install llama-cpp
+# Arch: pacman -S llama.cpp
+# macOS: brew install llama.cpp
+```
+
+1. **Download a model:**
+
+```bash
+# Example: Download Llama 2 7B Chat GGUF model
+wget https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/model.gguf
+```
+
+1. **Start the server:**
+
+```bash
+# Start llamacpp server on default port 8080
+llama-server --model model.gguf --host 0.0.0.0 --port 8080
+
+# Advanced options
+llama-server --model model.gguf --host localhost --port 8080 \
+  --ctx-size 4096 --threads 8 --n-gpu-layers 0
+```
+
+1. **Configure nixai:**
+
+```yaml
+# In configs/default.yaml
+ai_provider: llamacpp
+ai_model: llama-2-7b-chat
+
+# Or via environment variable
+export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
+```
+
+#### Advanced Configuration
+
+**Remote LlamaCpp Server:**
+
+```bash
+# Connect to remote llamacpp instance
+export LLAMACPP_ENDPOINT="http://192.168.1.100:8080/completion"
+nixai -a "Help with NixOS configuration"
+```
+
+**Multiple Models:**
+
+```yaml
+providers:
+  llamacpp:
+    base_url: "http://localhost:8080"
+    models:
+      llama-2-7b-chat:
+        name: "Llama 2 7B Chat"
+        context_limit: 4096
+      codellama-7b:
+        name: "Code Llama 7B"
+        context_limit: 4096
+```
+
+**Health Check:**
+
+```bash
+# Test llamacpp connectivity
+curl http://localhost:8080/health
+
+# nixai will automatically check health and fallback if needed
+nixai doctor  # Includes provider health checks
+```
 
 ---
 
@@ -302,6 +502,7 @@ nixai learn nix-language                       # Interactive learning modules
 ### Development Setup
 
 **Prerequisites:**
+
 - Nix (with flakes enabled)
 - Go 1.21+ (if developing outside Nix shell)
 - just (for development tasks)
@@ -396,6 +597,7 @@ For detailed development guidelines, see the [User Manual](docs/MANUAL.md) and i
 ### 🔧 Command Documentation
 
 Individual command guides available in `docs/`:
+
 - [diagnose.md](docs/diagnose.md) - System diagnostics and troubleshooting
 - [hardware.md](docs/hardware.md) - Hardware detection and optimization
 - [package-repo.md](docs/package-repo.md) - Repository analysis and packaging
