@@ -8,6 +8,57 @@
 
 **nixai: Your AI-powered, privacy-first NixOS assistant with 24+ specialized commands — automate, troubleshoot, and master NixOS from your terminal with intelligent agents and role-based expertise.**
 
+## 🆕 Latest Updates (June 2025)
+
+### ✨ **Modern TUI Interface** - **NEWLY COMPLETED!**
+- **🎨 Icon-Free Design**: 100% accessible text-based interface without Unicode dependencies
+- **📖 Enhanced Typography**: Larger, more readable text with improved visual hierarchy
+- **📜 Smart Scrolling**: Text-based scroll indicators with Page Up/Down support
+- **ℹ️ Version Display**: nixai version prominently shown in status bar
+- **📰 Changelog Popup**: Press F1 to view latest features and updates
+- **⌨️ Better Navigation**: Improved keyboard shortcuts and panel switching
+
+### 🚀 **Recent Feature Additions**
+- **Modern TUI Architecture**: Complete `/internal/tui/` system with Bubble Tea framework
+- **Enhanced Hardware Management**: 6 specialized subcommands for comprehensive system analysis
+- **AI Provider Flexibility**: Configuration-driven provider selection with fallback support
+- **MCP Integration**: Model Context Protocol server for enhanced documentation queries
+- **Developer Tools**: Advanced flake management, package analysis, and development environments
+
+---
+
+## 🎮 Modern TUI Experience
+
+The newly modernized Terminal User Interface provides a professional, accessible experience:
+
+### 🖥️ Interface Layout
+
+```
+┌─ Commands (24 total) ──────────────┬─ Execution Panel ─────────────────┐
+│                                    │                                   │
+│ ask [INPUT]                        │ Welcome to nixai TUI!             │
+│   Ask any NixOS question           │ Select a command from the left    │
+│ search [INPUT]                     │ panel to get started.            │
+│   Search for packages/services     │                                   │
+│ explain-option [INPUT]             │ Latest Updates:                   │
+│   Explain a NixOS option           │ • Icon-free accessible design    │
+│ hardware detect                    │ • Enhanced typography             │
+│   Comprehensive hardware analysis  │ • Smart scrolling system         │
+│                                    │ • Version display                │
+│ (Showing 1-8 of 24)               │ • F1 changelog popup             │
+└────────────────────────────────────┴───────────────────────────────────┘
+Commands | F1:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.2.3
+```
+
+### ✨ Key TUI Features
+
+- **🎯 Accessibility-First**: 100% text-based design without Unicode icon dependencies
+- **📖 Enhanced Readability**: Larger, bolder text with improved spacing and visual hierarchy
+- **🔄 Smooth Navigation**: Arrow keys, Tab switching, Page Up/Down scrolling with indicators
+- **📰 Feature Discovery**: F1 popup shows latest updates and changelog
+- **⌨️ Keyboard Efficient**: Complete keyboard navigation without mouse requirement
+- **🎨 Professional Design**: Clean two-panel layout with status bar and real-time feedback
+
 ---
 
 ## 📖 User Manual & Command Reference
@@ -155,6 +206,36 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 
 ## ✨ Key Features
 
+### 🖥️ **Modern Terminal User Interface**
+
+- **📱 Professional TUI Experience**: Beautiful two-panel layout with commands and execution areas
+- **🎯 Accessibility-First Design**: 100% text-based interface without icon dependencies
+- **📖 Enhanced Typography**: Large, readable text with improved visual hierarchy and spacing
+- **🔄 Smart Navigation**: Tab-based panel switching, arrow key navigation, and search functionality
+- **📜 Intelligent Scrolling**: Text-based scroll indicators with smooth Page Up/Down support
+- **ℹ️ Status Information**: Version display and real-time command execution feedback
+- **📰 Feature Discovery**: F1 changelog popup for viewing latest updates and features
+- **⌨️ Keyboard Shortcuts**: Comprehensive keyboard navigation without mouse dependency
+
+**TUI Interface Preview:**
+
+```text
+┌─ Commands (24 total) ──────────────┬─ Execution Panel ─────────────────┐
+│                                    │                                   │
+│ ask [INPUT]                        │ Welcome to nixai TUI!             │
+│   Ask any NixOS question           │ Select a command from the left    │
+│ search [INPUT]                     │ panel to get started.            │
+│   Search for packages/services     │                                   │
+│ explain-option [INPUT]             │ Latest Updates:                   │
+│   Explain a NixOS option           │ • Icon-free accessible design    │
+│ hardware detect                    │ • Enhanced typography             │
+│   Comprehensive hardware analysis  │ • Smart scrolling system         │
+│                                    │ • Version display                │
+│ (Showing 1-8 of 24)               │ • F1 changelog popup             │
+└────────────────────────────────────┴───────────────────────────────────┘
+Commands | F1:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.2.3
+```
+
 ### 🤖 AI-Powered Command System
 
 - **24+ Specialized Commands**: Complete command-line toolkit for all NixOS tasks and operations
@@ -173,12 +254,13 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 
 ### 🔧 Enhanced Hardware Management
 
-- **Comprehensive Hardware Detection**: `nixai hardware detect` for detailed system analysis
-- **Intelligent Optimization**: `nixai hardware optimize` with AI-powered configuration recommendations
-- **Driver Management**: `nixai hardware drivers` for automatic driver and firmware configuration
-- **Laptop Support**: `nixai hardware laptop` with power management and mobile-specific optimizations
-- **Hardware Comparison**: `nixai hardware compare` for current vs optimal settings analysis
-- **Function Interface**: `nixai hardware function` for advanced hardware function calling
+- **Comprehensive Hardware Detection**: `nixai hardware detect` for detailed system analysis and component identification
+- **Intelligent Optimization**: `nixai hardware optimize` with AI-powered configuration recommendations and performance tuning
+- **Driver Management**: `nixai hardware drivers` for automatic driver and firmware configuration and updates
+- **Laptop Support**: `nixai hardware laptop` with power management, thermal control, and mobile-specific optimizations
+- **Hardware Comparison**: `nixai hardware compare` for current vs optimal settings analysis and recommendations
+- **Function Interface**: `nixai hardware function` for advanced hardware function calling and direct system control
+- **Performance Monitoring**: Real-time hardware metrics and optimization suggestions
 
 ### 🔍 Search & Discovery
 
@@ -207,18 +289,22 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 
 ### 🌐 Community & Collaboration
 
-- **Community Resources**: `nixai community` for NixOS community links and support channels
-- **MCP Server**: `nixai mcp-server` for Model Context Protocol integration with editors
-- **Neovim Integration**: `nixai neovim-setup` for seamless editor integration
-- **Interactive Shell**: `nixai interactive` for guided assistance and exploration
+- **Community Resources**: `nixai community` for NixOS community links, forums, and support channels
+- **MCP Server Integration**: `nixai mcp-server` for Model Context Protocol integration with editors and IDEs
+- **Neovim Integration**: `nixai neovim-setup` for seamless editor integration with AI-powered assistance
+- **Interactive Shell**: `nixai interactive` with modern TUI for guided assistance and command exploration
+- **Configuration Sharing**: Community templates and snippets for common use cases
+- **Documentation Contributions**: User-contributed guides and best practices
 
 ### 🎨 User Experience
 
 - **Beautiful Terminal Output**: Colorized, formatted output with syntax highlighting via glamour
-- **Interactive & CLI Modes**: Use interactively or via CLI, with piped input support
+- **Modern TUI Interface**: Professional two-panel layout with real-time command execution
+- **Interactive & CLI Modes**: Use interactively via TUI or directly via CLI, with piped input support
 - **Progress Indicators**: Real-time feedback during API calls and long-running operations
 - **Role & Agent Selection**: `--role` and `--agent` flags for specialized behavior and expertise
-- **TUI Mode**: `--tui` flag for terminal user interface on supported commands
+- **Intelligent Help System**: Context-aware help and feature discovery with F1 changelog popup
+- **Accessibility Features**: Screen reader compatible, keyboard-only navigation, high contrast themes
 
 ### 🔒 Privacy & Performance
 
@@ -422,6 +508,13 @@ nixai doctor  # Includes provider health checks
 
 > For all commands, options, and real-world examples, see the [User Manual](docs/MANUAL.md).
 
+**Launch the modern TUI interface:**
+
+```zsh
+nixai interactive                               # Modern TUI with full navigation
+nixai interactive --classic                    # Classic text-based interactive mode
+```
+
 **Ask questions with intelligent AI assistance:**
 
 ```zsh
@@ -488,11 +581,25 @@ nixai machines show my-machine --role system-architect
 **Advanced features:**
 
 ```zsh
-nixai interactive                               # Launch interactive AI shell
+nixai interactive                               # Launch modern TUI interface
+nixai interactive --classic                    # Classic interactive mode
 nixai gc analyze                               # AI-powered garbage collection
 nixai store backup                             # Nix store management
 nixai community                                # Access community resources
 nixai learn nix-language                       # Interactive learning modules
+nixai mcp-server start                         # Start MCP server for editor integration
+```
+
+**TUI Navigation (Interactive Mode):**
+
+```zsh
+# In the modern TUI interface:
+# ↑↓ arrows: Navigate command list
+# Tab: Switch between panels  
+# Enter: Select/execute commands
+# /: Search commands
+# F1: Show changelog and latest features
+# Ctrl+C: Exit
 ```
 
 ---
@@ -550,6 +657,7 @@ go build -o nixai cmd/nixai/main.go
 - Follow the modular architecture patterns in `internal/`
 - Use the configuration system in `configs/default.yaml`
 - Maintain documentation for new features and commands
+- TUI development uses Bubble Tea framework in `internal/tui/`
 
 ### Testing & Quality
 
@@ -558,6 +666,8 @@ just test                    # Run all tests
 just test-coverage          # Generate coverage report
 just lint                   # Run linters
 just format                 # Format code
+just build                  # Build nixai binary
+just run                    # Build and run locally
 ```
 
 ### Contributing
@@ -578,6 +688,8 @@ For detailed development guidelines, see the [User Manual](docs/MANUAL.md) and i
 ### 📖 Documentation
 
 - [User Manual & Command Reference](docs/MANUAL.md) - Complete guide to all 24+ commands
+- [TUI Usage Guide](docs/TUI_INPUT_COMMANDS_GUIDE.md) - Modern terminal interface guide
+- [TUI Modernization Report](docs/TUI_MODERNIZATION_COMPLETION_REPORT.md) - Latest interface improvements
 - [Hardware Guide](docs/hardware.md) - Comprehensive hardware detection and optimization
 - [Agent Architecture](docs/agents.md) - AI agent system and role-based behavior
 - [Flake Integration Guide](docs/FLAKE_INTEGRATION_GUIDE.md) - Advanced flake setup and integration
@@ -587,6 +699,7 @@ For detailed development guidelines, see the [User Manual](docs/MANUAL.md) and i
 - [VS Code Integration](docs/MCP_VSCODE_INTEGRATION.md) - Model Context Protocol integration
 - [Neovim Integration](docs/neovim-integration.md) - Editor integration and MCP setup
 - [Community Resources](docs/community.md) - Community support and contribution guides
+- [TUI Modernization Plan](docs/TUI_MODERNIZATION_PROJECT_PLAN.md) - Technical implementation details
 
 ### 📋 Examples & References
 
@@ -640,6 +753,8 @@ nix build --rebuild
 - **Vendor hash mismatches**: The current vendor hash is `sha256-pGyNwzTkHuOzEDOjmkzx0sfb1jHsqb/1FcojsCGR6CY=`
 - **Hardware detection issues**: Ensure you have appropriate permissions for hardware access
 - **AI provider failures**: Verify Ollama is running (`ollama list`) or check API keys for cloud providers
+- **TUI display issues**: Ensure your terminal supports Unicode and has sufficient size (80x24 minimum)
+- **Interactive mode problems**: Try `nixai interactive --classic` for compatibility with older terminals
 
 ### Getting Help
 
@@ -658,6 +773,19 @@ nixai --version              # Should show "nixai version 0.1.0"
 nixai doctor                 # Run comprehensive health check
 nixai hardware detect       # Test hardware detection
 nixai -a "test question"     # Test AI functionality
+nixai interactive           # Launch modern TUI interface
+```
+
+### Latest Features Verification
+
+Test the newly completed TUI modernization:
+
+```zsh
+nixai interactive           # Launch modern TUI
+# In TUI: Press F1 to view changelog
+# In TUI: Use Tab to switch panels
+# In TUI: Type / to search commands
+# In TUI: Use ↑↓ arrows to navigate
 ```
 
 ---
