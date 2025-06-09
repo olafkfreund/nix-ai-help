@@ -12,6 +12,7 @@ import (
 	"nix-ai-help/internal/ai/agent"
 	"nix-ai-help/internal/ai/function/hardware"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
 	"github.com/spf13/cobra"
@@ -70,20 +71,14 @@ This command identifies:
 		}
 
 		// Initialize AI provider
-		var aiProvider ai.AIProvider
-		switch cfg.AIProvider {
-		case "ollama":
-			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		default:
-			aiProvider = ai.NewOllamaLegacyProvider("llama3")
+		legacyProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to initialize AI provider: " + err.Error()))
+			return
 		}
 
 		// Initialize Hardware Agent with legacy provider adapter
-		hardwareProvider := ai.NewLegacyProviderAdapter(aiProvider)
+		hardwareProvider := ai.NewLegacyProviderAdapter(legacyProvider)
 		hardwareAgent := agent.NewHardwareAgent(hardwareProvider)
 
 		// Perform comprehensive hardware detection
@@ -134,7 +129,7 @@ This command identifies:
 		if err != nil {
 			fmt.Println(utils.FormatWarning("Could not get AI analysis: " + err.Error()))
 			// Fallback to legacy provider for basic configuration suggestions
-			generateConfigurationSuggestions(hardwareInfo, aiProvider)
+			generateConfigurationSuggestions(hardwareInfo, legacyProvider)
 		} else {
 			fmt.Println(utils.FormatSubsection("🤖 AI Hardware Analysis", ""))
 			fmt.Println(utils.RenderMarkdown(analysis))
@@ -178,7 +173,11 @@ This command provides:
 			fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
 			cfg = &config.UserConfig{AIProvider: "ollama", AIModel: "llama3"}
 		}
-		aiProvider := InitializeAIProvider(cfg)
+		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to initialize AI provider: " + err.Error()))
+			return
+		}
 
 		// Get optimization recommendations
 		fmt.Println(utils.FormatProgress("Analyzing hardware for optimization opportunities..."))
@@ -260,7 +259,11 @@ This command handles:
 			fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
 			cfg = &config.UserConfig{AIProvider: "ollama", AIModel: "llama3"}
 		}
-		aiProvider := InitializeAIProvider(cfg)
+		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to initialize AI provider: " + err.Error()))
+			return
+		}
 
 		// Get driver configuration recommendations
 		fmt.Println(utils.FormatProgress("Analyzing hardware drivers and firmware..."))
@@ -341,7 +344,11 @@ This command analyzes:
 			fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
 			cfg = &config.UserConfig{AIProvider: "ollama", AIModel: "llama3"}
 		}
-		aiProvider := InitializeAIProvider(cfg)
+		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to initialize AI provider: " + err.Error()))
+			return
+		}
 
 		// Get comparison analysis
 		fmt.Println(utils.FormatProgress("Analyzing current configuration vs optimal settings..."))
@@ -432,7 +439,11 @@ This command provides:
 			fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
 			cfg = &config.UserConfig{AIProvider: "ollama", AIModel: "llama3"}
 		}
-		aiProvider := InitializeAIProvider(cfg)
+		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to initialize AI provider: " + err.Error()))
+			return
+		}
 
 		// Get laptop-specific recommendations
 		fmt.Println(utils.FormatProgress("Analyzing laptop hardware for optimization..."))

@@ -12,6 +12,7 @@ import (
 type OpenAIClient struct {
 	APIKey     string
 	APIURL     string
+	Model      string // Added model support
 	HTTPClient *http.Client
 }
 
@@ -20,8 +21,18 @@ func NewOpenAIClient(apiKey string) *OpenAIClient {
 	return &OpenAIClient{
 		APIKey:     apiKey,
 		APIURL:     "https://api.openai.com/v1/chat/completions",
+		Model:      "gpt-3.5-turbo", // default model
 		HTTPClient: &http.Client{Timeout: 10 * time.Second},
 	}
+}
+
+// NewOpenAIClientWithModel creates an OpenAI client with a specific model.
+func NewOpenAIClientWithModel(apiKey, model string) *OpenAIClient {
+	client := NewOpenAIClient(apiKey)
+	if model != "" {
+		client.Model = model
+	}
+	return client
 }
 
 // Request represents a request to the OpenAI API.
@@ -46,10 +57,10 @@ type Choice struct {
 	Message Message `json:"message"`
 }
 
-// GenerateResponse generates a response from the OpenAI API based on the provided messages.
-func (client *OpenAIClient) GenerateResponse(messages []Message) (string, error) {
+// GenerateResponseFromMessages generates a response from the OpenAI API based on the provided messages.
+func (client *OpenAIClient) GenerateResponseFromMessages(messages []Message) (string, error) {
 	request := Request{
-		Model:    "gpt-3.5-turbo",
+		Model:    client.Model, // Use the configured model
 		Messages: messages,
 	}
 
@@ -88,8 +99,47 @@ func (client *OpenAIClient) GenerateResponse(messages []Message) (string, error)
 	return response.Choices[0].Message.Content, nil
 }
 
+// GenerateResponse implements the legacy AIProvider interface for simple prompts.
+func (client *OpenAIClient) GenerateResponse(prompt string) (string, error) {
+	return client.Query(prompt)
+}
+
 // Query implements the AIProvider interface for OpenAIClient.
 func (client *OpenAIClient) Query(prompt string) (string, error) {
 	messages := []Message{{Role: "user", Content: prompt}}
-	return client.GenerateResponse(messages)
+	return client.GenerateResponseFromMessages(messages)
+}
+
+// CheckHealth checks if the OpenAI API is accessible and responding.
+func (client *OpenAIClient) CheckHealth() error {
+	// For OpenAI, we can check by making a simple request to the models endpoint
+	req, err := http.NewRequest("GET", "https://api.openai.com/v1/models", nil)
+	if err != nil {
+		return fmt.Errorf("failed to create health check request: %w", err)
+	}
+
+	req.Header.Set("Authorization", "Bearer "+client.APIKey)
+
+	httpClient := &http.Client{Timeout: 5 * time.Second}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("openAI API not accessible: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("openAI API returned error status: %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// GetSelectedModel returns the currently selected model.
+func (client *OpenAIClient) GetSelectedModel() string {
+	return client.Model
+}
+
+// SetModel updates the selected model.
+func (client *OpenAIClient) SetModel(modelName string) {
+	client.Model = modelName
 }

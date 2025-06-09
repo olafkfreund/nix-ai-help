@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -103,6 +104,36 @@ func (o *OllamaProvider) queryWithContext(ctx context.Context, prompt string) (s
 	}
 
 	return result.Response, nil
+}
+
+// HealthCheck checks if the Ollama server is running and accessible
+func (o *OllamaProvider) HealthCheck() error {
+	// Create a simple health check request
+	healthURL := strings.Replace(o.Endpoint, "/api/generate", "/api/tags", 1)
+
+	req, err := http.NewRequest("GET", healthURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create health check request: %w", err)
+	}
+
+	resp, err := o.Client.Do(req)
+	if err != nil {
+		return fmt.Errorf("ollama server not accessible: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("ollama server returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
+// SetModel allows changing the model after creation
+func (o *OllamaProvider) SetModel(model string) {
+	if model != "" {
+		o.Model = model
+	}
 }
 
 // Legacy Provider Wrapper for backward compatibility

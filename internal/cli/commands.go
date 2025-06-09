@@ -64,26 +64,20 @@ Usage:
 				os.Exit(1)
 			}
 
-			// Create AI provider
-			providerName := cfg.AIProvider
+			// Create AI provider using the new unified system
+			manager := ai.NewProviderManager(cfg, logger.NewLogger())
+
+			// Get the configured default provider or fall back to ollama
+			defaultProvider := cfg.AIModels.SelectionPreferences.DefaultProvider
 			if agentType != "" {
-				providerName = agentType
-			} else if providerName == "" {
-				providerName = "ollama"
+				defaultProvider = agentType
+			} else if defaultProvider == "" {
+				defaultProvider = "ollama"
 			}
 
-			var aiProvider ai.Provider
-			switch providerName {
-			case "ollama":
-				aiProvider = ai.NewOllamaProvider(cfg.AIModel)
-			case "openai":
-				openaiClient := ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-				aiProvider = ai.NewLegacyProviderAdapter(openaiClient)
-			case "gemini":
-				geminiClient := ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-				aiProvider = ai.NewLegacyProviderAdapter(geminiClient)
-			default:
-				fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
+			aiProvider, err := manager.GetProvider(defaultProvider)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 				os.Exit(1)
 			}
 
@@ -458,21 +452,16 @@ var searchCmd = &cobra.Command{
 			fmt.Println(pkgOut)
 		}
 		// Query MCP for documentation context (with progress indicator)
+		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
+			os.Exit(1)
+		}
+
+		// Get provider name for context
 		providerName := cfg.AIProvider
 		if providerName == "" {
 			providerName = "ollama"
-		}
-		var aiProvider ai.AIProvider
-		switch providerName {
-		case "ollama":
-			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-		default:
-			fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
-			os.Exit(1)
 		}
 		var docExcerpts []string
 		fmt.Print(utils.FormatInfo("Querying documentation... "))
@@ -542,21 +531,16 @@ var explainHomeOptionCmd = &cobra.Command{
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 			os.Exit(1)
 		}
+		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
+			os.Exit(1)
+		}
+
+		// Get provider name for context
 		providerName := cfg.AIProvider
 		if providerName == "" {
 			providerName = "ollama"
-		}
-		var aiProvider ai.AIProvider
-		switch providerName {
-		case "ollama":
-			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-		default:
-			fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
-			os.Exit(1)
 		}
 
 		// Query MCP for documentation context (with progress indicator)
@@ -647,16 +631,15 @@ func NewExplainOptionCommand() *cobra.Command {
 			if aiProviderName == "" {
 				aiProviderName = cfg.AIProvider
 			}
-			var aiProvider ai.AIProvider
-			switch aiProviderName {
-			case "ollama":
-				aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-			case "openai":
-				aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-			case "gemini":
-				aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-			default:
-				aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
+
+			// Create a temporary config with the selected provider
+			tempCfg := *cfg
+			tempCfg.AIProvider = aiProviderName
+
+			aiProvider, err := GetLegacyAIProvider(&tempCfg, logger.NewLogger())
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
+				os.Exit(1)
 			}
 			var prompt string
 			if examplesOnly {
@@ -913,21 +896,16 @@ Examples:
 			os.Exit(1)
 		}
 
+		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
+			os.Exit(1)
+		}
+
+		// Get provider name for context
 		providerName := cfg.AIProvider
 		if providerName == "" {
 			providerName = "ollama"
-		}
-		var aiProvider ai.AIProvider
-		switch providerName {
-		case "ollama":
-			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-		default:
-			fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
-			os.Exit(1)
 		}
 
 		// Query MCP for documentation context (optional, ignore errors)
@@ -1071,21 +1049,16 @@ Examples:
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 			os.Exit(1)
 		}
+		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
+			os.Exit(1)
+		}
+
+		// Get provider name for context
 		providerName := cfg.AIProvider
 		if providerName == "" {
 			providerName = "ollama"
-		}
-		var aiProvider ai.AIProvider
-		switch providerName {
-		case "ollama":
-			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-		default:
-			fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
-			os.Exit(1)
 		}
 
 		var input string
@@ -1270,20 +1243,9 @@ Examples:
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 			os.Exit(1)
 		}
-		providerName := cfg.AIProvider
-		if providerName == "" {
-			providerName = "ollama"
-		}
-		var aiProvider ai.AIProvider
-		switch providerName {
-		case "ollama":
-			aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-		case "openai":
-			aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-		case "gemini":
-			aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-		default:
-			fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
+		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 			os.Exit(1)
 		}
 		prompt := "You are a NixOS expert. Analyze the following log or error output and provide a diagnosis, root cause, and step-by-step fix instructions.\n\nLog or error:\n" + logData
@@ -1353,21 +1315,9 @@ func runDoctorCommand(cmd *cobra.Command, args []string) {
 	showChecksBeingPerformed(checkType, verbose)
 
 	// Initialize AI provider for analysis
-	providerName := cfg.AIProvider
-	if providerName == "" {
-		providerName = "ollama"
-	}
-
-	var aiProvider ai.AIProvider
-	switch providerName {
-	case "ollama":
-		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-	case "openai":
-		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-	case "gemini":
-		aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-	default:
-		fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
+	aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 		os.Exit(1)
 	}
 
@@ -2413,21 +2363,9 @@ func handleFlakeAnalyze(cmd *cobra.Command, args []string) {
 	}
 
 	// Initialize AI provider for analysis
-	providerName := cfg.AIProvider
-	if providerName == "" {
-		providerName = "ollama"
-	}
-
-	var aiProvider ai.AIProvider
-	switch providerName {
-	case "ollama":
-		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-	case "openai":
-		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-	case "gemini":
-		aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-	default:
-		fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
+	aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 		os.Exit(1)
 	}
 
@@ -2552,21 +2490,9 @@ func handleLogsAnalyze(cmd *cobra.Command, args []string) {
 	}
 
 	// Initialize AI provider
-	providerName := cfg.AIProvider
-	if providerName == "" {
-		providerName = "ollama"
-	}
-
-	var aiProvider ai.AIProvider
-	switch providerName {
-	case "ollama":
-		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-	case "openai":
-		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-	case "gemini":
-		aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-	default:
-		fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
+	aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 		os.Exit(1)
 	}
 
@@ -2800,21 +2726,9 @@ func handlePackageRepoAnalysis(cmd *cobra.Command, args []string) {
 	}
 
 	// Initialize AI provider
-	providerName := cfg.AIProvider
-	if providerName == "" {
-		providerName = "ollama"
-	}
-
-	var aiProvider ai.AIProvider
-	switch providerName {
-	case "ollama":
-		aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-	case "openai":
-		aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-	case "gemini":
-		aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "")
-	default:
-		fmt.Fprintln(os.Stderr, utils.FormatError("Unknown AI provider: "+providerName))
+	aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 		os.Exit(1)
 	}
 

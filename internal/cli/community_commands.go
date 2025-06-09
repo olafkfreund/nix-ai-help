@@ -9,6 +9,7 @@ import (
 
 	"nix-ai-help/internal/community"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
 	"github.com/spf13/cobra"
@@ -391,8 +392,10 @@ func runCommunityValidate(configFile string, detailed, fixSuggestions bool, cmd 
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("🔧 AI-Powered Fix Suggestions", ""))
 
 		// Get AI suggestions for fixes
-		aiProvider := initializeAIProvider(cfg)
-		if aiProvider != nil {
+		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+		if err != nil {
+			_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Failed to initialize AI provider: "+err.Error()))
+		} else {
 			prompt := buildValidationFixPrompt(configFile, result)
 			suggestions, aiErr := aiProvider.Query(prompt)
 			if aiErr != nil {

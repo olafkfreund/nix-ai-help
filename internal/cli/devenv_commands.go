@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/devenv"
 	"nix-ai-help/pkg/logger"
@@ -41,25 +40,21 @@ func NewDevenvListCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List available devenv templates",
-		Long:  "List all available devenv templates with their descriptions.",
-		Run: func(cmd *cobra.Command, args []string) {
+		Long:  "List all available devenv templates with their descriptions.", Run: func(cmd *cobra.Command, args []string) {
 			cfg, err := config.LoadUserConfig()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
 				os.Exit(1)
 			}
 			log := logger.NewLoggerWithLevel(cfg.LogLevel)
-			var aiProvider ai.AIProvider
-			switch cfg.AIProvider {
-			case "ollama":
-				aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-			case "gemini":
-				aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
-			case "openai":
-				aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-			default:
-				aiProvider = ai.NewOllamaLegacyProvider("llama3")
+
+			// Use the new ProviderManager system
+			aiProvider, err := GetLegacyAIProvider(cfg, log)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Error getting AI provider: "+err.Error()))
+				os.Exit(1)
 			}
+
 			service, err := devenv.NewService(aiProvider, log)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, utils.FormatError("Error creating devenv service: "+err.Error()))
@@ -123,17 +118,14 @@ func NewDevenvCreateCmd() *cobra.Command {
 				os.Exit(1)
 			}
 			log := logger.NewLoggerWithLevel(cfg.LogLevel)
-			var aiProvider ai.AIProvider
-			switch cfg.AIProvider {
-			case "ollama":
-				aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-			case "gemini":
-				aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
-			case "openai":
-				aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-			default:
-				aiProvider = ai.NewOllamaLegacyProvider("llama3")
+
+			// Use the new ProviderManager system
+			aiProvider, err := GetLegacyAIProvider(cfg, log)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Error getting AI provider: "+err.Error()))
+				os.Exit(1)
 			}
+
 			service, err := devenv.NewService(aiProvider, log)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, utils.FormatError("Error creating devenv service: "+err.Error()))
@@ -211,17 +203,14 @@ func NewDevenvSuggestCmd() *cobra.Command {
 				os.Exit(1)
 			}
 			log := logger.NewLoggerWithLevel(cfg.LogLevel)
-			var aiProvider ai.AIProvider
-			switch cfg.AIProvider {
-			case "ollama":
-				aiProvider = ai.NewOllamaLegacyProvider(cfg.AIModel)
-			case "gemini":
-				aiProvider = ai.NewGeminiClient(os.Getenv("GEMINI_API_KEY"), "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent")
-			case "openai":
-				aiProvider = ai.NewOpenAIClient(os.Getenv("OPENAI_API_KEY"))
-			default:
-				aiProvider = ai.NewOllamaLegacyProvider("llama3")
+
+			// Use the new ProviderManager system
+			aiProvider, err := GetLegacyAIProvider(cfg, log)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Error getting AI provider: "+err.Error()))
+				os.Exit(1)
 			}
+
 			service, err := devenv.NewService(aiProvider, log)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, utils.FormatError("Error creating devenv service: "+err.Error()))

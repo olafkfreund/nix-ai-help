@@ -23,6 +23,7 @@ import (
 	"strings"
 
 	"nix-ai-help/internal/config"
+	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
 	"github.com/charmbracelet/glamour"
@@ -181,7 +182,10 @@ func handleAsk(question string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	provider := InitializeAIProvider(cfg)
+	provider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+	if err != nil {
+		return "", err
+	}
 	resp, err := provider.Query(question)
 	if err != nil {
 		return "", err

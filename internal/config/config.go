@@ -20,6 +20,40 @@ const EmbeddedDefaultConfig = `default:
         headers:  # Optional custom headers (e.g., for authentication)
             Authorization: "Bearer your-api-key-here"
             # Content-Type: "application/json"  # Set automatically if not provided
+    # Basic AI models configuration (subset for embedded config)
+    ai_models:
+        providers:
+            ollama:
+                name: "Ollama"
+                description: "Local AI model provider"
+                type: "local"
+                base_url: "http://localhost:11434"
+                available: true
+                supports_streaming: true
+                supports_tools: true
+                requires_api_key: false
+                models:
+                    llama3:
+                        name: "Llama 3"
+                        description: "Meta's Llama 3 model"
+                        type: "chat"
+                        context_window: 8192
+                        max_tokens: 4096
+                        recommended_for: ["nixos", "general"]
+                        default: true
+        selection_preferences:
+            default_provider: "ollama"
+            default_models:
+                ollama: "llama3"
+            task_models:
+                nixos_config:
+                    primary: ["ollama:llama3"]
+                    fallback: []
+        discovery:
+            auto_discover: true
+            cache_duration: 3600
+            check_timeout: 10
+            max_retries: 2
     log_level: info
     mcp_server:
         host: localhost
@@ -147,9 +181,68 @@ type DiscourseConfig struct {
 	Enabled  bool   `yaml:"enabled" json:"enabled"`
 }
 
+// AI Models Configuration Structures
+
+// AIModelConfig represents a single AI model configuration
+type AIModelConfig struct {
+	Name             string   `yaml:"name" json:"name"`
+	Description      string   `yaml:"description" json:"description"`
+	Size             string   `yaml:"size,omitempty" json:"size,omitempty"`
+	Type             string   `yaml:"type" json:"type"` // chat, code, completion
+	ContextWindow    int      `yaml:"context_window" json:"context_window"`
+	MaxTokens        int      `yaml:"max_tokens" json:"max_tokens"`
+	RecommendedFor   []string `yaml:"recommended_for" json:"recommended_for"`
+	RequiresDownload bool     `yaml:"requires_download,omitempty" json:"requires_download,omitempty"`
+	CostTier         string   `yaml:"cost_tier,omitempty" json:"cost_tier,omitempty"` // budget, standard, premium
+	Default          bool     `yaml:"default,omitempty" json:"default,omitempty"`
+}
+
+// AIProviderConfig represents a single AI provider configuration
+type AIProviderConfig struct {
+	Name              string                   `yaml:"name" json:"name"`
+	Description       string                   `yaml:"description" json:"description"`
+	Type              string                   `yaml:"type" json:"type"` // local, cloud, custom
+	BaseURL           string                   `yaml:"base_url" json:"base_url"`
+	Available         bool                     `yaml:"available" json:"available"`
+	SupportsStreaming bool                     `yaml:"supports_streaming" json:"supports_streaming"`
+	SupportsTools     bool                     `yaml:"supports_tools" json:"supports_tools"`
+	RequiresAPIKey    bool                     `yaml:"requires_api_key" json:"requires_api_key"`
+	EnvVar            string                   `yaml:"env_var,omitempty" json:"env_var,omitempty"`
+	Models            map[string]AIModelConfig `yaml:"models" json:"models"`
+}
+
+// TaskModelPreferences represents model preferences for specific tasks
+type TaskModelPreferences struct {
+	Primary  []string `yaml:"primary" json:"primary"`
+	Fallback []string `yaml:"fallback" json:"fallback"`
+}
+
+// AISelectionPreferences represents model selection preferences
+type AISelectionPreferences struct {
+	DefaultProvider string                          `yaml:"default_provider" json:"default_provider"`
+	DefaultModels   map[string]string               `yaml:"default_models" json:"default_models"`
+	TaskModels      map[string]TaskModelPreferences `yaml:"task_models" json:"task_models"`
+}
+
+// AIDiscoveryConfig represents model discovery configuration
+type AIDiscoveryConfig struct {
+	AutoDiscover  bool `yaml:"auto_discover" json:"auto_discover"`
+	CacheDuration int  `yaml:"cache_duration" json:"cache_duration"`
+	CheckTimeout  int  `yaml:"check_timeout" json:"check_timeout"`
+	MaxRetries    int  `yaml:"max_retries" json:"max_retries"`
+}
+
+// AIModelsConfig represents the complete AI models configuration
+type AIModelsConfig struct {
+	Providers            map[string]AIProviderConfig `yaml:"providers" json:"providers"`
+	SelectionPreferences AISelectionPreferences      `yaml:"selection_preferences" json:"selection_preferences"`
+	Discovery            AIDiscoveryConfig           `yaml:"discovery" json:"discovery"`
+}
+
 type YAMLConfig struct {
 	AIProvider  string            `yaml:"ai_provider" json:"ai_provider"`
 	LogLevel    string            `yaml:"log_level" json:"log_level"`
+	AIModels    AIModelsConfig    `yaml:"ai_models" json:"ai_models"`
 	MCPServer   MCPServerConfig   `yaml:"mcp_server" json:"mcp_server"`
 	Nixos       NixosConfig       `yaml:"nixos" json:"nixos"`
 	Diagnostics DiagnosticsConfig `yaml:"diagnostics" json:"diagnostics"`
@@ -164,6 +257,7 @@ type UserConfig struct {
 	AIModel     string            `yaml:"ai_model" json:"ai_model"`
 	NixosFolder string            `yaml:"nixos_folder" json:"nixos_folder"`
 	LogLevel    string            `yaml:"log_level" json:"log_level"`
+	AIModels    AIModelsConfig    `yaml:"ai_models" json:"ai_models"`
 	MCPServer   MCPServerConfig   `yaml:"mcp_server" json:"mcp_server"`
 	Nixos       NixosConfig       `yaml:"nixos" json:"nixos"`
 	Diagnostics DiagnosticsConfig `yaml:"diagnostics" json:"diagnostics"`
@@ -179,6 +273,103 @@ func DefaultUserConfig() *UserConfig {
 		AIModel:     "llama3",
 		NixosFolder: "~/nixos-config",
 		LogLevel:    "info",
+		AIModels: AIModelsConfig{
+			Providers: map[string]AIProviderConfig{
+				"ollama": {
+					Name:              "Ollama",
+					Description:       "Local AI model provider for privacy-focused inference",
+					Type:              "local",
+					BaseURL:           "http://localhost:11434",
+					Available:         true,
+					SupportsStreaming: true,
+					SupportsTools:     true,
+					RequiresAPIKey:    false,
+					Models: map[string]AIModelConfig{
+						"llama3": {
+							Name:             "Llama 3",
+							Description:      "Meta's Llama 3 model for general-purpose tasks",
+							Size:             "8B",
+							Type:             "chat",
+							ContextWindow:    8192,
+							MaxTokens:        4096,
+							RecommendedFor:   []string{"nixos", "general", "coding"},
+							RequiresDownload: true,
+							Default:          true,
+						},
+					},
+				},
+				"gemini": {
+					Name:              "Google Gemini",
+					Description:       "Google's advanced AI models via API",
+					Type:              "cloud",
+					BaseURL:           "https://generativelanguage.googleapis.com",
+					Available:         true,
+					SupportsStreaming: true,
+					SupportsTools:     true,
+					RequiresAPIKey:    true,
+					EnvVar:            "GEMINI_API_KEY",
+					Models: map[string]AIModelConfig{
+						"gemini-1.5-flash": {
+							Name:           "Gemini 1.5 Flash",
+							Description:    "Fast and efficient Gemini model",
+							Type:           "chat",
+							ContextWindow:  1048576,
+							MaxTokens:      8192,
+							RecommendedFor: []string{"fast", "general", "nixos"},
+							CostTier:       "standard",
+							Default:        true,
+						},
+					},
+				},
+				"openai": {
+					Name:              "OpenAI",
+					Description:       "OpenAI's GPT models via API",
+					Type:              "cloud",
+					BaseURL:           "https://api.openai.com",
+					Available:         true,
+					SupportsStreaming: true,
+					SupportsTools:     true,
+					RequiresAPIKey:    true,
+					EnvVar:            "OPENAI_API_KEY",
+					Models: map[string]AIModelConfig{
+						"gpt-3.5-turbo": {
+							Name:           "GPT-3.5 Turbo",
+							Description:    "Fast and cost-effective model",
+							Type:           "chat",
+							ContextWindow:  16385,
+							MaxTokens:      4096,
+							RecommendedFor: []string{"general", "fast", "budget"},
+							CostTier:       "standard",
+							Default:        true,
+						},
+					},
+				},
+			},
+			SelectionPreferences: AISelectionPreferences{
+				DefaultProvider: "ollama",
+				DefaultModels: map[string]string{
+					"ollama": "llama3",
+					"gemini": "gemini-1.5-flash",
+					"openai": "gpt-3.5-turbo",
+				},
+				TaskModels: map[string]TaskModelPreferences{
+					"nixos_config": {
+						Primary:  []string{"ollama:llama3", "gemini:gemini-1.5-flash"},
+						Fallback: []string{"openai:gpt-3.5-turbo"},
+					},
+					"general_help": {
+						Primary:  []string{"ollama:llama3", "gemini:gemini-1.5-flash"},
+						Fallback: []string{"openai:gpt-3.5-turbo"},
+					},
+				},
+			},
+			Discovery: AIDiscoveryConfig{
+				AutoDiscover:  true,
+				CacheDuration: 3600,
+				CheckTimeout:  10,
+				MaxRetries:    2,
+			},
+		},
 		MCPServer: MCPServerConfig{
 			Host:       "localhost",
 			Port:       8081,
@@ -387,6 +578,7 @@ func EnsureConfigFileFromEmbedded() (string, error) {
 			AIModel:     "llama3",         // Default model
 			NixosFolder: "~/nixos-config", // Default folder
 			LogLevel:    embeddedCfg.LogLevel,
+			AIModels:    embeddedCfg.AIModels,
 			MCPServer:   embeddedCfg.MCPServer,
 			Nixos:       embeddedCfg.Nixos,
 			Diagnostics: embeddedCfg.Diagnostics,

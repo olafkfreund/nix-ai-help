@@ -15,6 +15,206 @@ default:
         headers:  # Optional custom headers (e.g., for authentication)
             Authorization: "Bearer your-api-key-here"
             # Content-Type: "application/json"  # Set automatically if not provided
+    # AI Models Configuration - Enhanced model management system
+    ai_models:
+        # Provider definitions with their configuration
+        providers:
+            ollama:
+                name: "Ollama"
+                description: "Local AI model provider for privacy-focused inference"
+                type: "local"
+                base_url: "http://localhost:11434"
+                available: true
+                supports_streaming: true
+                supports_tools: true
+                requires_api_key: false
+                models:
+                    llama3:
+                        name: "Llama 3"
+                        description: "Meta's Llama 3 model for general-purpose tasks"
+                        size: "8B"
+                        type: "chat"
+                        context_window: 8192
+                        max_tokens: 4096
+                        recommended_for: ["nixos", "general", "coding"]
+                        requires_download: true
+                        default: true
+                    llama3:70b:
+                        name: "Llama 3 70B"
+                        description: "Larger Llama 3 model for complex tasks"
+                        size: "70B"
+                        type: "chat"
+                        context_window: 8192
+                        max_tokens: 4096
+                        recommended_for: ["complex", "analysis", "detailed"]
+                        requires_download: true
+                    codellama:
+                        name: "Code Llama"
+                        description: "Specialized model for code generation and analysis"
+                        size: "13B"
+                        type: "code"
+                        context_window: 16384
+                        max_tokens: 4096
+                        recommended_for: ["coding", "nix", "debugging"]
+                        requires_download: true
+                    mistral:
+                        name: "Mistral"
+                        description: "Efficient model for general tasks"
+                        size: "7B"
+                        type: "chat"
+                        context_window: 8192
+                        max_tokens: 4096
+                        recommended_for: ["general", "fast"]
+                        requires_download: true
+            gemini:
+                name: "Google Gemini"
+                description: "Google's advanced AI models via API"
+                type: "cloud"
+                base_url: "https://generativelanguage.googleapis.com"
+                available: true
+                supports_streaming: true
+                supports_tools: true
+                requires_api_key: true
+                env_var: "GEMINI_API_KEY"
+                models:
+                    gemini-1.5-pro:
+                        name: "Gemini 1.5 Pro"
+                        description: "Most capable Gemini model for complex tasks"
+                        type: "chat"
+                        context_window: 2097152
+                        max_tokens: 8192
+                        recommended_for: ["complex", "analysis", "reasoning"]
+                        cost_tier: "premium"
+                        default: true
+                    gemini-1.5-flash:
+                        name: "Gemini 1.5 Flash"
+                        description: "Fast and efficient Gemini model"
+                        type: "chat"
+                        context_window: 1048576
+                        max_tokens: 8192
+                        recommended_for: ["fast", "general", "nixos"]
+                        cost_tier: "standard"
+                    gemini-1.0-pro:
+                        name: "Gemini 1.0 Pro"
+                        description: "Previous generation Gemini model"
+                        type: "chat"
+                        context_window: 32768
+                        max_tokens: 2048
+                        recommended_for: ["general", "budget"]
+                        cost_tier: "budget"
+            openai:
+                name: "OpenAI"
+                description: "OpenAI's GPT models via API"
+                type: "cloud"
+                base_url: "https://api.openai.com"
+                available: true
+                supports_streaming: true
+                supports_tools: true
+                requires_api_key: true
+                env_var: "OPENAI_API_KEY"
+                models:
+                    gpt-4:
+                        name: "GPT-4"
+                        description: "Most capable GPT model for complex reasoning"
+                        type: "chat"
+                        context_window: 128000
+                        max_tokens: 4096
+                        recommended_for: ["complex", "analysis", "reasoning"]
+                        cost_tier: "premium"
+                        default: true
+                    gpt-4-turbo:
+                        name: "GPT-4 Turbo"
+                        description: "Latest GPT-4 with improved performance"
+                        type: "chat"
+                        context_window: 128000
+                        max_tokens: 4096
+                        recommended_for: ["complex", "fast", "coding"]
+                        cost_tier: "premium"
+                    gpt-3.5-turbo:
+                        name: "GPT-3.5 Turbo"
+                        description: "Fast and cost-effective model"
+                        type: "chat"
+                        context_window: 16385
+                        max_tokens: 4096
+                        recommended_for: ["general", "fast", "budget"]
+                        cost_tier: "standard"
+            llamacpp:
+                name: "Llama.cpp"
+                description: "Local CPU-optimized inference server"
+                type: "local"
+                base_url: "http://localhost:8080"
+                available: true
+                supports_streaming: true
+                supports_tools: false
+                requires_api_key: false
+                env_var: "LLAMACPP_ENDPOINT"
+                models:
+                    llama-2-7b-chat:
+                        name: "Llama 2 7B Chat"
+                        description: "CPU-optimized Llama 2 model"
+                        size: "7B"
+                        type: "chat"
+                        context_window: 4096
+                        max_tokens: 2048
+                        recommended_for: ["local", "cpu", "privacy"]
+                        requires_download: true
+                        default: true
+            custom:
+                name: "Custom API"
+                description: "User-defined API endpoint"
+                type: "custom"
+                base_url: "http://localhost:8080/api/generate"
+                available: true
+                supports_streaming: false
+                supports_tools: false
+                requires_api_key: false
+                models:
+                    custom-model:
+                        name: "Custom Model"
+                        description: "User-defined model via custom API"
+                        type: "chat"
+                        context_window: 4096
+                        max_tokens: 2048
+                        recommended_for: ["custom", "experimental"]
+                        default: true
+        # Model selection preferences
+        selection_preferences:
+            # Default provider when none specified
+            default_provider: "ollama"
+            # Default model per provider (overrides model defaults above)
+            default_models:
+                ollama: "llama3"
+                gemini: "gemini-1.5-flash"
+                openai: "gpt-3.5-turbo"
+                llamacpp: "llama-2-7b-chat"
+                custom: "custom-model"
+            # Task-specific model recommendations
+            task_models:
+                nixos_config:
+                    primary: ["ollama:llama3", "gemini:gemini-1.5-flash"]
+                    fallback: ["openai:gpt-3.5-turbo"]
+                code_generation:
+                    primary: ["ollama:codellama", "openai:gpt-4"]
+                    fallback: ["gemini:gemini-1.5-pro"]
+                debugging:
+                    primary: ["openai:gpt-4", "gemini:gemini-1.5-pro"]
+                    fallback: ["ollama:llama3"]
+                general_help:
+                    primary: ["ollama:llama3", "gemini:gemini-1.5-flash"]
+                    fallback: ["openai:gpt-3.5-turbo"]
+                complex_analysis:
+                    primary: ["openai:gpt-4", "gemini:gemini-1.5-pro"]
+                    fallback: ["ollama:llama3:70b"]
+        # Model discovery and availability checking
+        discovery:
+            # Whether to auto-discover available models on startup
+            auto_discover: true
+            # Cache discovery results for this duration (seconds)
+            cache_duration: 3600
+            # Timeout for availability checks (seconds)
+            check_timeout: 10
+            # Retry count for failed checks
+            max_retries: 2
     log_level: debug
     mcp_server:
         host: localhost
