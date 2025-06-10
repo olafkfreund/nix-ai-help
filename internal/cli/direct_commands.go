@@ -605,6 +605,42 @@ func runLogsCmd(args []string, out io.Writer) {
 		showLogsOptions(out)
 		return
 	}
+
+	subcommand := args[0]
+
+	// Handle logs subcommands by calling the core analysis functions directly
+	switch subcommand {
+	case "system":
+		analyzeSystemLogs(out)
+		return
+	case "boot":
+		// TODO: Create analyzeBootLogs function
+		_, _ = fmt.Fprintln(out, utils.FormatHeader("🚀 Boot Logs Analysis"))
+		_, _ = fmt.Fprintln(out, utils.FormatInfo("Boot logs analysis functionality coming soon"))
+		return
+	case "service":
+		// TODO: Create analyzeServiceLogs function
+		_, _ = fmt.Fprintln(out, utils.FormatHeader("🔧 Service Logs Analysis"))
+		_, _ = fmt.Fprintln(out, utils.FormatInfo("Service logs analysis functionality coming soon"))
+		return
+	case "errors":
+		// TODO: Create analyzeErrorLogs function
+		_, _ = fmt.Fprintln(out, utils.FormatHeader("🚨 Error Logs Analysis"))
+		_, _ = fmt.Fprintln(out, utils.FormatInfo("Error logs analysis functionality coming soon"))
+		return
+	case "build":
+		// TODO: Create analyzeBuildLogs function
+		_, _ = fmt.Fprintln(out, utils.FormatHeader("🔨 Build Logs Analysis"))
+		_, _ = fmt.Fprintln(out, utils.FormatInfo("Build logs analysis functionality coming soon"))
+		return
+	case "analyze":
+		// TODO: Create analyzeSpecificLogFile function
+		_, _ = fmt.Fprintln(out, utils.FormatHeader("🔍 Log File Analysis"))
+		_, _ = fmt.Fprintln(out, utils.FormatInfo("Log file analysis functionality coming soon"))
+		return
+	}
+
+	// Original file-based analysis logic for direct file paths
 	file := args[0]
 	if utils.IsFile(file) {
 		data, err := os.ReadFile(file)
@@ -637,8 +673,8 @@ func runLogsCmd(args []string, out io.Writer) {
 		_, _ = fmt.Fprintln(out, utils.RenderMarkdown(resp))
 		return
 	}
-	_, _ = fmt.Fprintln(out, "Analyzing logs for:", args[0])
-	_, _ = fmt.Fprintln(out, "No critical issues detected.")
+	_, _ = fmt.Fprintln(out, utils.FormatWarning("Unknown logs command: "+subcommand))
+	_, _ = fmt.Fprintln(out, "Use 'logs' without arguments to see available options.")
 }
 
 // MCP Server helper functions
