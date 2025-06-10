@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"time"
 
 	yaml "gopkg.in/yaml.v3"
 )
@@ -125,6 +126,39 @@ type MCPServerConfig struct {
 type NixosConfig struct {
 	ConfigPath string `yaml:"config_path" json:"config_path"`
 	LogPath    string `yaml:"log_path" json:"log_path"`
+}
+
+// NixOSContext represents the detected NixOS configuration context
+type NixOSContext struct {
+	// System Detection
+	UsesFlakes      bool   `yaml:"uses_flakes" json:"uses_flakes"`
+	UsesChannels    bool   `yaml:"uses_channels" json:"uses_channels"`
+	NixOSConfigPath string `yaml:"nixos_config_path" json:"nixos_config_path"`
+	SystemType      string `yaml:"system_type" json:"system_type"` // "nixos", "nix-darwin", "home-manager-only", "unknown"
+
+	// Home Manager
+	HasHomeManager        bool   `yaml:"has_home_manager" json:"has_home_manager"`
+	HomeManagerType       string `yaml:"home_manager_type" json:"home_manager_type"` // "standalone", "module", "none"
+	HomeManagerConfigPath string `yaml:"home_manager_config_path" json:"home_manager_config_path"`
+
+	// Version Information
+	NixOSVersion string `yaml:"nixos_version" json:"nixos_version"`
+	NixVersion   string `yaml:"nix_version" json:"nix_version"`
+
+	// Configuration Analysis
+	ConfigurationFiles []string `yaml:"configuration_files" json:"configuration_files"`
+	EnabledServices    []string `yaml:"enabled_services" json:"enabled_services"`
+	InstalledPackages  []string `yaml:"installed_packages" json:"installed_packages"`
+
+	// File Paths
+	FlakeFile         string `yaml:"flake_file" json:"flake_file"`
+	ConfigurationNix  string `yaml:"configuration_nix" json:"configuration_nix"`
+	HardwareConfigNix string `yaml:"hardware_config_nix" json:"hardware_config_nix"`
+
+	// Cache Information
+	LastDetected    time.Time `yaml:"last_detected" json:"last_detected"`
+	CacheValid      bool      `yaml:"cache_valid" json:"cache_valid"`
+	DetectionErrors []string  `yaml:"detection_errors,omitempty" json:"detection_errors,omitempty"`
 }
 
 // ErrorPatternConfig allows user-defined error patterns for diagnostics
@@ -253,18 +287,19 @@ type YAMLConfig struct {
 }
 
 type UserConfig struct {
-	AIProvider  string            `yaml:"ai_provider" json:"ai_provider"`
-	AIModel     string            `yaml:"ai_model" json:"ai_model"`
-	NixosFolder string            `yaml:"nixos_folder" json:"nixos_folder"`
-	LogLevel    string            `yaml:"log_level" json:"log_level"`
-	AIModels    AIModelsConfig    `yaml:"ai_models" json:"ai_models"`
-	MCPServer   MCPServerConfig   `yaml:"mcp_server" json:"mcp_server"`
-	Nixos       NixosConfig       `yaml:"nixos" json:"nixos"`
-	Diagnostics DiagnosticsConfig `yaml:"diagnostics" json:"diagnostics"`
-	Commands    CommandsConfig    `yaml:"commands" json:"commands"`
-	Devenv      DevenvConfig      `yaml:"devenv" json:"devenv"`
-	CustomAI    CustomAIConfig    `yaml:"custom_ai" json:"custom_ai"`
-	Discourse   DiscourseConfig   `yaml:"discourse" json:"discourse"`
+	AIProvider   string            `yaml:"ai_provider" json:"ai_provider"`
+	AIModel      string            `yaml:"ai_model" json:"ai_model"`
+	NixosFolder  string            `yaml:"nixos_folder" json:"nixos_folder"`
+	LogLevel     string            `yaml:"log_level" json:"log_level"`
+	AIModels     AIModelsConfig    `yaml:"ai_models" json:"ai_models"`
+	MCPServer    MCPServerConfig   `yaml:"mcp_server" json:"mcp_server"`
+	Nixos        NixosConfig       `yaml:"nixos" json:"nixos"`
+	Diagnostics  DiagnosticsConfig `yaml:"diagnostics" json:"diagnostics"`
+	Commands     CommandsConfig    `yaml:"commands" json:"commands"`
+	Devenv       DevenvConfig      `yaml:"devenv" json:"devenv"`
+	CustomAI     CustomAIConfig    `yaml:"custom_ai" json:"custom_ai"`
+	Discourse    DiscourseConfig   `yaml:"discourse" json:"discourse"`
+	NixOSContext NixOSContext      `yaml:"nixos_context" json:"nixos_context"`
 }
 
 func DefaultUserConfig() *UserConfig {
@@ -432,6 +467,26 @@ func DefaultUserConfig() *UserConfig {
 			Username: "", // Optional, can be set via environment variable
 			Enabled:  true,
 		},
+		NixOSContext: NixOSContext{
+			UsesFlakes:            false,
+			UsesChannels:          false,
+			NixOSConfigPath:       "",
+			SystemType:            "unknown",
+			HasHomeManager:        false,
+			HomeManagerType:       "none",
+			HomeManagerConfigPath: "",
+			NixOSVersion:          "",
+			NixVersion:            "",
+			ConfigurationFiles:    []string{},
+			EnabledServices:       []string{},
+			InstalledPackages:     []string{},
+			FlakeFile:             "",
+			ConfigurationNix:      "",
+			HardwareConfigNix:     "",
+			LastDetected:          time.Time{},
+			CacheValid:            false,
+			DetectionErrors:       []string{},
+		},
 	}
 }
 
@@ -586,6 +641,26 @@ func EnsureConfigFileFromEmbedded() (string, error) {
 			Devenv:      embeddedCfg.Devenv,
 			CustomAI:    embeddedCfg.CustomAI,
 			Discourse:   embeddedCfg.Discourse,
+			NixOSContext: NixOSContext{
+				UsesFlakes:            false,
+				UsesChannels:          false,
+				NixOSConfigPath:       "",
+				SystemType:            "unknown",
+				HasHomeManager:        false,
+				HomeManagerType:       "none",
+				HomeManagerConfigPath: "",
+				NixOSVersion:          "",
+				NixVersion:            "",
+				ConfigurationFiles:    []string{},
+				EnabledServices:       []string{},
+				InstalledPackages:     []string{},
+				FlakeFile:             "",
+				ConfigurationNix:      "",
+				HardwareConfigNix:     "",
+				LastDetected:          time.Time{},
+				CacheValid:            false,
+				DetectionErrors:       []string{},
+			},
 		}
 
 		// Marshal to YAML and write to user config file

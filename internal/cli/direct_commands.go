@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"nix-ai-help/internal/ai"
-	"nix-ai-help/internal/ai/agent"
+	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/ai/roles"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/mcp"
@@ -1401,6 +1401,22 @@ func runAskCmd(args []string, out io.Writer) {
 		return
 	}
 
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatWarning("Failed to detect NixOS context: "+err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		_, _ = fmt.Fprintln(out, utils.FormatNote("📋 "+contextSummary))
+		_, _ = fmt.Fprintln(out)
+	}
+
 	// Create modern AI provider using new ProviderManager system
 	manager := ai.NewProviderManager(cfg, logger.NewLogger())
 	defaultProvider := cfg.AIModels.SelectionPreferences.DefaultProvider
@@ -1412,16 +1428,6 @@ func runAskCmd(args []string, out io.Writer) {
 	if err != nil {
 		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 		return
-	}
-
-	// Create AskAgent with enhanced capabilities
-	askAgent := agent.NewAskAgent(provider)
-
-	// Set role if specified in global flags, otherwise use default Ask role
-	if agentRole != "" {
-		if err := askAgent.SetRole(roles.RoleType(agentRole)); err != nil {
-			_, _ = fmt.Fprintln(out, utils.FormatWarning("Invalid role '"+agentRole+"', using default 'ask' role"))
-		}
 	}
 
 	// Query MCP server for documentation context (with progress indicator)
@@ -1456,18 +1462,6 @@ func runAskCmd(args []string, out io.Writer) {
 		_, _ = fmt.Fprintln(out, utils.FormatNote("skipped"))
 	}
 
-	// Build enhanced context for the AskAgent
-	askContext := &agent.AskContext{
-		Question: question,
-		Context:  strings.Join(docExcerpts, "\n\n"),
-		Metadata: make(map[string]string),
-	}
-
-	// Add NixOS-specific context information to metadata
-	askContext.Metadata["provider"] = defaultProvider
-	askContext.Metadata["nixos_version"] = "latest"
-	askContext.Metadata["documentation_available"] = fmt.Sprintf("%t", mcpContextAdded)
-
 	// Add package/service search context to provide accurate information
 	var searchContext []string
 	_, _ = fmt.Fprint(out, utils.FormatInfo("Searching NixOS packages and options... "))
@@ -1485,43 +1479,45 @@ func runAskCmd(args []string, out io.Writer) {
 
 	_, _ = fmt.Fprintln(out, utils.FormatSuccess("done"))
 
-	// Create enhanced prompt with NixOS expertise and strict guidelines
-	nixosPromptInstruction := "ATTENTION: You are a NixOS expert. NEVER EVER suggest nix-env commands!\n\n" +
+	// Build context-aware prompt using the context builder
+	contextBuilder := nixoscontext.NewNixOSContextBuilder()
+
+	// Create base prompt with role template
+	basePrompt := ""
+	if template, exists := roles.RolePromptTemplate[roles.RoleAsk]; exists {
+		basePrompt = template
+	}
+
+	// Add NixOS-specific guidelines
+	nixosGuidelines := "ATTENTION: You are a NixOS expert. NEVER EVER suggest nix-env commands!\n\n" +
 		"CRITICAL RULES:\n" +
 		"❌ NEVER suggest 'nix-env -i' or any nix-env commands\n" +
 		"❌ NEVER recommend manual installation\n\n" +
 		"✅ ALWAYS USE configuration.nix for system packages\n" +
 		"✅ ALWAYS USE services.* options for services\n" +
-		"✅ ALWAYS end with 'sudo nixos-rebuild switch'\n\n" +
-		"For nginx specifically: Use services.nginx.enable = true; in configuration.nix"
+		"✅ ALWAYS end with 'sudo nixos-rebuild switch'\n\n"
 
-	if mcpContextAdded {
-		nixosPromptInstruction += "\n\nIMPORTANT: Use the provided NixOS documentation context to ensure accuracy and provide the most current information."
+	// Build context-aware prompt
+	contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt+"\n\n"+nixosGuidelines, nixosCtx)
+
+	// Add documentation context
+	if len(docExcerpts) > 0 {
+		contextualPrompt += "\n\nDOCUMENTATION CONTEXT:\n" + strings.Join(docExcerpts, "\n\n")
 	}
 
+	// Add package search context
 	if len(searchContext) > 0 {
-		nixosPromptInstruction += "\n\nPACKAGE SEARCH CONTEXT:\n" + strings.Join(searchContext, "\n\n")
-		nixosPromptInstruction += "\n\nUse this package information to provide accurate package names and availability."
+		contextualPrompt += "\n\nPACKAGE SEARCH CONTEXT:\n" + strings.Join(searchContext, "\n\n")
+		contextualPrompt += "\n\nUse this package information to provide accurate package names and availability."
 	}
 
-	_, _ = fmt.Fprintln(out, utils.FormatNote("[DEBUG] Enhanced prompt ready"))
+	// Add the user question
+	finalPrompt := contextualPrompt + "\n\nUser Question: " + question
 
-	// Query the AI provider directly with our enhanced prompt to avoid double-wrapping
-	_, _ = fmt.Fprint(out, utils.FormatInfo("Generating NixOS-specific response... "))
+	// Query the AI provider
+	_, _ = fmt.Fprint(out, utils.FormatInfo("Generating context-aware NixOS response... "))
 
 	ctx := context.Background()
-
-	// Construct the final prompt with role template + our detailed instructions + user question
-	finalPrompt := ""
-	if template, exists := roles.RolePromptTemplate[roles.RoleAsk]; exists {
-		finalPrompt = template + "\n\n"
-		_, _ = fmt.Fprintln(out, "\n[DEBUG] Using RoleAsk template")
-	} else {
-		_, _ = fmt.Fprintln(out, "\n[DEBUG] RoleAsk template NOT found!")
-	}
-	finalPrompt += nixosPromptInstruction + "\n\nUser Question: " + question
-
-	// Use provider directly to avoid agent's prompt wrapping
 	response, err := provider.Query(ctx, finalPrompt)
 
 	_, _ = fmt.Fprintln(out, utils.FormatSuccess("done"))
@@ -1545,6 +1541,9 @@ func runAskCmd(args []string, out io.Writer) {
 	_, _ = fmt.Fprintln(out, utils.FormatNote("• Use `nixai doctor` for system health checks"))
 	if mcpContextAdded {
 		_, _ = fmt.Fprintln(out, utils.FormatNote("• This answer used live NixOS documentation for accuracy"))
+	}
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		_, _ = fmt.Fprintln(out, utils.FormatNote("• This answer was personalized for your NixOS configuration"))
 	}
 }
 
