@@ -892,20 +892,7 @@ func showNeovimSetupOptions(out io.Writer) {
 
 // runNeovimSetupCmd executes the neovim-setup command directly
 func runNeovimSetupCmd(args []string, out io.Writer) {
-	if len(args) == 0 {
-		showNeovimSetupOptions(out)
-		return
-	}
-	switch args[0] {
-	case "install":
-		_, _ = fmt.Fprintln(out, "Installing Neovim integration...")
-	case "configure":
-		_, _ = fmt.Fprintln(out, "Configuring Neovim integration...")
-	case "check":
-		_, _ = fmt.Fprintln(out, "Neovim integration is healthy.")
-	default:
-		_, _ = fmt.Fprintln(out, utils.FormatWarning("Unknown or unimplemented neovim-setup subcommand: "+args[0]))
-	}
+	runCobraCommand(NewNeovimSetupCmd(), args, out)
 }
 
 // Package Repo helper functions

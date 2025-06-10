@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ import (
 	"nix-ai-help/internal/ai/roles"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/mcp"
+	"nix-ai-help/internal/neovim"
 	"nix-ai-help/internal/nixos"
 	"nix-ai-help/internal/packaging"
 	"nix-ai-help/pkg/logger"
@@ -906,7 +908,102 @@ providing seamless access to NixOS help directly from your editor.`,
 
   # Update integration configuration
   nixai neovim-setup update`,
-	Run: handleNeovimSetupCommand,
+	Run: func(cmd *cobra.Command, args []string) {
+		_ = cmd.Help()
+	},
+}
+
+var neovimSetupInstallCmd = &cobra.Command{
+	Use:   "install",
+	Short: "Install Neovim integration with nixai",
+	Long: `Install Neovim integration by creating the necessary configuration files
+and Lua modules to connect Neovim with the nixai MCP server.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		handleNeovimSetupInstall(cmd, args)
+	},
+}
+
+var neovimSetupConfigureCmd = &cobra.Command{
+	Use:   "configure",
+	Short: "Configure Neovim integration settings",
+	Long: `Configure Neovim integration settings such as socket path,
+key bindings, and other integration options.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		handleNeovimSetupConfigure(cmd, args)
+	},
+}
+
+var neovimSetupStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Check Neovim integration status",
+	Long: `Check the status of Neovim integration, including whether
+configuration files exist and the MCP server is accessible.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		handleNeovimSetupStatus(cmd, args)
+	},
+}
+
+var neovimSetupUpdateCmd = &cobra.Command{
+	Use:   "update",
+	Short: "Update Neovim integration configuration",
+	Long: `Update the Neovim integration configuration files to the
+latest version and apply any new features or bug fixes.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		handleNeovimSetupUpdate(cmd, args)
+	},
+}
+
+var neovimSetupRemoveCmd = &cobra.Command{
+	Use:   "remove",
+	Short: "Remove Neovim integration",
+	Long: `Remove the Neovim integration by deleting configuration files
+and modules that were created for nixai integration.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		handleNeovimSetupRemove(cmd, args)
+	},
+}
+
+func init() {
+	// Add subcommands to neovim-setup
+	neovimSetupCmd.AddCommand(neovimSetupInstallCmd)
+	neovimSetupCmd.AddCommand(neovimSetupConfigureCmd)
+	neovimSetupCmd.AddCommand(neovimSetupStatusCmd)
+	neovimSetupCmd.AddCommand(neovimSetupUpdateCmd)
+	neovimSetupCmd.AddCommand(neovimSetupRemoveCmd)
+
+	// Add flags to install and configure commands
+	neovimSetupInstallCmd.Flags().String("config-dir", "", "Neovim configuration directory (default: auto-detect)")
+	neovimSetupInstallCmd.Flags().String("socket-path", "/tmp/nixai-mcp.sock", "MCP server socket path")
+
+	neovimSetupConfigureCmd.Flags().String("config-dir", "", "Neovim configuration directory (default: auto-detect)")
+	neovimSetupConfigureCmd.Flags().String("socket-path", "/tmp/nixai-mcp.sock", "MCP server socket path")
+
+	neovimSetupUpdateCmd.Flags().String("config-dir", "", "Neovim configuration directory (default: auto-detect)")
+	neovimSetupUpdateCmd.Flags().String("socket-path", "/tmp/nixai-mcp.sock", "MCP server socket path")
+}
+
+// NewNeovimSetupCmd creates a new neovim-setup command for TUI mode
+func NewNeovimSetupCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     neovimSetupCmd.Use,
+		Short:   neovimSetupCmd.Short,
+		Long:    neovimSetupCmd.Long,
+		Example: neovimSetupCmd.Example,
+		Run:     neovimSetupCmd.Run,
+	}
+
+	// Add subcommands
+	cmd.AddCommand(neovimSetupInstallCmd)
+	cmd.AddCommand(neovimSetupConfigureCmd)
+	cmd.AddCommand(neovimSetupStatusCmd)
+	cmd.AddCommand(neovimSetupUpdateCmd)
+	cmd.AddCommand(neovimSetupRemoveCmd)
+
+	// Copy flags from existing commands
+	cmd.PersistentFlags().AddFlagSet(neovimSetupCmd.PersistentFlags())
+	cmd.Flags().AddFlagSet(neovimSetupCmd.Flags())
+
+	return cmd
 }
 
 // Package repository analysis command implementation
@@ -2729,6 +2826,123 @@ func handleNeovimSetupCommand(cmd *cobra.Command, args []string) {
 
 	// TODO: Implement neovim setup functionality
 	fmt.Println("Neovim setup functionality is coming soon!")
+}
+
+// Neovim setup subcommand handlers
+func handleNeovimSetupInstall(cmd *cobra.Command, args []string) {
+	configDir, _ := cmd.Flags().GetString("config-dir")
+	socketPath, _ := cmd.Flags().GetString("socket-path")
+
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("🔧 Installing Neovim Integration"))
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Use default config directory if not specified
+	if configDir == "" {
+		var err error
+		configDir, err = neovim.GetUserConfigDir()
+		if err != nil {
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Failed to get config directory: "+err.Error()))
+			return
+		}
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Config Directory", configDir))
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Socket Path", socketPath))
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Create the Neovim module
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Creating nixai.lua module..."))
+	err := neovim.CreateNeovimModule(socketPath, configDir)
+	if err != nil {
+		fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Failed to create Neovim module: "+err.Error()))
+		return
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess("Neovim integration installed successfully!"))
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("📝 Next Steps", ""))
+	fmt.Fprintln(cmd.OutOrStdout(), "1. Add the following to your init.lua:")
+	fmt.Fprintln(cmd.OutOrStdout())
+	initConfig := neovim.GenerateInitConfig(socketPath)
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatCodeBlock(initConfig, "lua"))
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), "2. Restart Neovim to load the integration")
+	fmt.Fprintln(cmd.OutOrStdout(), "3. Use <leader>na to ask nixai questions from Neovim")
+}
+
+func handleNeovimSetupConfigure(cmd *cobra.Command, args []string) {
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("⚙️ Configuring Neovim Integration"))
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), "Configuration options:")
+	fmt.Fprintln(cmd.OutOrStdout(), "• Use --socket-path to specify custom MCP socket")
+	fmt.Fprintln(cmd.OutOrStdout(), "• Use --config-dir to specify custom Neovim config directory")
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Run 'nixai neovim-setup install' to apply configuration"))
+}
+
+func handleNeovimSetupStatus(cmd *cobra.Command, args []string) {
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("📊 Neovim Integration Status"))
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Check if config directory exists
+	configDir, err := neovim.GetUserConfigDir()
+	if err != nil {
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Config Directory", "❌ Not found"))
+		return
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Config Directory", "✅ "+configDir))
+
+	// Check if nixai.lua exists
+	nixaiLuaPath := filepath.Join(configDir, "lua", "nixai.lua")
+	if _, err := os.Stat(nixaiLuaPath); err == nil {
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("nixai.lua Module", "✅ Installed"))
+	} else {
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("nixai.lua Module", "❌ Not found"))
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Run 'nixai neovim-setup install' to install integration"))
+		return
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Integration Status", "✅ Ready"))
+}
+
+func handleNeovimSetupUpdate(cmd *cobra.Command, args []string) {
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("🔄 Updating Neovim Integration"))
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Re-run installation to update files
+	handleNeovimSetupInstall(cmd, args)
+
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatNote("Integration updated to latest version"))
+}
+
+func handleNeovimSetupRemove(cmd *cobra.Command, args []string) {
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("🗑️ Removing Neovim Integration"))
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	configDir, err := neovim.GetUserConfigDir()
+	if err != nil {
+		fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Failed to get config directory: "+err.Error()))
+		return
+	}
+
+	nixaiLuaPath := filepath.Join(configDir, "lua", "nixai.lua")
+	if _, err := os.Stat(nixaiLuaPath); err == nil {
+		err := os.Remove(nixaiLuaPath)
+		if err != nil {
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Failed to remove nixai.lua: "+err.Error()))
+			return
+		}
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess("nixai.lua module removed"))
+	} else {
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatNote("nixai.lua module not found"))
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("Manual cleanup required:"))
+	fmt.Fprintln(cmd.OutOrStdout(), "• Remove nixai setup code from your init.lua")
+	fmt.Fprintln(cmd.OutOrStdout(), "• Restart Neovim to complete removal")
 }
 
 // handlePackageRepoCommand handles the package-repo command

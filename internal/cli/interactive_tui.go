@@ -502,7 +502,16 @@ func getAvailableCommands() []commandItem {
 			{name: "analyze", description: "Analyze current setup and migration complexity"},
 			{name: "to-flakes", description: "Convert from channels to flakes"},
 		}},
-		{name: "neovim-setup", description: "Neovim integration setup", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{name: "neovim-setup", description: "Neovim integration setup", needsInput: true, options: []commandOption{
+			{name: "Config Directory", flag: "config-dir", description: "Neovim configuration directory (default: auto-detect)", required: false, hasValue: true, optionType: "string"},
+			{name: "Socket Path", flag: "socket-path", description: "MCP server socket path", required: false, hasValue: true, defaultValue: "/tmp/nixai-mcp.sock", optionType: "string"},
+		}, subcommands: []subcommandItem{
+			{name: "install", description: "Install Neovim integration with nixai"},
+			{name: "configure", description: "Configure Neovim integration settings"},
+			{name: "status", description: "Check Neovim integration status"},
+			{name: "update", description: "Update Neovim integration configuration"},
+			{name: "remove", description: "Remove Neovim integration"},
+		}},
 	}
 
 	return commands
