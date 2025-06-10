@@ -435,19 +435,23 @@ func runSystemDiagnostics(out io.Writer) {
 	_, _ = fmt.Fprintln(out, utils.FormatSuccess("System health: All checks passed"))
 }
 
+// NewDiagnoseCommand creates a new diagnose command for TUI mode
+func NewDiagnoseCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     diagnoseCmd.Use,
+		Short:   diagnoseCmd.Short,
+		Long:    diagnoseCmd.Long,
+		Example: diagnoseCmd.Example,
+		Run:     diagnoseCmd.Run,
+	}
+	cmd.PersistentFlags().AddFlagSet(diagnoseCmd.PersistentFlags())
+	cmd.Flags().AddFlagSet(diagnoseCmd.Flags())
+	return cmd
+}
+
 // runDiagnoseCmd executes the diagnose command directly
 func runDiagnoseCmd(args []string, out io.Writer) {
-	if len(args) == 0 {
-		showDiagnosticOptions(out)
-		return
-	}
-	// Minimal: system health check
-	if args[0] == "system" {
-		runSystemDiagnostics(out)
-		return
-	}
-	_, _ = fmt.Fprintln(out, "Running diagnostics for:", args[0])
-	_, _ = fmt.Fprintln(out, "No critical issues detected.")
+	runCobraCommand(NewDiagnoseCommand(), args, out)
 }
 
 // Doctor helper functions

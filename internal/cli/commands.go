@@ -1363,11 +1363,20 @@ var diagnoseCmd = &cobra.Command{
 Examples:
   nixai diagnose /var/log/messages
   journalctl -xe | nixai diagnose
+  nixai diagnose --file /var/log/nixos-rebuild.log
+  nixai diagnose --type system
+  nixai diagnose --context "build failed with dependency error"
 `,
 	Args: conditionalMaximumArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(utils.FormatHeader("🩺 NixOS Diagnostics"))
 		fmt.Println()
+
+		// Parse command flags
+		inputFile, _ := cmd.Flags().GetString("file")
+		diagType, _ := cmd.Flags().GetString("type")
+		outputFormat, _ := cmd.Flags().GetString("output")
+		additionalContext, _ := cmd.Flags().GetString("context")
 
 		// Load configuration first
 		cfg, err := config.LoadUserConfig()
@@ -1393,7 +1402,18 @@ Examples:
 		}
 
 		var logData string
-		if len(args) > 0 {
+
+		// Determine input source based on flags and arguments
+		if inputFile != "" {
+			// Use --file flag
+			data, err := os.ReadFile(inputFile)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to read file: "+err.Error()))
+				os.Exit(1)
+			}
+			logData = string(data)
+		} else if len(args) > 0 {
+			// Use positional argument
 			file := args[0]
 			data, err := os.ReadFile(file)
 			if err != nil {
@@ -1408,8 +1428,15 @@ Examples:
 				input, _ := io.ReadAll(os.Stdin)
 				logData = string(input)
 			} else {
-				fmt.Println(utils.FormatWarning("No log file or piped input provided."))
-				return
+				// No input provided, offer diagnostic options based on type flag
+				if diagType != "" {
+					fmt.Printf("Running %s diagnostics...\n", diagType)
+					logData = fmt.Sprintf("Perform %s diagnostics for NixOS system", diagType)
+				} else {
+					fmt.Println(utils.FormatWarning("No log file, piped input, or diagnostic type provided."))
+					fmt.Println(utils.FormatTip("Usage: nixai diagnose [logfile] or nixai diagnose --type system"))
+					return
+				}
 			}
 		}
 
@@ -1420,7 +1447,18 @@ Examples:
 		}
 
 		// Build context-aware prompt using the context builder
-		basePrompt := "You are a NixOS expert. Analyze the following log or error output and provide a diagnosis, root cause, and step-by-step fix instructions.\n\nLog or error:\n" + logData
+		basePrompt := "You are a NixOS expert. Analyze the following log or error output and provide a diagnosis, root cause, and step-by-step fix instructions.\n\n"
+
+		if diagType != "" {
+			basePrompt += fmt.Sprintf("Focus on %s-related issues. ", diagType)
+		}
+
+		if additionalContext != "" {
+			basePrompt += fmt.Sprintf("Additional context: %s\n\n", additionalContext)
+		}
+
+		basePrompt += "Log or error:\n" + logData
+
 		contextBuilder := nixoscontext.NewNixOSContextBuilder()
 		contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
 
@@ -1431,8 +1469,27 @@ Examples:
 			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
 			os.Exit(1)
 		}
-		fmt.Println(utils.RenderMarkdown(resp))
+
+		// Format output based on output format flag
+		switch outputFormat {
+		case "plain":
+			fmt.Println(resp)
+		case "json":
+			// Simple JSON wrapper
+			fmt.Printf(`{"diagnosis": %q}`, resp)
+			fmt.Println()
+		default: // markdown
+			fmt.Println(utils.RenderMarkdown(resp))
+		}
 	},
+}
+
+func init() {
+	// Add flags to diagnose command
+	diagnoseCmd.Flags().StringP("file", "f", "", "Specify log file path to analyze")
+	diagnoseCmd.Flags().StringP("type", "t", "", "Diagnostic type (system, config, services, network, hardware, performance)")
+	diagnoseCmd.Flags().StringP("output", "o", "markdown", "Output format (markdown, plain, json)")
+	diagnoseCmd.Flags().StringP("context", "c", "", "Additional context information to include in analysis")
 }
 
 var doctorCmd = &cobra.Command{
@@ -2753,7 +2810,7 @@ func handlePackageRepoCommand(cmd *cobra.Command, args []string) {
 	fmt.Println(utils.FormatKeyValue("Language", result.Analysis.Language))
 	fmt.Println(utils.FormatKeyValue("Build System", string(result.Analysis.BuildSystem))) // Convert BuildSystem to string
 	fmt.Println(utils.FormatKeyValue("Dependencies", fmt.Sprintf("%d found", len(result.Analysis.Dependencies))))
-	
+
 	if len(result.Analysis.Dependencies) > 0 {
 		fmt.Println()
 		fmt.Println(utils.FormatHeader("📋 Dependencies"))

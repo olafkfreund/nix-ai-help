@@ -453,7 +453,12 @@ func getAvailableCommands() []commandItem {
 			},
 			subcommands: []subcommandItem{},
 		},
-		{name: "diagnose", description: "Diagnose NixOS issues", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{name: "diagnose", description: "Diagnose NixOS issues", needsInput: true, options: []commandOption{
+			{name: "Input File", flag: "file", description: "Specify log file path to analyze", required: false, hasValue: true, optionType: "string"},
+			{name: "Diagnostic Type", flag: "type", description: "Type: system, config, services, network, hardware, performance", required: false, hasValue: true, optionType: "string"},
+			{name: "Output Format", flag: "output", description: "Output format: markdown, plain, json", required: false, hasValue: true, optionType: "string"},
+			{name: "Additional Context", flag: "context", description: "Additional context information", required: false, hasValue: true, optionType: "string"},
+		}, subcommands: []subcommandItem{}},
 		{name: "config", description: "Manage nixai configuration", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
 		{name: "configure", description: "Configure NixOS interactively", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
 		{name: "gc", description: "AI-powered garbage collection analysis", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
