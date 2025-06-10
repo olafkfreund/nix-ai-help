@@ -460,7 +460,12 @@ func getAvailableCommands() []commandItem {
 			{name: "Additional Context", flag: "context", description: "Additional context information", required: false, hasValue: true, optionType: "string"},
 		}, subcommands: []subcommandItem{}},
 		{name: "config", description: "Manage nixai configuration", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "configure", description: "Configure NixOS interactively", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{name: "configure", description: "Configure NixOS interactively", needsInput: true, options: []commandOption{
+			{name: "Search Query", flag: "search", description: "Search query for configuration type (e.g., 'web server nginx', 'desktop')", required: false, hasValue: true, optionType: "string"},
+			{name: "Output File", flag: "output", description: "Output file path for generated configuration", required: false, hasValue: true, optionType: "string"},
+			{name: "Advanced Mode", flag: "advanced", description: "Generate advanced configuration with detailed options", required: false, hasValue: false, optionType: "bool"},
+			{name: "Home Manager", flag: "home", description: "Generate Home Manager configuration instead of NixOS", required: false, hasValue: false, optionType: "bool"},
+		}, subcommands: []subcommandItem{}},
 		{name: "gc", description: "AI-powered garbage collection analysis", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
 		{name: "hardware", description: "AI-powered hardware configuration optimizer", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
 		{name: "migrate", description: "AI-powered migration assistant", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},

@@ -401,9 +401,23 @@ func runCommunityCmd(args []string, out io.Writer) {
 	}
 }
 
+// NewConfigureCommand creates a new configure command for TUI mode
+func NewConfigureCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     configureCmd.Use,
+		Short:   configureCmd.Short,
+		Long:    configureCmd.Long,
+		Example: configureCmd.Example,
+		Run:     configureCmd.Run,
+	}
+	cmd.PersistentFlags().AddFlagSet(configureCmd.PersistentFlags())
+	cmd.Flags().AddFlagSet(configureCmd.Flags())
+	return cmd
+}
+
 // runConfigureCmd executes the configure command directly
 func runConfigureCmd(args []string, out io.Writer) {
-	_, _ = fmt.Fprintln(out, "Interactive configuration coming soon.")
+	runCobraCommand(NewConfigureCommand(), args, out)
 }
 
 // Diagnose helper functions
