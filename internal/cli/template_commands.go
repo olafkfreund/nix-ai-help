@@ -12,7 +12,9 @@ import (
 	"strings"
 	"time"
 
+	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
@@ -588,6 +590,22 @@ var templatesListCmd = &cobra.Command{
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
 			os.Exit(1)
+		}
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
 		}
 
 		// Create template manager

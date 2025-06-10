@@ -14,6 +14,7 @@ import (
 
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/ai/agent"
+	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/ai/roles"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/mcp"
@@ -446,6 +447,23 @@ var searchCmd = &cobra.Command{
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 			os.Exit(1)
 		}
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		if nixosPath != "" {
 			cfg.NixosFolder = nixosPath
 		}
@@ -498,8 +516,14 @@ var searchCmd = &cobra.Command{
 		} else {
 			docExcerpts = append(docExcerpts, "\n"+promptInstruction)
 		}
+
+		// Build context-aware prompt
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		basePrompt := fmt.Sprintf("How to search, install, and configure %s in NixOS?", query)
+		contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
 		promptCtx := ai.PromptContext{
-			Question:     query,
+			Question:     contextualPrompt,
 			DocExcerpts:  docExcerpts,
 			Intent:       "explain",
 			OutputFormat: "markdown",
@@ -531,12 +555,29 @@ var explainHomeOptionCmd = &cobra.Command{
 		fmt.Println(utils.FormatHeader("🏠 Home Manager Option: " + option))
 		fmt.Println()
 
-		// Load configuration
+		// Load configuration first
 		cfg, err := config.LoadUserConfig()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 			os.Exit(1)
 		}
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
@@ -578,13 +619,18 @@ var explainHomeOptionCmd = &cobra.Command{
 			Provider:     providerName,
 		}
 		builder := ai.DefaultPromptBuilder{}
-		prompt, err := builder.BuildPrompt(promptCtx)
+		basePrompt, err := builder.BuildPrompt(promptCtx)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Prompt build error: "+err.Error()))
 			os.Exit(1)
 		}
+
+		// Build context-aware prompt using the context builder
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
 		fmt.Print(utils.FormatInfo("Querying AI provider... "))
-		aiResp, aiErr := aiProvider.Query(prompt)
+		aiResp, aiErr := aiProvider.Query(contextualPrompt)
 		fmt.Println(utils.FormatSuccess("done"))
 		if aiErr != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+aiErr.Error()))
@@ -608,11 +654,30 @@ func NewExplainOptionCommand() *cobra.Command {
 			format, _ := cmd.Flags().GetString("format")
 			providerFlag, _ := cmd.Flags().GetString("provider")
 			examplesOnly, _ := cmd.Flags().GetBool("examples-only")
+
+			// Load configuration first
 			cfg, err := config.LoadUserConfig()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 				os.Exit(1)
 			}
+
+			// Initialize context detector and get NixOS context
+			contextDetector := nixos.NewContextDetector(logger.NewLogger())
+			nixosCtx, err := contextDetector.GetContext(cfg)
+			if err != nil {
+				fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+				nixosCtx = nil
+			}
+
+			// Display detected context summary if available
+			if nixosCtx != nil && nixosCtx.CacheValid {
+				contextBuilder := nixoscontext.NewNixOSContextBuilder()
+				contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+				fmt.Println(utils.FormatNote("📋 " + contextSummary))
+				fmt.Println()
+			}
+
 			mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
 			mcpClient := mcp.NewMCPClient(mcpURL)
 			fmt.Print(utils.FormatInfo("Querying documentation... "))
@@ -647,14 +712,19 @@ func NewExplainOptionCommand() *cobra.Command {
 				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 				os.Exit(1)
 			}
-			var prompt string
+
+			// Build context-aware prompt using the context builder
+			var basePrompt string
 			if examplesOnly {
-				prompt = buildExamplesOnlyPrompt(option, doc, format, source, version)
+				basePrompt = buildExamplesOnlyPrompt(option, doc, format, source, version)
 			} else {
-				prompt = buildEnhancedExplainOptionPrompt(option, doc, format, source, version)
+				basePrompt = buildEnhancedExplainOptionPrompt(option, doc, format, source, version)
 			}
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
 			fmt.Print(utils.FormatInfo("Querying AI provider... "))
-			aiResp, aiErr := aiProvider.Query(prompt)
+			aiResp, aiErr := aiProvider.Query(contextualPrompt)
 			fmt.Println(utils.FormatSuccess("done"))
 			if aiErr != nil {
 				fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+aiErr.Error()))
@@ -1098,6 +1168,23 @@ Examples:
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 			os.Exit(1)
 		}
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Failed to detect NixOS context: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
@@ -1130,6 +1217,13 @@ Examples:
 
 		// Build the prompt based on configuration type and advanced options
 		prompt := buildConfigurePrompt(input, isHome, isAdvanced)
+
+		// Enhance prompt with context-aware information
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextualPrompt := contextBuilder.BuildContextualPrompt(prompt, nixosCtx)
+			prompt = contextualPrompt
+		}
 
 		fmt.Print(utils.FormatInfo("Querying AI provider... "))
 		resp, err := aiProvider.Query(prompt)
@@ -1267,6 +1361,30 @@ Examples:
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(utils.FormatHeader("🩺 NixOS Diagnostics"))
 		fmt.Println()
+
+		// Load configuration first
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
+			os.Exit(1)
+		}
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		var logData string
 		if len(args) > 0 {
 			file := args[0]
@@ -1287,19 +1405,20 @@ Examples:
 				return
 			}
 		}
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-			os.Exit(1)
-		}
+
 		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 			os.Exit(1)
 		}
-		prompt := "You are a NixOS expert. Analyze the following log or error output and provide a diagnosis, root cause, and step-by-step fix instructions.\n\nLog or error:\n" + logData
+
+		// Build context-aware prompt using the context builder
+		basePrompt := "You are a NixOS expert. Analyze the following log or error output and provide a diagnosis, root cause, and step-by-step fix instructions.\n\nLog or error:\n" + logData
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
 		fmt.Print(utils.FormatInfo("Querying AI provider... "))
-		resp, err := aiProvider.Query(prompt)
+		resp, err := aiProvider.Query(contextualPrompt)
 		fmt.Println(utils.FormatSuccess("done"))
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
@@ -1341,11 +1460,27 @@ func runDoctorCommand(cmd *cobra.Command, args []string) {
 	fmt.Println(utils.FormatHeader("🩻 NixOS Doctor: Comprehensive Health Check"))
 	fmt.Println()
 
-	// Load configuration
+	// Load configuration first
 	cfg, err := config.LoadUserConfig()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 		os.Exit(1)
+	}
+
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		fmt.Println(utils.FormatNote("📋 " + contextSummary))
+		fmt.Println()
 	}
 
 	// Determine check type
@@ -1382,8 +1517,12 @@ func runDoctorCommand(cmd *cobra.Command, args []string) {
 		fmt.Println(utils.FormatHeader("🤖 AI-Powered Analysis"))
 		fmt.Print(utils.FormatInfo("Analyzing results with AI... "))
 
-		analysisPrompt := buildAnalysisPrompt(healthResults, checkType)
-		analysis, err := aiProvider.Query(analysisPrompt)
+		// Build context-aware prompt using the context builder
+		baseAnalysisPrompt := buildAnalysisPrompt(healthResults, checkType)
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextualPrompt := contextBuilder.BuildContextualPrompt(baseAnalysisPrompt, nixosCtx)
+
+		analysis, err := aiProvider.Query(contextualPrompt)
 
 		fmt.Println(utils.FormatSuccess("done"))
 		if err != nil {
@@ -2943,6 +3082,7 @@ func initializeCommands() {
 	rootCmd.AddCommand(enhancedBuildCmd)
 	rootCmd.AddCommand(devenvCmd)
 	rootCmd.AddCommand(NewDepsCommand())
+	rootCmd.AddCommand(contextCmd)
 	// Register stub commands for missing features
 	rootCmd.AddCommand(communityCmd)
 	rootCmd.AddCommand(configCmd)

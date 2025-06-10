@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"nix-ai-help/internal/ai"
+	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/mcp"
+	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
@@ -273,6 +275,52 @@ func (mm *MigrationManager) AnalyzeMigration(targetSetup string) (*MigrationAnal
 	}
 }
 
+// AnalyzeMigrationWithContext performs context-aware migration analysis
+func (mm *MigrationManager) AnalyzeMigrationWithContext(targetSetup string, nixosCtx *config.NixOSContext) (*MigrationAnalysis, error) {
+	analysis, err := mm.AnalyzeMigration(targetSetup)
+	if err != nil {
+		return nil, err
+	}
+
+	// Enhance analysis with context-specific recommendations
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		// Add context-specific risks and recommendations
+		if nixosCtx.HasHomeManager {
+			analysis.Risks = append(analysis.Risks, "Home Manager configuration needs migration attention")
+			analysis.Recommendations = append(analysis.Recommendations, "Consider migrating Home Manager to flake-based setup")
+		}
+
+		if len(nixosCtx.EnabledServices) > 0 {
+			analysis.Recommendations = append(analysis.Recommendations,
+				fmt.Sprintf("Verify %d enabled services after migration", len(nixosCtx.EnabledServices)))
+		}
+
+		// Add context-aware migration steps based on system state
+		if nixosCtx.SystemType == "nixos" {
+			analysis.Prerequisites = append(analysis.Prerequisites,
+				"System-level NixOS configuration detected - ensure admin access")
+		}
+
+		if nixosCtx.SystemType == "nix-darwin" {
+			analysis.Prerequisites = append(analysis.Prerequisites,
+				"nix-darwin detected - migration steps may differ from standard NixOS")
+		}
+
+		// Add flake-specific recommendations if already using flakes
+		if nixosCtx.UsesFlakes && targetSetup == "flakes" {
+			analysis.Recommendations = append(analysis.Recommendations,
+				"Already using flakes - consider updating flake inputs instead")
+		}
+
+		// Add channel-specific warnings
+		if nixosCtx.UsesChannels && targetSetup == "flakes" {
+			analysis.Risks = append(analysis.Risks, "Migration from channels to flakes requires careful validation")
+		}
+	}
+
+	return analysis, nil
+}
+
 // analyzeChannelsToFlakes analyzes migration from channels to flakes
 func (mm *MigrationManager) analyzeChannelsToFlakes(analysis *MigrationAnalysis) (*MigrationAnalysis, error) {
 	analysis.Complexity = "moderate"
@@ -480,7 +528,7 @@ func (mm *MigrationManager) GenerateFlakeFromChannels() (string, error) {
 	}
 
 	// Use AI to help generate flake structure
-	prompt := fmt.Sprintf(`Convert this NixOS channel-based configuration to a flake.nix file.
+	basePrompt := fmt.Sprintf(`Convert this NixOS channel-based configuration to a flake.nix file.
 
 Current configuration.nix content:
 %s
@@ -493,6 +541,16 @@ Generate a complete flake.nix that:
 5. Follows flake best practices
 
 Return only the flake.nix content without explanations.`, string(configContent))
+
+	// Enhance prompt with context if available
+	prompt := basePrompt
+	if cfg, err := config.LoadUserConfig(); err == nil {
+		contextDetector := nixos.NewContextDetector(mm.logger)
+		if nixosCtx, err := contextDetector.GetContext(cfg); err == nil && nixosCtx != nil {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			prompt = contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+		}
+	}
 
 	response, err := mm.aiProvider.Query(prompt)
 	if err != nil {
@@ -571,6 +629,22 @@ Examples:
 			os.Exit(1)
 		}
 
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		// Get NixOS path
 		nixosPath := ""
 		if cfg.NixosFolder != "" {
@@ -584,6 +658,14 @@ Examples:
 
 		// Create migration manager
 		migrationManager := NewMigrationManager(nixosPath, log, aiProvider, mcpClient)
+
+		// Build context-aware analysis prompts if context is available
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		if target != "" {
+			basePrompt := fmt.Sprintf("Analyzing migration from current setup to %s", target)
+			contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+			log.Debug("Using contextual migration analysis prompt: " + contextualPrompt)
+		}
 
 		fmt.Println(utils.FormatHeader("🔄 NixOS Migration Analysis"))
 		fmt.Println()
@@ -708,6 +790,22 @@ Examples:
 		log := logger.NewLoggerWithLevel(cfg.LogLevel)
 		aiProvider := getAIProvider(cfg, log)
 		mcpClient := getMCPClient(cfg, log)
+
+		// Detect context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
 
 		// Create migration manager
 		migrationManager := NewMigrationManager(nixosPath, log, aiProvider, mcpClient)

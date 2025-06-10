@@ -91,20 +91,16 @@ func (cd *ContextDetector) detectNixVersion(context *config.NixOSContext) {
 	cd.logger.Debug("Detecting Nix version...")
 
 	// Get Nix version
-	if cmd := exec.Command("nix", "--version"); cmd.Err == nil {
-		if output, err := cmd.Output(); err == nil {
-			context.NixVersion = strings.TrimSpace(string(output))
-			cd.logger.Debug("Detected Nix version: " + context.NixVersion)
-		}
+	if output, err := exec.Command("nix", "--version").Output(); err == nil {
+		context.NixVersion = strings.TrimSpace(string(output))
+		cd.logger.Debug("Detected Nix version: " + context.NixVersion)
 	}
 
 	// Get NixOS version (only on NixOS systems)
 	if context.SystemType == "nixos" {
-		if cmd := exec.Command("nixos-version"); cmd.Err == nil {
-			if output, err := cmd.Output(); err == nil {
-				context.NixOSVersion = strings.TrimSpace(string(output))
-				cd.logger.Debug("Detected NixOS version: " + context.NixOSVersion)
-			}
+		if output, err := exec.Command("nixos-version").Output(); err == nil {
+			context.NixOSVersion = strings.TrimSpace(string(output))
+			cd.logger.Debug("Detected NixOS version: " + context.NixOSVersion)
 		}
 	}
 }
@@ -164,22 +160,18 @@ func (cd *ContextDetector) detectChannelsUsage(context *config.NixOSContext) {
 	cd.logger.Debug("Detecting channels usage...")
 
 	// Check for user channels
-	if cmd := exec.Command("nix-channel", "--list"); cmd.Err == nil {
-		if output, err := cmd.Output(); err == nil && len(strings.TrimSpace(string(output))) > 0 {
-			context.UsesChannels = true
-			cd.logger.Debug("User channels detected")
-			return
-		}
+	if output, err := exec.Command("nix-channel", "--list").Output(); err == nil && len(strings.TrimSpace(string(output))) > 0 {
+		context.UsesChannels = true
+		cd.logger.Debug("User channels detected")
+		return
 	}
 
 	// Check for system channels (on NixOS)
 	if context.SystemType == "nixos" {
-		if cmd := exec.Command("sudo", "nix-channel", "--list"); cmd.Err == nil {
-			if output, err := cmd.Output(); err == nil && len(strings.TrimSpace(string(output))) > 0 {
-				context.UsesChannels = true
-				cd.logger.Debug("System channels detected")
-				return
-			}
+		if output, err := exec.Command("sudo", "nix-channel", "--list").Output(); err == nil && len(strings.TrimSpace(string(output))) > 0 {
+			context.UsesChannels = true
+			cd.logger.Debug("System channels detected")
+			return
 		}
 	}
 
@@ -339,16 +331,14 @@ func (cd *ContextDetector) detectInstalledPackages(context *config.NixOSContext)
 	cd.logger.Debug("Detecting installed packages...")
 
 	// Try to get system packages (limited to avoid performance issues)
-	if cmd := exec.Command("nix-env", "--query", "--installed"); cmd.Err == nil {
-		if output, err := cmd.Output(); err == nil {
-			scanner := bufio.NewScanner(strings.NewReader(string(output)))
-			count := 0
-			for scanner.Scan() && count < 50 { // Limit to first 50 packages
-				line := strings.TrimSpace(scanner.Text())
-				if line != "" {
-					context.InstalledPackages = append(context.InstalledPackages, line)
-					count++
-				}
+	if output, err := exec.Command("nix-env", "--query", "--installed").Output(); err == nil {
+		scanner := bufio.NewScanner(strings.NewReader(string(output)))
+		count := 0
+		for scanner.Scan() && count < 50 { // Limit to first 50 packages
+			line := strings.TrimSpace(scanner.Text())
+			if line != "" {
+				context.InstalledPackages = append(context.InstalledPackages, line)
+				count++
 			}
 		}
 	}
@@ -429,4 +419,38 @@ func (cd *ContextDetector) GetContext(userConfig *config.UserConfig) (*config.Ni
 	}
 
 	return newContext, nil
+}
+
+// ClearCache clears the cached context by invalidating it in the user config
+func (cd *ContextDetector) ClearCache() error {
+	cd.logger.Debug("Clearing context cache...")
+
+	// Load current user config
+	userConfig, err := config.LoadUserConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load user config: %v", err)
+	}
+
+	// Invalidate the cached context
+	userConfig.NixOSContext.CacheValid = false
+	userConfig.NixOSContext.LastDetected = time.Time{}
+	userConfig.NixOSContext.DetectionErrors = []string{}
+
+	// Save the updated config
+	if err := config.SaveUserConfig(userConfig); err != nil {
+		return fmt.Errorf("failed to save updated config: %v", err)
+	}
+
+	cd.logger.Debug("Context cache cleared successfully")
+	return nil
+}
+
+// GetCacheLocation returns the location where context cache is stored
+func (cd *ContextDetector) GetCacheLocation() string {
+	// The context is cached in the user config file
+	configPath, err := config.ConfigFilePath()
+	if err != nil {
+		return "unknown (config path unavailable)"
+	}
+	return configPath
 }

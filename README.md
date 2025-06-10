@@ -20,6 +20,7 @@
 
 ### 🚀 **Recent Feature Additions**
 - **Modern TUI Architecture**: Complete `/internal/tui/` system with Bubble Tea framework
+- **Context-Aware System**: Intelligent NixOS context detection with 4 management commands
 - **Enhanced Hardware Management**: 6 specialized subcommands for comprehensive system analysis
 - **AI Provider Flexibility**: Configuration-driven provider selection with fallback support
 - **MCP Integration**: Model Context Protocol server for enhanced documentation queries
@@ -58,6 +59,18 @@ Commands | F1:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1
 - **📰 Feature Discovery**: F1 popup shows latest updates and changelog
 - **⌨️ Keyboard Efficient**: Complete keyboard navigation without mouse requirement
 - **🎨 Professional Design**: Clean two-panel layout with status bar and real-time feedback
+
+### 🧠 **Context-Aware Intelligence**
+
+Every command in nixai now features **intelligent context detection** that automatically understands your NixOS setup:
+
+- **🔍 Automatic System Detection**: Seamlessly detects NixOS configuration type, Home Manager setup, and system services
+- **📋 Intelligent Context Display**: Every command shows personalized system summary: `📋 System: nixos | Flakes: Yes | Home Manager: standalone`
+- **⚡ Performance Optimized**: Context caching system for instant access with intelligent refresh triggers
+- **🎯 Personalized Assistance**: AI responses adapt to your specific NixOS setup (flakes vs channels, Home Manager type, enabled services)
+- **🛠️ Context Management**: 4 specialized commands for complete control over context detection and validation
+- **📊 Health Monitoring**: Context system status monitoring with error detection and recovery suggestions
+- **🔄 Smart Refresh**: Automatic context invalidation when system configuration changes significantly
 
 ---
 
@@ -241,7 +254,8 @@ Commands | F1:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1
 - **24+ Specialized Commands**: Complete command-line toolkit for all NixOS tasks and operations
 - **Intelligent Agent Architecture**: Role-based AI behavior with specialized expertise domains
 - **Direct Question Interface**: `nixai -a "your question"` for instant AI-powered assistance
-- **Context-Aware Responses**: Commands adapt behavior based on role, context, and system state
+- **Context-Aware Responses**: Commands adapt behavior based on detected system configuration, role, and context
+- **Smart Context Detection**: Automatic detection of flakes vs channels, Home Manager type, NixOS version, and system services
 - **Multi-Provider AI Support**: Local Ollama (privacy-first), LlamaCpp (CPU-optimized), OpenAI, Gemini with intelligent fallback
 
 ### 🩺 System Management & Diagnostics
@@ -261,6 +275,16 @@ Commands | F1:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1
 - **Hardware Comparison**: `nixai hardware compare` for current vs optimal settings analysis and recommendations
 - **Function Interface**: `nixai hardware function` for advanced hardware function calling and direct system control
 - **Performance Monitoring**: Real-time hardware metrics and optimization suggestions
+
+### 🎯 Context-Aware System Management
+
+- **Intelligent Context Detection**: Automatic detection of NixOS configuration type (flakes vs channels), Home Manager setup, system version, and enabled services
+- **Context Management Commands**: `nixai context` with 4 specialized subcommands for complete context control
+- **System-Aware Responses**: All commands provide personalized assistance based on your actual NixOS configuration
+- **Context Caching**: Performance-optimized context detection with intelligent caching and refresh capabilities
+- **Context Validation**: Health checks and status monitoring for context detection system
+- **Multiple Output Formats**: JSON output support for scripting and automation integration
+- **Interactive Management**: User-friendly context reset and refresh with confirmation prompts
 
 ### 🔍 Search & Discovery
 
@@ -542,6 +566,18 @@ nixai hardware laptop --power-save              # Laptop-specific optimizations
 nixai hardware compare                          # Compare current vs optimal settings
 ```
 
+**Context management and system awareness:**
+
+```zsh
+nixai context detect                            # Force re-detection of system context
+nixai context show                             # Display current NixOS context information
+nixai context show --detailed                  # Show detailed context with services and packages
+nixai context show --format json              # Output context in JSON format for scripts
+nixai context reset                           # Clear cache and force fresh detection
+nixai context reset --confirm                 # Skip confirmation prompt
+nixai context status                          # Show context system health and status
+```
+
 **Search and discovery:**
 
 ```zsh
@@ -711,6 +747,7 @@ For detailed development guidelines, see the [User Manual](docs/MANUAL.md) and i
 
 Individual command guides available in `docs/`:
 
+- [context.md](docs/context.md) - Context management and system awareness
 - [diagnose.md](docs/diagnose.md) - System diagnostics and troubleshooting
 - [hardware.md](docs/hardware.md) - Hardware detection and optimization
 - [package-repo.md](docs/package-repo.md) - Repository analysis and packaging
@@ -755,6 +792,8 @@ nix build --rebuild
 - **AI provider failures**: Verify Ollama is running (`ollama list`) or check API keys for cloud providers
 - **TUI display issues**: Ensure your terminal supports Unicode and has sufficient size (80x24 minimum)
 - **Interactive mode problems**: Try `nixai interactive --classic` for compatibility with older terminals
+- **Context detection problems**: Use `nixai context status` to check system health, or `nixai context reset` to force refresh
+- **Outdated context information**: Run `nixai context detect` after major system configuration changes
 
 ### Getting Help
 
@@ -778,7 +817,7 @@ nixai interactive           # Launch modern TUI interface
 
 ### Latest Features Verification
 
-Test the newly completed TUI modernization:
+Test the newly completed TUI modernization and context system:
 
 ```zsh
 nixai interactive           # Launch modern TUI
@@ -786,6 +825,12 @@ nixai interactive           # Launch modern TUI
 # In TUI: Use Tab to switch panels
 # In TUI: Type / to search commands
 # In TUI: Use ↑↓ arrows to navigate
+
+# Test context management system
+nixai context status       # Check context system health
+nixai context show         # View current system context
+nixai context detect -v    # Force re-detection with verbose output
+nixai ask "How do I configure SSH?" # See context-aware response
 ```
 
 ---

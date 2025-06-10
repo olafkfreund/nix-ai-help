@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"nix-ai-help/internal/ai"
+	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/logger"
@@ -126,6 +127,24 @@ in DOT format, which can be used with tools like Graphviz to create visual diagr
 func runDepsAnalyze() {
 	fmt.Println(utils.FormatHeader("🛠️ NixOS Dependency Analyzer"))
 
+	// Load user configuration for context detection and AI provider
+	userCfg, configErr := config.LoadUserConfig()
+	if configErr != nil {
+		fmt.Println(utils.FormatWarning("Could not load user config: " + configErr.Error()))
+	} else {
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(userCfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+		} else if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+	}
+
 	depGraph, err := getDependencyGraph()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, utils.FormatError(fmt.Sprintf("Failed to analyze dependencies: %v", err)))
@@ -141,11 +160,7 @@ func runDepsAnalyze() {
 		fmt.Println(utils.FormatDivider())
 		fmt.Println(utils.FormatHeader("🤖 AI Analysis & Insights"))
 
-		// Load user configuration for AI provider
-		userCfg, configErr := config.LoadUserConfig()
-		if configErr != nil {
-			fmt.Println(utils.FormatWarning("Could not load user config for AI insights, skipping AI analysis"))
-		} else {
+		if userCfg != nil {
 			// Get AI insights
 			aiInsights, aiErr := getAIInsightsForDependencies(depGraph, userCfg)
 			if aiErr != nil {
@@ -166,6 +181,8 @@ func runDepsAnalyze() {
 					}
 				}
 			}
+		} else {
+			fmt.Println(utils.FormatWarning("Could not load user config for AI insights, skipping AI analysis"))
 		}
 	} else {
 		fmt.Println(utils.FormatWarning("Dependency analysis did not produce a graph."))

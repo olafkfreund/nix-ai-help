@@ -191,13 +191,27 @@ func FlakeHasDeployConfig(flakePath string) bool {
 	return false
 }
 
-// PromptYesNo prompts the user for yes/no input in the terminal.
+// PromptYesNo prompts the user for a yes/no answer and returns true for yes
 func PromptYesNo(prompt string) bool {
-	fmt.Printf("%s [y/N]: ", prompt)
-	var response string
-	_, _ = fmt.Scanln(&response)
-	response = strings.ToLower(strings.TrimSpace(response))
-	return response == "y" || response == "yes"
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Printf("%s (y/N): ", prompt)
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			return false
+		}
+
+		response = strings.TrimSpace(strings.ToLower(response))
+		switch response {
+		case "y", "yes":
+			return true
+		case "n", "no", "":
+			return false
+		default:
+			fmt.Println("Please answer with 'y' or 'n' (or press Enter for 'no')")
+		}
+	}
 }
 
 // GenerateMinimalDeployConfig appends a minimal deploy-rs config to flake.nix.

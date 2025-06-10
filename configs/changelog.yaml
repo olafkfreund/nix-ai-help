@@ -1,4 +1,31 @@
 changelog:
+  - version: "1.3.0"
+    date: "2025-06-10"
+    highlights:
+      - "Context-Aware Intelligence System"
+      - "4 new context management commands"
+      - "Personalized AI responses for all commands"
+      - "Performance-optimized context caching"
+    features:
+      - title: "Context Detection System"
+        description: "Automatic detection of NixOS configuration type, Home Manager setup, and system services"
+      - title: "Context Management Commands"
+        description: "4 specialized commands: detect, show, reset, status for complete context control"
+      - title: "System-Aware Responses"
+        description: "All commands now provide personalized assistance based on your actual NixOS configuration"
+      - title: "Context Display"
+        description: "Every command shows personalized system summary with flakes/channels, Home Manager type"
+      - title: "JSON Output Support"
+        description: "Context commands support JSON output for scripting and automation"
+    improvements:
+      - "Context caching for instant access with intelligent refresh triggers"
+      - "Health monitoring for context detection system"
+      - "Interactive context reset with confirmation prompts"
+      - "Automatic context invalidation when system configuration changes"
+    fixes:
+      - "Improved context detection reliability across different NixOS setups"
+      - "Fixed context caching issues and memory optimization"
+
   - version: "1.2.3"
     date: "2025-06-09"
     highlights:

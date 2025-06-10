@@ -2,6 +2,11 @@ package cli
 
 import (
 	"fmt"
+
+	nixoscontext "nix-ai-help/internal/ai/context"
+	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/nixos"
+	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
 	"github.com/spf13/cobra"
@@ -25,7 +30,27 @@ Examples:
 		} else if outFlag, _ := cmd.Flags().GetString("output"); outFlag != "" {
 			output = outFlag
 		}
+
 		fmt.Println(utils.FormatHeader("🗄️ Nix Store Backup"))
+
+		// Load configuration for context detection
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Failed to load config for context detection: " + err.Error()))
+		} else {
+			// Initialize context detector and get NixOS context
+			contextDetector := nixos.NewContextDetector(logger.NewLogger())
+			nixosCtx, err := contextDetector.GetContext(cfg)
+			if err != nil {
+				fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			} else if nixosCtx != nil && nixosCtx.CacheValid {
+				contextBuilder := nixoscontext.NewNixOSContextBuilder()
+				contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+				fmt.Println(utils.FormatNote("📋 " + contextSummary))
+				fmt.Println()
+			}
+		}
+
 		fmt.Println(utils.FormatProgress("Creating backup..."))
 		// TODO: Implement backup logic (tar store, config, etc.)
 		fmt.Println(utils.FormatSuccess("Backup created at: " + output))
@@ -45,6 +70,25 @@ Examples:
 	Run: func(cmd *cobra.Command, args []string) {
 		backupFile := args[0]
 		fmt.Println(utils.FormatHeader("♻️ Nix Store Restore"))
+
+		// Load configuration for context detection
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Failed to load config for context detection: " + err.Error()))
+		} else {
+			// Initialize context detector and get NixOS context
+			contextDetector := nixos.NewContextDetector(logger.NewLogger())
+			nixosCtx, err := contextDetector.GetContext(cfg)
+			if err != nil {
+				fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			} else if nixosCtx != nil && nixosCtx.CacheValid {
+				contextBuilder := nixoscontext.NewNixOSContextBuilder()
+				contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+				fmt.Println(utils.FormatNote("📋 " + contextSummary))
+				fmt.Println()
+			}
+		}
+
 		fmt.Println(utils.FormatProgress("Restoring from backup: " + backupFile))
 		// TODO: Implement restore logic (untar, validate, etc.)
 		fmt.Println(utils.FormatSuccess("Restore completed from: " + backupFile))

@@ -10,8 +10,10 @@ import (
 
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/ai/agent"
+	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/ai/function/hardware"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
@@ -70,6 +72,22 @@ This command identifies:
 			os.Exit(1)
 		}
 
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		// Initialize AI provider
 		legacyProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
 		if err != nil {
@@ -123,9 +141,13 @@ This command identifies:
 		fmt.Println(utils.FormatProgress("Analyzing hardware for NixOS optimization..."))
 
 		ctx := context.Background()
-		analysisQuery := "Analyze the detected hardware and provide comprehensive NixOS configuration recommendations for optimal performance, compatibility, and power management."
 
-		analysis, err := hardwareAgent.Query(ctx, analysisQuery)
+		// Build context-aware analysis query
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		baseQuery := "Analyze the detected hardware and provide comprehensive NixOS configuration recommendations for optimal performance, compatibility, and power management."
+		contextualQuery := contextBuilder.BuildContextualPrompt(baseQuery, nixosCtx)
+
+		analysis, err := hardwareAgent.Query(ctx, contextualQuery)
 		if err != nil {
 			fmt.Println(utils.FormatWarning("Could not get AI analysis: " + err.Error()))
 			// Fallback to legacy provider for basic configuration suggestions
@@ -173,6 +195,23 @@ This command provides:
 			fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
 			cfg = &config.UserConfig{AIProvider: "ollama", AIModel: "llama3"}
 		}
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
 		if err != nil {
 			fmt.Println(utils.FormatError("Failed to initialize AI provider: " + err.Error()))
@@ -211,7 +250,11 @@ This command provides:
 
 Provide actual NixOS configuration snippets that can be applied.`
 
-		optimization, err := aiProvider.Query(prompt)
+		// Build context-aware optimization query
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextualPrompt := contextBuilder.BuildContextualPrompt(prompt, nixosCtx)
+
+		optimization, err := aiProvider.Query(contextualPrompt)
 		if err != nil {
 			fmt.Println(utils.FormatError("Could not get optimization recommendations: " + err.Error()))
 			return
