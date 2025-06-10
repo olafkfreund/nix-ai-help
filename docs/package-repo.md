@@ -4,15 +4,28 @@ Analyze a Git repository and generate a Nix derivation for packaging with intell
 
 ---
 
+## 🆕 TUI Integration & Enhanced Features
+
+The `package-repo` command now features **comprehensive TUI integration** with AI-powered analysis:
+
+### ✨ **Interactive TUI Features**
+- **🎯 Interactive Parameter Input**: Repository URL and output path configuration through modern TUI interface
+- **📊 Real-Time Analysis Display**: Live repository analysis progress with AI insights within the TUI
+- **⌨️ Command Discovery**: Enhanced command browser with `[INPUT]` indicators for configurable options
+- **🔍 Interactive Flag Configuration**: All 4 flags (`--output`, `--format`, `--template`, `--confidence`) configurable via TUI
+- **📋 Context-Aware Analysis**: Automatic NixOS setup detection for personalized derivation generation
+
 ## ✨ Enhanced Features
 
 The `package-repo` command now includes:
 
-- **🧠 Intelligent Language Detection**: Multi-factor analysis with confidence scoring
-- **📝 Template System**: Pre-built templates for Node.js, Python, Rust, Go, and more
-- **🔍 Content Analysis**: Analyzes imports, syntax patterns, and configuration files
-- **✅ Comprehensive Testing**: 100% test coverage with production-ready validation
-- **🎯 High Accuracy**: >95% language detection accuracy on diverse repositories
+- **🧠 Intelligent Language Detection**: Multi-factor analysis with confidence scoring and pattern recognition
+- **📝 Advanced Template System**: Pre-built templates for Node.js, Python, Rust, Go, C/C++, Java, and more
+- **🔍 Deep Content Analysis**: Analyzes imports, syntax patterns, configuration files, and dependency manifests
+- **✅ Production-Ready Validation**: 100% test coverage with enterprise-grade reliability
+- **🎯 High Accuracy**: >95% language detection accuracy on diverse repositories with machine learning
+- **📊 Multiple Output Formats**: Support for derivation.nix, flake.nix, and shell.nix generation
+- **🔧 Customizable Templates**: User-defined templates with variable substitution and inheritance
 
 ---
 

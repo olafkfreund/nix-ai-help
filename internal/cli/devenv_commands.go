@@ -7,8 +7,10 @@ import (
 	"sort"
 	"strings"
 
+	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/devenv"
+	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
@@ -197,11 +199,30 @@ func NewDevenvSuggestCmd() *cobra.Command {
 		Args:  conditionalArgsValidator(1),
 		Run: func(cmd *cobra.Command, args []string) {
 			description := strings.Join(args, " ")
+
+			// Load configuration
 			cfg, err := config.LoadUserConfig()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
 				os.Exit(1)
 			}
+
+			// Initialize context detector and get NixOS context
+			contextDetector := nixos.NewContextDetector(logger.NewLogger())
+			nixosCtx, err := contextDetector.GetContext(cfg)
+			if err != nil {
+				fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+				nixosCtx = nil
+			}
+
+			// Display detected context summary if available
+			if nixosCtx != nil && nixosCtx.CacheValid {
+				contextBuilder := nixoscontext.NewNixOSContextBuilder()
+				contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+				fmt.Println(utils.FormatNote("📋 " + contextSummary))
+				fmt.Println()
+			}
+
 			log := logger.NewLoggerWithLevel(cfg.LogLevel)
 
 			// Use the new ProviderManager system
@@ -216,11 +237,22 @@ func NewDevenvSuggestCmd() *cobra.Command {
 				fmt.Fprintln(os.Stderr, utils.FormatError("Error creating devenv service: "+err.Error()))
 				os.Exit(1)
 			}
+
 			fmt.Println(utils.FormatHeader("🤖 AI Template Suggestion"))
 			fmt.Println(utils.FormatKeyValue("Description", description))
 			fmt.Println(utils.FormatDivider())
 			fmt.Print(utils.FormatProgress("Analyzing your project description..."))
-			suggestion, err := service.SuggestTemplate(description)
+
+			// Build context-aware suggestion if context is available
+			var suggestion string
+			if nixosCtx != nil && nixosCtx.CacheValid {
+				contextBuilder := nixoscontext.NewNixOSContextBuilder()
+				contextualDescription := contextBuilder.BuildContextualPrompt("Suggest a devenv template for: "+description, nixosCtx)
+				suggestion, err = service.SuggestTemplate(contextualDescription)
+			} else {
+				suggestion, err = service.SuggestTemplate(description)
+			}
+
 			if err != nil {
 				fmt.Fprintln(os.Stderr, utils.FormatError("Error getting suggestion: "+err.Error()))
 				os.Exit(1)

@@ -16,6 +16,7 @@ Welcome to the nixai Command Manual. Each command has its own dedicated document
 - [completion](completion.md)
 - [config](config.md)
 - [configure](configure.md)
+- [context](context.md)
 - [devenv](devenv.md)
 - [diagnose](diagnose.md)
 - [doctor](doctor.md)

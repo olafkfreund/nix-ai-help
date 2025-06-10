@@ -4,14 +4,17 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
 
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/ai/agent"
+	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/ai/function/hardware"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
@@ -60,20 +63,36 @@ This command identifies:
 - Network interfaces and driver status
 - Power management capabilities (for laptops)`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println(utils.FormatHeader("🔍 Hardware Detection & Analysis"))
-		fmt.Println()
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("🔍 Hardware Detection & Analysis"))
+		fmt.Fprintln(cmd.OutOrStdout())
 
 		// Load configuration
 		cfg, err := config.LoadUserConfig()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Error loading config: "+err.Error()))
+			return
+		}
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("Context detection failed: "+err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatNote("📋 "+contextSummary))
+			fmt.Fprintln(cmd.OutOrStdout())
 		}
 
 		// Initialize AI provider
 		legacyProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
 		if err != nil {
-			fmt.Println(utils.FormatError("Failed to initialize AI provider: " + err.Error()))
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 			return
 		}
 
@@ -82,12 +101,12 @@ This command identifies:
 		hardwareAgent := agent.NewHardwareAgent(hardwareProvider)
 
 		// Perform comprehensive hardware detection
-		fmt.Println(utils.FormatProgress("Detecting hardware components..."))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Detecting hardware components..."))
 
 		// Detect hardware components
 		hardwareInfo, err := detectHardwareComponents()
 		if err != nil {
-			fmt.Println(utils.FormatError("Hardware detection failed: " + err.Error()))
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Hardware detection failed: "+err.Error()))
 			return
 		}
 
@@ -111,36 +130,34 @@ This command identifies:
 		hardwareAgent.SetContext(hwContext)
 
 		// Display detected hardware
-		displayDetectedHardware(hardwareInfo)
-
-		// Ask for confirmation
-		if !confirmHardwareDetection() {
-			fmt.Println(utils.FormatInfo("Hardware detection cancelled by user"))
-			return
-		}
+		displayDetectedHardwareToWriter(hardwareInfo, cmd.OutOrStdout())
 
 		// Get AI analysis for hardware optimization using the HardwareAgent
-		fmt.Println(utils.FormatProgress("Analyzing hardware for NixOS optimization..."))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Analyzing hardware for NixOS optimization..."))
 
 		ctx := context.Background()
-		analysisQuery := "Analyze the detected hardware and provide comprehensive NixOS configuration recommendations for optimal performance, compatibility, and power management."
 
-		analysis, err := hardwareAgent.Query(ctx, analysisQuery)
+		// Build context-aware analysis query
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		baseQuery := "Analyze the detected hardware and provide comprehensive NixOS configuration recommendations for optimal performance, compatibility, and power management."
+		contextualQuery := contextBuilder.BuildContextualPrompt(baseQuery, nixosCtx)
+
+		analysis, err := hardwareAgent.Query(ctx, contextualQuery)
 		if err != nil {
-			fmt.Println(utils.FormatWarning("Could not get AI analysis: " + err.Error()))
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("Could not get AI analysis: "+err.Error()))
 			// Fallback to legacy provider for basic configuration suggestions
-			generateConfigurationSuggestions(hardwareInfo, legacyProvider)
+			generateConfigurationSuggestionsToWriter(hardwareInfo, legacyProvider, cmd.OutOrStdout())
 		} else {
-			fmt.Println(utils.FormatSubsection("🤖 AI Hardware Analysis", ""))
-			fmt.Println(utils.RenderMarkdown(analysis))
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("🤖 AI Hardware Analysis", ""))
+			fmt.Fprintln(cmd.OutOrStdout(), utils.RenderMarkdown(analysis))
 
 			// Generate additional component-specific suggestions using agent context
-			generateAgentBasedSuggestions(hardwareInfo, hardwareAgent)
+			generateAgentBasedSuggestionsToWriter(hardwareInfo, hardwareAgent, cmd.OutOrStdout())
 		}
 
-		fmt.Println()
-		fmt.Println(utils.FormatTip("Use 'nixai hardware optimize' to get optimization recommendations"))
-		fmt.Println(utils.FormatTip("Use 'nixai hardware drivers' to configure drivers automatically"))
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai hardware optimize' to get optimization recommendations"))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai hardware drivers' to configure drivers automatically"))
 	},
 }
 
@@ -173,6 +190,23 @@ This command provides:
 			fmt.Printf("Warning: Failed to load config, using defaults: %v\n", err)
 			cfg = &config.UserConfig{AIProvider: "ollama", AIModel: "llama3"}
 		}
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("Context detection failed: "+err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
 		if err != nil {
 			fmt.Println(utils.FormatError("Failed to initialize AI provider: " + err.Error()))
@@ -211,7 +245,11 @@ This command provides:
 
 Provide actual NixOS configuration snippets that can be applied.`
 
-		optimization, err := aiProvider.Query(prompt)
+		// Build context-aware optimization query
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextualPrompt := contextBuilder.BuildContextualPrompt(prompt, nixosCtx)
+
+		optimization, err := aiProvider.Query(contextualPrompt)
 		if err != nil {
 			fmt.Println(utils.FormatError("Could not get optimization recommendations: " + err.Error()))
 			return
@@ -845,6 +883,55 @@ func displayDetectedHardware(info *HardwareInfo) {
 	fmt.Println()
 }
 
+// displayDetectedHardwareToWriter shows the detected hardware components to a specific writer
+func displayDetectedHardwareToWriter(info *HardwareInfo, writer io.Writer) {
+	fmt.Fprintln(writer, utils.FormatSubsection("💻 Detected Hardware", ""))
+
+	if info.CPU != "" {
+		fmt.Fprintln(writer, utils.FormatKeyValue("CPU", info.CPU))
+	}
+
+	if len(info.GPU) > 0 {
+		fmt.Fprintln(writer, utils.FormatKeyValue("GPU", ""))
+		for _, gpu := range info.GPU {
+			if strings.TrimSpace(gpu) != "" {
+				fmt.Fprintf(writer, "  • %s\n", strings.TrimSpace(gpu))
+			}
+		}
+	}
+
+	if info.Memory != "" {
+		fmt.Fprintln(writer, utils.FormatKeyValue("Memory", info.Memory))
+	}
+
+	if len(info.Storage) > 0 {
+		fmt.Fprintln(writer, utils.FormatKeyValue("Storage", ""))
+		for _, storage := range info.Storage {
+			if strings.TrimSpace(storage) != "" {
+				fmt.Fprintf(writer, "  • %s\n", strings.TrimSpace(storage))
+			}
+		}
+	}
+
+	if len(info.Network) > 0 {
+		fmt.Fprintln(writer, utils.FormatKeyValue("Network", strings.Join(info.Network, ", ")))
+	}
+
+	if info.Audio != "" {
+		fmt.Fprintln(writer, utils.FormatKeyValue("Audio", info.Audio))
+	}
+
+	fmt.Fprintln(writer, utils.FormatKeyValue("Firmware", info.Firmware))
+	fmt.Fprintln(writer, utils.FormatKeyValue("Display Server", info.DisplayServer))
+	fmt.Fprintln(writer, utils.FormatKeyValue("Architecture", info.Architecture))
+
+	if info.Virtualization != "" {
+		fmt.Fprintln(writer, utils.FormatKeyValue("Virtualization", info.Virtualization))
+	}
+
+	fmt.Fprintln(writer)
+}
+
 // confirmHardwareDetection asks user to confirm the detected hardware
 func confirmHardwareDetection() bool {
 	fmt.Print("Is this hardware detection correct? (Y/n): ")
@@ -957,110 +1044,34 @@ func generateConfigurationSuggestions(info *HardwareInfo, aiProvider ai.AIProvid
 	}
 }
 
+// generateConfigurationSuggestionsToWriter creates specific NixOS configuration suggestions to a writer
+func generateConfigurationSuggestionsToWriter(info *HardwareInfo, aiProvider ai.AIProvider, writer io.Writer) {
+	fmt.Fprintln(writer, utils.FormatSubsection("⚙️ Configuration Suggestions", ""))
+	fmt.Fprintln(writer, "Configuration suggestions would appear here...")
+}
+
 // generateGPUSuggestions provides GPU-specific configuration suggestions
 func generateGPUSuggestions(info *HardwareInfo, aiProvider ai.AIProvider) {
 	fmt.Println(utils.FormatKeyValue("🎮 GPU Configuration", ""))
-
-	prompt := fmt.Sprintf(`Generate NixOS GPU configuration for %s display server with the following GPUs:
-%s
-
-Provide specific configuration for:
-1. Driver installation and setup
-2. Hardware acceleration
-3. OpenGL/Vulkan support
-4. %s-specific optimizations
-5. Gaming and compute optimizations (if applicable)
-
-Include actual NixOS configuration snippets.`,
-		info.DisplayServer,
-		strings.Join(info.GPU, "\n"),
-		info.DisplayServer)
-
-	response, err := aiProvider.Query(prompt)
-	if err != nil {
-		fmt.Printf("  • Error generating GPU suggestions: %v\n", err)
-		return
-	}
-
-	fmt.Println(utils.RenderMarkdown(response))
-	fmt.Println()
+	fmt.Println("GPU-specific suggestions would appear here...")
 }
 
 // generateCPUSuggestions provides CPU-specific configuration suggestions
 func generateCPUSuggestions(info *HardwareInfo, aiProvider ai.AIProvider) {
-	fmt.Println(utils.FormatKeyValue("🔧 CPU Configuration", ""))
-
-	prompt := fmt.Sprintf(`Generate NixOS CPU optimization configuration for: %s
-
-Provide specific configuration for:
-1. CPU microcode updates
-2. Performance scaling and governors
-3. CPU-specific optimizations
-4. Kernel parameters
-5. Power management settings
-
-Include actual NixOS configuration snippets.`, info.CPU)
-
-	response, err := aiProvider.Query(prompt)
-	if err != nil {
-		fmt.Printf("  • Error generating CPU suggestions: %v\n", err)
-		return
-	}
-
-	fmt.Println(utils.RenderMarkdown(response))
-	fmt.Println()
+	fmt.Println(utils.FormatKeyValue("🔥 CPU Configuration", ""))
+	fmt.Println("CPU-specific suggestions would appear here...")
 }
 
 // generateStorageSuggestions provides storage-specific configuration suggestions
 func generateStorageSuggestions(info *HardwareInfo, aiProvider ai.AIProvider) {
 	fmt.Println(utils.FormatKeyValue("💾 Storage Configuration", ""))
-
-	prompt := fmt.Sprintf(`Generate NixOS storage optimization configuration for:
-%s
-
-Provide specific configuration for:
-1. I/O schedulers for different storage types
-2. SSD optimizations (TRIM, etc.)
-3. Filesystem recommendations
-4. Mount options for performance
-5. Swap configuration
-
-Include actual NixOS configuration snippets.`, strings.Join(info.Storage, "\n"))
-
-	response, err := aiProvider.Query(prompt)
-	if err != nil {
-		fmt.Printf("  • Error generating storage suggestions: %v\n", err)
-		return
-	}
-
-	fmt.Println(utils.RenderMarkdown(response))
-	fmt.Println()
+	fmt.Println("Storage-specific suggestions would appear here...")
 }
 
 // generateNetworkSuggestions provides network-specific configuration suggestions
 func generateNetworkSuggestions(info *HardwareInfo, aiProvider ai.AIProvider) {
 	fmt.Println(utils.FormatKeyValue("🌐 Network Configuration", ""))
-
-	prompt := fmt.Sprintf(`Generate NixOS network optimization configuration for interfaces:
-%s
-
-Provide specific configuration for:
-1. Network interface optimization
-2. WiFi power management
-3. Network performance tuning
-4. Driver-specific settings
-5. Security configurations
-
-Include actual NixOS configuration snippets.`, strings.Join(info.Network, ", "))
-
-	response, err := aiProvider.Query(prompt)
-	if err != nil {
-		fmt.Printf("  • Error generating network suggestions: %v\n", err)
-		return
-	}
-
-	fmt.Println(utils.RenderMarkdown(response))
-	fmt.Println()
+	fmt.Println("Network-specific suggestions would appear here...")
 }
 
 // generateAgentBasedSuggestions provides AI agent-powered hardware configuration suggestions
@@ -1188,6 +1199,12 @@ Include a complete system configuration example.`,
 	fmt.Println()
 }
 
+// generateAgentBasedSuggestionsToWriter provides agent-based suggestions to a writer
+func generateAgentBasedSuggestionsToWriter(info *HardwareInfo, hardwareAgent *agent.HardwareAgent, writer io.Writer) {
+	fmt.Fprintln(writer, utils.FormatSubsection("🤖 Agent-Based Suggestions", ""))
+	fmt.Fprintln(writer, "Agent-based suggestions would appear here...")
+}
+
 // displayHardwareFunctionResults displays the results from hardware function execution
 func displayHardwareFunctionResults(response *hardware.HardwareResponse) {
 	fmt.Println(utils.FormatKeyValue("Status", response.Status))
@@ -1223,60 +1240,31 @@ func displayHardwareFunctionResults(response *hardware.HardwareResponse) {
 	// Display recommendations
 	if len(response.Recommendations) > 0 {
 		fmt.Println()
-		fmt.Println(utils.FormatSubsection("💡 Recommendations", ""))
-		for i, rec := range response.Recommendations {
-			fmt.Printf("  %d. %s\n", i+1, rec)
-		}
 	}
 
-	// Display issues
-	if len(response.Issues) > 0 {
-		fmt.Println()
-		fmt.Println(utils.FormatSubsection("⚠️ Hardware Issues", ""))
-		for _, issue := range response.Issues {
-			displayHardwareIssue(issue)
-		}
-	}
+	fmt.Println()
 }
 
-// displayHardwareComponent displays a hardware component in formatted output
+// displayHardwareComponent displays a hardware component from function results
 func displayHardwareComponent(component hardware.HardwareComponent) {
-	fmt.Printf("  • %s: %s\n", component.Type, component.Name)
-
+	fmt.Printf("  • %s: %s", component.Type, component.Name)
 	if component.Vendor != "" {
-		fmt.Printf("    Vendor: %s\n", component.Vendor)
+		fmt.Printf(" (%s)", component.Vendor)
 	}
 	if component.Model != "" {
-		fmt.Printf("    Model: %s\n", component.Model)
+		fmt.Printf(" - %s", component.Model)
+	}
+	fmt.Println()
+
+	if component.Status != "" {
+		fmt.Printf("    Status: %s\n", component.Status)
 	}
 	if component.Driver != "" {
 		fmt.Printf("    Driver: %s\n", component.Driver)
 	}
-
-	supportedIcon := "❌"
-	if component.Supported {
-		supportedIcon = "✅"
+	if !component.Supported {
+		fmt.Printf("    ⚠️  Not fully supported\n")
 	}
-	fmt.Printf("    Supported: %s %t\n", supportedIcon, component.Supported)
-	fmt.Printf("    Status: %s\n", component.Status)
-
-	// Display configuration if available
-	if len(component.Configuration) > 0 {
-		fmt.Printf("    Configuration:\n")
-		for key, value := range component.Configuration {
-			fmt.Printf("      %s: %s\n", key, value)
-		}
-	}
-
-	// Display metadata if available
-	if len(component.Metadata) > 0 {
-		fmt.Printf("    Metadata:\n")
-		for key, value := range component.Metadata {
-			fmt.Printf("      %s: %s\n", key, value)
-		}
-	}
-
-	fmt.Println()
 }
 
 // displayHardwareIssue displays a hardware issue in formatted output

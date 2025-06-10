@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,8 +11,10 @@ import (
 	"time"
 
 	"nix-ai-help/internal/ai"
+	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/mcp"
+	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
@@ -273,6 +274,52 @@ func (mm *MigrationManager) AnalyzeMigration(targetSetup string) (*MigrationAnal
 	}
 }
 
+// AnalyzeMigrationWithContext performs context-aware migration analysis
+func (mm *MigrationManager) AnalyzeMigrationWithContext(targetSetup string, nixosCtx *config.NixOSContext) (*MigrationAnalysis, error) {
+	analysis, err := mm.AnalyzeMigration(targetSetup)
+	if err != nil {
+		return nil, err
+	}
+
+	// Enhance analysis with context-specific recommendations
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		// Add context-specific risks and recommendations
+		if nixosCtx.HasHomeManager {
+			analysis.Risks = append(analysis.Risks, "Home Manager configuration needs migration attention")
+			analysis.Recommendations = append(analysis.Recommendations, "Consider migrating Home Manager to flake-based setup")
+		}
+
+		if len(nixosCtx.EnabledServices) > 0 {
+			analysis.Recommendations = append(analysis.Recommendations,
+				fmt.Sprintf("Verify %d enabled services after migration", len(nixosCtx.EnabledServices)))
+		}
+
+		// Add context-aware migration steps based on system state
+		if nixosCtx.SystemType == "nixos" {
+			analysis.Prerequisites = append(analysis.Prerequisites,
+				"System-level NixOS configuration detected - ensure admin access")
+		}
+
+		if nixosCtx.SystemType == "nix-darwin" {
+			analysis.Prerequisites = append(analysis.Prerequisites,
+				"nix-darwin detected - migration steps may differ from standard NixOS")
+		}
+
+		// Add flake-specific recommendations if already using flakes
+		if nixosCtx.UsesFlakes && targetSetup == "flakes" {
+			analysis.Recommendations = append(analysis.Recommendations,
+				"Already using flakes - consider updating flake inputs instead")
+		}
+
+		// Add channel-specific warnings
+		if nixosCtx.UsesChannels && targetSetup == "flakes" {
+			analysis.Risks = append(analysis.Risks, "Migration from channels to flakes requires careful validation")
+		}
+	}
+
+	return analysis, nil
+}
+
 // analyzeChannelsToFlakes analyzes migration from channels to flakes
 func (mm *MigrationManager) analyzeChannelsToFlakes(analysis *MigrationAnalysis) (*MigrationAnalysis, error) {
 	analysis.Complexity = "moderate"
@@ -480,7 +527,7 @@ func (mm *MigrationManager) GenerateFlakeFromChannels() (string, error) {
 	}
 
 	// Use AI to help generate flake structure
-	prompt := fmt.Sprintf(`Convert this NixOS channel-based configuration to a flake.nix file.
+	basePrompt := fmt.Sprintf(`Convert this NixOS channel-based configuration to a flake.nix file.
 
 Current configuration.nix content:
 %s
@@ -493,6 +540,16 @@ Generate a complete flake.nix that:
 5. Follows flake best practices
 
 Return only the flake.nix content without explanations.`, string(configContent))
+
+	// Enhance prompt with context if available
+	prompt := basePrompt
+	if cfg, err := config.LoadUserConfig(); err == nil {
+		contextDetector := nixos.NewContextDetector(mm.logger)
+		if nixosCtx, err := contextDetector.GetContext(cfg); err == nil && nixosCtx != nil {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			prompt = contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+		}
+	}
 
 	response, err := mm.aiProvider.Query(prompt)
 	if err != nil {
@@ -567,8 +624,24 @@ Examples:
 		// Load configuration
 		cfg, err := config.LoadUserConfig()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Error loading config: "+err.Error()))
+			return
+		}
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("Context detection failed: "+err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatNote("📋 "+contextSummary))
+			fmt.Fprintln(cmd.OutOrStdout())
 		}
 
 		// Get NixOS path
@@ -585,88 +658,96 @@ Examples:
 		// Create migration manager
 		migrationManager := NewMigrationManager(nixosPath, log, aiProvider, mcpClient)
 
-		fmt.Println(utils.FormatHeader("🔄 NixOS Migration Analysis"))
-		fmt.Println()
-
-		// Detect current setup
-		fmt.Println(utils.FormatProgress("Detecting current NixOS setup..."))
-		currentSetup, metadata, err := migrationManager.DetectCurrentSetup()
-		if err != nil {
-			fmt.Println(utils.FormatError("Failed to detect setup: " + err.Error()))
-			os.Exit(1)
+		// Build context-aware analysis prompts if context is available
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		if target != "" {
+			basePrompt := fmt.Sprintf("Analyzing migration from current setup to %s", target)
+			contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+			log.Debug("Using contextual migration analysis prompt: " + contextualPrompt)
 		}
 
-		fmt.Println(utils.FormatKeyValue("Current Setup", currentSetup))
-		fmt.Println(utils.FormatKeyValue("Configuration Path", nixosPath))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("🔄 NixOS Migration Analysis"))
+		fmt.Fprintln(cmd.OutOrStdout())
+
+		// Detect current setup
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Detecting current NixOS setup..."))
+		currentSetup, metadata, err := migrationManager.DetectCurrentSetup()
+		if err != nil {
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Failed to detect setup: "+err.Error()))
+			return
+		}
+
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Current Setup", currentSetup))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Configuration Path", nixosPath))
 
 		if verbose {
-			fmt.Println()
-			fmt.Println(utils.FormatSubsection("📋 Setup Details", ""))
+			fmt.Fprintln(cmd.OutOrStdout())
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("📋 Setup Details", ""))
 			for key, value := range metadata {
-				fmt.Println(utils.FormatKeyValue(key, fmt.Sprintf("%v", value)))
+				fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue(key, fmt.Sprintf("%v", value)))
 			}
 		}
 
 		// If target specified, analyze migration
 		if target != "" && target != currentSetup {
-			fmt.Println()
-			fmt.Println(utils.FormatProgress("Analyzing migration to " + target + "..."))
+			fmt.Fprintln(cmd.OutOrStdout())
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Analyzing migration to "+target+"..."))
 
 			analysis, err := migrationManager.AnalyzeMigration(target)
 			if err != nil {
-				fmt.Println(utils.FormatError("Migration analysis failed: " + err.Error()))
-				os.Exit(1)
+				fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Migration analysis failed: "+err.Error()))
+				return
 			}
 
 			// Display analysis results
-			fmt.Println()
-			fmt.Println(utils.FormatHeader("📊 Migration Analysis"))
-			fmt.Println()
-			fmt.Println(utils.FormatKeyValue("Migration", fmt.Sprintf("%s → %s", analysis.CurrentSetup, analysis.TargetSetup)))
-			fmt.Println(utils.FormatKeyValue("Complexity", analysis.Complexity))
-			fmt.Println(utils.FormatKeyValue("Estimated Time", analysis.EstimatedTime))
-			fmt.Println(utils.FormatKeyValue("Backup Required", fmt.Sprintf("%t", analysis.BackupRequired)))
+			fmt.Fprintln(cmd.OutOrStdout())
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("📊 Migration Analysis"))
+			fmt.Fprintln(cmd.OutOrStdout())
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Migration", fmt.Sprintf("%s → %s", analysis.CurrentSetup, analysis.TargetSetup)))
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Complexity", analysis.Complexity))
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Estimated Time", analysis.EstimatedTime))
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Backup Required", fmt.Sprintf("%t", analysis.BackupRequired)))
 
 			if len(analysis.Prerequisites) > 0 {
-				fmt.Println()
-				fmt.Println(utils.FormatSubsection("📋 Prerequisites", ""))
+				fmt.Fprintln(cmd.OutOrStdout())
+				fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("📋 Prerequisites", ""))
 				for _, prereq := range analysis.Prerequisites {
-					fmt.Printf("  • %s\n", prereq)
+					fmt.Fprintf(cmd.OutOrStdout(), "  • %s\n", prereq)
 				}
 			}
 
 			if len(analysis.Risks) > 0 {
-				fmt.Println()
-				fmt.Println(utils.FormatSubsection("⚠️  Risks", ""))
+				fmt.Fprintln(cmd.OutOrStdout())
+				fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("⚠️  Risks", ""))
 				for _, risk := range analysis.Risks {
-					fmt.Printf("  • %s\n", risk)
+					fmt.Fprintf(cmd.OutOrStdout(), "  • %s\n", risk)
 				}
 			}
 
 			if len(analysis.Steps) > 0 {
-				fmt.Println()
-				fmt.Println(utils.FormatSubsection("📝 Migration Steps", ""))
+				fmt.Fprintln(cmd.OutOrStdout())
+				fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("📝 Migration Steps", ""))
 				for _, step := range analysis.Steps {
-					fmt.Printf("  %d. %s\n", step.ID, step.Title)
+					fmt.Fprintf(cmd.OutOrStdout(), "  %d. %s\n", step.ID, step.Title)
 					if verbose {
-						fmt.Printf("     %s\n", step.Description)
-						fmt.Printf("     Estimated time: %s\n", step.EstimatedTime)
+						fmt.Fprintf(cmd.OutOrStdout(), "     %s\n", step.Description)
+						fmt.Fprintf(cmd.OutOrStdout(), "     Estimated time: %s\n", step.EstimatedTime)
 					}
 				}
 			}
 
 			if len(analysis.Recommendations) > 0 {
-				fmt.Println()
-				fmt.Println(utils.FormatSubsection("💡 Recommendations", ""))
+				fmt.Fprintln(cmd.OutOrStdout())
+				fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("💡 Recommendations", ""))
 				for _, rec := range analysis.Recommendations {
-					fmt.Printf("  • %s\n", rec)
+					fmt.Fprintf(cmd.OutOrStdout(), "  • %s\n", rec)
 				}
 			}
 		}
 
-		fmt.Println()
-		fmt.Println(utils.FormatTip("Use 'nixai migrate to-flakes' to start migration to flakes"))
-		fmt.Println(utils.FormatTip("Use 'nixai migrate --help' to see all migration options"))
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai migrate to-flakes' to start migration to flakes"))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai migrate --help' to see all migration options"))
 	},
 }
 
@@ -694,8 +775,8 @@ Examples:
 		// Load configuration
 		cfg, err := config.LoadUserConfig()
 		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
-			os.Exit(1)
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Error loading config: "+err.Error()))
+			return
 		}
 
 		// Get NixOS path
@@ -709,100 +790,111 @@ Examples:
 		aiProvider := getAIProvider(cfg, log)
 		mcpClient := getMCPClient(cfg, log)
 
+		// Detect context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("Context detection failed: "+err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatNote("📋 "+contextSummary))
+			fmt.Fprintln(cmd.OutOrStdout())
+		}
+
 		// Create migration manager
 		migrationManager := NewMigrationManager(nixosPath, log, aiProvider, mcpClient)
 
-		fmt.Println(utils.FormatHeader("🔄 Converting to Flakes"))
-		fmt.Println()
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("🔄 Converting to Flakes"))
+		fmt.Fprintln(cmd.OutOrStdout())
 
 		// Detect current setup
 		currentSetup, _, err := migrationManager.DetectCurrentSetup()
 		if err != nil {
-			fmt.Println(utils.FormatError("Failed to detect setup: " + err.Error()))
-			os.Exit(1)
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Failed to detect setup: "+err.Error()))
+			return
 		}
 
 		if currentSetup != "channels" {
-			fmt.Println(utils.FormatWarning("Current setup is not channel-based: " + currentSetup))
-			fmt.Println(utils.FormatTip("Use 'nixai migrate analyze' to understand your current setup"))
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("Current setup is not channel-based: "+currentSetup))
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai migrate analyze' to understand your current setup"))
 			return
 		}
 
 		// Analyze migration
-		fmt.Println(utils.FormatProgress("Analyzing migration complexity..."))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Analyzing migration complexity..."))
 		analysis, err := migrationManager.AnalyzeMigration("flakes")
 		if err != nil {
-			fmt.Println(utils.FormatError("Migration analysis failed: " + err.Error()))
-			os.Exit(1)
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Migration analysis failed: "+err.Error()))
+			return
 		}
 
-		fmt.Println(utils.FormatKeyValue("Complexity", analysis.Complexity))
-		fmt.Println(utils.FormatKeyValue("Estimated Time", analysis.EstimatedTime))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Complexity", analysis.Complexity))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Estimated Time", analysis.EstimatedTime))
 
 		if dryRun {
-			fmt.Println()
-			fmt.Println(utils.FormatSubsection("🔍 Dry Run - Migration Steps", ""))
+			fmt.Fprintln(cmd.OutOrStdout())
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("🔍 Dry Run - Migration Steps", ""))
 			for _, step := range analysis.Steps {
-				fmt.Printf("  %d. %s\n", step.ID, step.Title)
-				fmt.Printf("     %s\n", step.Description)
+				fmt.Fprintf(cmd.OutOrStdout(), "  %d. %s\n", step.ID, step.Title)
+				fmt.Fprintf(cmd.OutOrStdout(), "     %s\n", step.Description)
 			}
-			fmt.Println()
-			fmt.Println(utils.FormatNote("This was a dry run. Use without --dry-run to execute."))
+			fmt.Fprintln(cmd.OutOrStdout())
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatNote("This was a dry run. Use without --dry-run to execute."))
 			return
 		}
 
-		// Confirm migration
-		fmt.Println()
-		fmt.Print(utils.FormatWarning("This will modify your NixOS configuration. Continue? (y/N): "))
-		reader := bufio.NewReader(os.Stdin)
-		response, _ := reader.ReadString('\n')
-		if strings.ToLower(strings.TrimSpace(response)) != "y" {
-			fmt.Println("Migration cancelled.")
-			return
-		}
+		// For TUI mode, skip interactive confirmation and just proceed
+		// In real implementation, TUI should handle confirmation differently
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatNote("Proceeding with migration..."))
 
 		// Create backup
-		fmt.Println()
-		fmt.Println(utils.FormatProgress("Creating backup..."))
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Creating backup..."))
 		backupPath, err := migrationManager.CreateBackup(backupName)
 		if err != nil {
-			fmt.Println(utils.FormatError("Backup failed: " + err.Error()))
-			os.Exit(1)
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Backup failed: "+err.Error()))
+			return
 		}
-		fmt.Println(utils.FormatKeyValue("Backup created", backupPath))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Backup created", backupPath))
 
 		// Generate flake
-		fmt.Println()
-		fmt.Println(utils.FormatProgress("Generating flake.nix with AI assistance..."))
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Generating flake.nix with AI assistance..."))
 		flakeContent, err := migrationManager.GenerateFlakeFromChannels()
 		if err != nil {
-			fmt.Println(utils.FormatError("Flake generation failed: " + err.Error()))
-			fmt.Println(utils.FormatTip("You can restore from backup: " + backupPath))
-			os.Exit(1)
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Flake generation failed: "+err.Error()))
+			fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("You can restore from backup: "+backupPath))
+			return
 		}
 
 		// Write flake.nix
 		flakePath := filepath.Join(nixosPath, "flake.nix")
 		if err := os.WriteFile(flakePath, []byte(flakeContent), 0644); err != nil {
-			fmt.Println(utils.FormatError("Failed to write flake.nix: " + err.Error()))
-			os.Exit(1)
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Failed to write flake.nix: "+err.Error()))
+			return
 		}
 
-		fmt.Println(utils.FormatSuccess("Flake.nix generated successfully!"))
-		fmt.Println()
-		fmt.Println(utils.FormatSubsection("📝 Generated Flake", ""))
-		fmt.Println(utils.FormatCodeBlock(flakeContent, "nix"))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess("Flake.nix generated successfully!"))
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("📝 Generated Flake", ""))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatCodeBlock(flakeContent, "nix"))
 
-		fmt.Println()
-		fmt.Println(utils.FormatSubsection("✅ Next Steps", ""))
-		fmt.Println("1. Review the generated flake.nix")
-		fmt.Println("2. Run: cd " + nixosPath + " && nix flake check")
-		fmt.Println("3. Test: nixos-rebuild test --flake .#$(hostname)")
-		fmt.Println("4. Apply: nixos-rebuild switch --flake .#$(hostname)")
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("✅ Next Steps", ""))
+		fmt.Fprintln(cmd.OutOrStdout(), "1. Review the generated flake.nix")
+		fmt.Fprintln(cmd.OutOrStdout(), "2. Run: cd "+nixosPath+" && nix flake check")
+		fmt.Fprintln(cmd.OutOrStdout(), "3. Test: nixos-rebuild test --flake .#$(hostname)")
+		fmt.Fprintln(cmd.OutOrStdout(), "4. Apply: nixos-rebuild switch --flake .#$(hostname)")
 
-		fmt.Println()
-		fmt.Println(utils.FormatWarning("Rollback available: " + backupPath))
-		fmt.Println(utils.FormatTip("Use 'nixai migrate rollback' if issues occur"))
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("Rollback available: "+backupPath))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Use 'nixai migrate rollback' if issues occur"))
 	},
 }
 

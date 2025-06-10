@@ -8,7 +8,9 @@ import (
 
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/ai/agent"
+	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 )
@@ -101,9 +103,31 @@ Packages will be built one after another, with AI analysis applied to:
 func runBuildWatch(packageName string, cmd *cobra.Command) {
 	fmt.Println(utils.FormatHeader(fmt.Sprintf("👀 Watching Build: %s", packageName)))
 
+	// Load configuration and initialize context
+	cfg, err := config.LoadUserConfig()
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Failed to load config: " + err.Error()))
+		cfg = &config.UserConfig{} // Use defaults
+	}
+
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		fmt.Println(utils.FormatNote("📋 " + contextSummary))
+		fmt.Println()
+	}
+
 	// Initialize monitor if needed
 	if globalBuildMonitor == nil {
-		cfg, _ := config.LoadUserConfig()
 		provider := initializeModernAIProvider(cfg)
 		buildAgent := agent.NewBuildAgent(provider)
 		globalBuildMonitor = NewBuildMonitor(buildAgent)
@@ -202,9 +226,31 @@ func runBuildStop(buildID string, cmd *cobra.Command) {
 func runBuildBackground(packageName string, cmd *cobra.Command) {
 	fmt.Println(utils.FormatHeader(fmt.Sprintf("🚀 Starting Background Build: %s", packageName)))
 
+	// Load configuration and initialize context
+	cfg, err := config.LoadUserConfig()
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Failed to load config: " + err.Error()))
+		cfg = &config.UserConfig{} // Use defaults
+	}
+
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		fmt.Println(utils.FormatNote("📋 " + contextSummary))
+		fmt.Println()
+	}
+
 	// Initialize monitor if needed
 	if globalBuildMonitor == nil {
-		cfg, _ := config.LoadUserConfig()
 		provider := initializeModernAIProvider(cfg)
 		buildAgent := agent.NewBuildAgent(provider)
 		globalBuildMonitor = NewBuildMonitor(buildAgent)
@@ -230,9 +276,31 @@ func runBuildBackground(packageName string, cmd *cobra.Command) {
 func runBuildQueue(packages []string, cmd *cobra.Command) {
 	fmt.Println(utils.FormatHeader("📝 Build Queue"))
 
+	// Load configuration and initialize context
+	cfg, err := config.LoadUserConfig()
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Failed to load config: " + err.Error()))
+		cfg = &config.UserConfig{} // Use defaults
+	}
+
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		fmt.Println(utils.FormatNote("📋 " + contextSummary))
+		fmt.Println()
+	}
+
 	// Initialize monitor if needed
 	if globalBuildMonitor == nil {
-		cfg, _ := config.LoadUserConfig()
 		provider := initializeModernAIProvider(cfg)
 		buildAgent := agent.NewBuildAgent(provider)
 		globalBuildMonitor = NewBuildMonitor(buildAgent)

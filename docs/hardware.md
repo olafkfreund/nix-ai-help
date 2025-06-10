@@ -1,10 +1,30 @@
 # nixai hardware
 
-Detect hardware and automatically generate optimized NixOS configurations.
+Comprehensive hardware detection, optimization, and management with AI-powered analysis and automated configuration generation.
 
-Analyze your system hardware and get AI-powered recommendations for optimal NixOS configuration including drivers, performance settings, and power management.
+Analyze your system hardware and get AI-powered recommendations for optimal NixOS configuration including drivers, performance settings, power management, and hardware-specific optimizations.
 
 ---
+
+## 🆕 TUI Integration & Enhanced Features
+
+The `nixai hardware` command now features **comprehensive TUI integration** with advanced hardware management:
+
+### ✨ **Interactive TUI Features**
+- **🎯 Interactive Parameter Input**: Hardware analysis options and optimization settings through modern TUI interface
+- **📊 Real-Time Hardware Analysis**: Live hardware detection and analysis progress within the TUI
+- **⌨️ Command Discovery**: Enhanced command browser with `[INPUT]` indicators for all 6 subcommands and 6 flags
+- **🔧 Interactive Optimization Wizard**: Step-by-step hardware optimization with AI guidance
+- **📋 Context-Aware Hardware Detection**: Integration with existing NixOS configuration for seamless optimization
+
+### 💻 **Advanced Hardware Management Features**
+- **🧠 AI-Powered Hardware Analysis**: Machine learning-based hardware detection with optimization recommendations
+- **⚡ Performance Optimization**: Automatic CPU, GPU, and memory optimization based on workload patterns
+- **🔋 Power Management**: Intelligent power configuration for laptops and servers with usage-based tuning
+- **🎮 Gaming Optimization**: Specialized configurations for gaming hardware with latency and performance tuning
+- **🖥️ Multi-GPU Support**: Automatic detection and configuration of multiple GPUs with workload distribution
+- **🌡️ Thermal Management**: Intelligent cooling configuration with temperature monitoring and alerts
+- **🔌 Hardware Compatibility**: Comprehensive hardware compatibility checking with alternative suggestions
 
 ## Command Help Output
 

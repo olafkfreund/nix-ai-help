@@ -1,11 +1,17 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"nix-ai-help/internal/ai"
+	nixoscontext "nix-ai-help/internal/ai/context"
+	"nix-ai-help/internal/ai/roles"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/mcp"
 	"nix-ai-help/internal/nixos"
@@ -24,6 +30,150 @@ func runCobraCommand(cmd *cobra.Command, args []string, out io.Writer) {
 }
 
 // Helper functions for running commands directly in interactive mode
+
+// extractSearchTerms extracts relevant search terms from a user question
+// for NixOS package and option searches
+func extractSearchTerms(question string) []string {
+	// Convert to lowercase for matching
+	lowerQuestion := strings.ToLower(question)
+
+	var terms []string
+
+	// Common NixOS package and service keywords to look for
+	nixosKeywords := map[string][]string{
+		// Desktop environments and window managers
+		"desktop":       {"gnome", "kde", "xfce", "i3", "sway", "hyprland", "plasma", "cinnamon"},
+		"windowmanager": {"i3", "dwm", "awesome", "bspwm", "herbstluftwm", "xmonad", "qtile"},
+		"wayland":       {"sway", "hyprland", "river", "weston", "wayfire"},
+
+		// Web servers and services
+		"webserver": {"nginx", "apache", "caddy", "lighttpd"},
+		"database":  {"postgresql", "mysql", "mariadb", "mongodb", "redis", "sqlite"},
+		"container": {"docker", "podman", "kubernetes", "k3s"},
+
+		// Development tools
+		"editor":  {"vim", "neovim", "emacs", "vscode", "atom", "sublime"},
+		"lang":    {"python", "nodejs", "go", "rust", "java", "php", "ruby", "haskell"},
+		"version": {"git", "mercurial", "subversion", "fossil"},
+
+		// Media and graphics
+		"media": {"vlc", "mpv", "ffmpeg", "obs", "blender", "gimp", "inkscape"},
+		"audio": {"pulseaudio", "pipewire", "alsa", "jack", "spotify", "audacity"},
+
+		// Security and networking
+		"firewall": {"iptables", "nftables", "firewall"},
+		"vpn":      {"openvpn", "wireguard", "strongswan", "nordvpn"},
+		"ssh":      {"openssh", "sshd", "ssh"},
+
+		// System tools
+		"display":    {"xorg", "wayland", "x11", "display-manager", "lightdm", "gdm", "sddm"},
+		"boot":       {"grub", "systemd-boot", "bootloader"},
+		"filesystem": {"zfs", "btrfs", "ext4", "xfs", "ntfs"},
+	}
+
+	// Direct package name matching (common packages users ask about)
+	commonPackages := []string{
+		"firefox", "chromium", "brave", "discord", "telegram", "signal",
+		"steam", "lutris", "wine", "bottles", "heroic",
+		"libreoffice", "thunderbird", "gimp", "blender", "obs-studio",
+		"kitty", "alacritty", "konsole", "gnome-terminal", "wezterm",
+		"tmux", "screen", "zsh", "fish", "bash",
+		"hyprlock", "hyprpaper", "waybar", "rofi", "dmenu",
+	}
+
+	// Check for direct package mentions
+	for _, pkg := range commonPackages {
+		if strings.Contains(lowerQuestion, pkg) {
+			terms = append(terms, pkg)
+		}
+	}
+
+	// Check for keyword categories
+	for category, packages := range nixosKeywords {
+		for _, keyword := range []string{category} {
+			if strings.Contains(lowerQuestion, keyword) {
+				// Add relevant packages from this category
+				for _, pkg := range packages {
+					if strings.Contains(lowerQuestion, pkg) {
+						terms = append(terms, pkg)
+					}
+				}
+				// If no specific package mentioned, add the first few as examples
+				if len(terms) == 0 {
+					for i, pkg := range packages {
+						if i < 2 { // Limit to first 2 to avoid too many searches
+							terms = append(terms, pkg)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Look for "how to install/enable/configure X" patterns
+	installPatterns := []string{
+		"install ", "enable ", "configure ", "setup ", "use ", "run ",
+		"how to ", "setting up ", "getting ", "adding ",
+	}
+
+	for _, pattern := range installPatterns {
+		if idx := strings.Index(lowerQuestion, pattern); idx != -1 {
+			// Extract the word(s) after the pattern
+			afterPattern := lowerQuestion[idx+len(pattern):]
+			words := strings.Fields(afterPattern)
+
+			for i, word := range words {
+				// Clean up the word (remove punctuation)
+				cleaned := strings.Trim(word, ".,!?;:")
+
+				// Stop at common stop words or if we've found enough terms
+				if len(cleaned) > 2 && !isStopWord(cleaned) && i < 3 {
+					terms = append(terms, cleaned)
+				}
+
+				// Stop at question words or conjunctions
+				if isStopWord(cleaned) {
+					break
+				}
+			}
+		}
+	}
+
+	// Remove duplicates and return
+	seen := make(map[string]bool)
+	var uniqueTerms []string
+	for _, term := range terms {
+		if !seen[term] && len(term) > 1 {
+			seen[term] = true
+			uniqueTerms = append(uniqueTerms, term)
+		}
+	}
+
+	// Limit to top 3 terms to avoid too many API calls
+	if len(uniqueTerms) > 3 {
+		uniqueTerms = uniqueTerms[:3]
+	}
+
+	return uniqueTerms
+}
+
+// isStopWord checks if a word should stop the extraction process
+func isStopWord(word string) bool {
+	stopWords := []string{
+		"and", "or", "but", "with", "from", "to", "for", "in", "on", "at",
+		"the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+		"have", "has", "had", "do", "does", "did", "will", "would", "could",
+		"should", "may", "might", "can", "must", "shall", "also", "work",
+		"working", "properly", "correctly", "nixos", "linux", "system",
+	}
+
+	for _, stop := range stopWords {
+		if word == stop {
+			return true
+		}
+	}
+	return false
+}
 
 // Config command wrapper functions that accept io.Writer
 func showConfigWithOutput(out io.Writer) {
@@ -251,9 +401,23 @@ func runCommunityCmd(args []string, out io.Writer) {
 	}
 }
 
+// NewConfigureCommand creates a new configure command for TUI mode
+func NewConfigureCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     configureCmd.Use,
+		Short:   configureCmd.Short,
+		Long:    configureCmd.Long,
+		Example: configureCmd.Example,
+		Run:     configureCmd.Run,
+	}
+	cmd.PersistentFlags().AddFlagSet(configureCmd.PersistentFlags())
+	cmd.Flags().AddFlagSet(configureCmd.Flags())
+	return cmd
+}
+
 // runConfigureCmd executes the configure command directly
 func runConfigureCmd(args []string, out io.Writer) {
-	_, _ = fmt.Fprintln(out, "Interactive configuration coming soon.")
+	runCobraCommand(NewConfigureCommand(), args, out)
 }
 
 // Diagnose helper functions
@@ -285,19 +449,23 @@ func runSystemDiagnostics(out io.Writer) {
 	_, _ = fmt.Fprintln(out, utils.FormatSuccess("System health: All checks passed"))
 }
 
+// NewDiagnoseCommand creates a new diagnose command for TUI mode
+func NewDiagnoseCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     diagnoseCmd.Use,
+		Short:   diagnoseCmd.Short,
+		Long:    diagnoseCmd.Long,
+		Example: diagnoseCmd.Example,
+		Run:     diagnoseCmd.Run,
+	}
+	cmd.PersistentFlags().AddFlagSet(diagnoseCmd.PersistentFlags())
+	cmd.Flags().AddFlagSet(diagnoseCmd.Flags())
+	return cmd
+}
+
 // runDiagnoseCmd executes the diagnose command directly
 func runDiagnoseCmd(args []string, out io.Writer) {
-	if len(args) == 0 {
-		showDiagnosticOptions(out)
-		return
-	}
-	// Minimal: system health check
-	if args[0] == "system" {
-		runSystemDiagnostics(out)
-		return
-	}
-	_, _ = fmt.Fprintln(out, "Running diagnostics for:", args[0])
-	_, _ = fmt.Fprintln(out, "No critical issues detected.")
+	runCobraCommand(NewDiagnoseCommand(), args, out)
 }
 
 // Doctor helper functions
@@ -326,24 +494,234 @@ func showFlakeOptions(out io.Writer) {
 	_, _ = fmt.Fprintln(out, utils.FormatHeader("❄️  Flake Options"))
 	_, _ = fmt.Fprintln(out)
 	_, _ = fmt.Fprintln(out, utils.FormatSubsection("Available Commands", ""))
+	_, _ = fmt.Fprintln(out, "  validate      - Validate flake configuration (nix flake check)")
+	_, _ = fmt.Fprintln(out, "  check         - Check flake integrity (same as validate)")
 	_, _ = fmt.Fprintln(out, "  init          - Initialize a new flake")
 	_, _ = fmt.Fprintln(out, "  update        - Update flake inputs")
-	_, _ = fmt.Fprintln(out, "  check         - Check flake integrity")
 	_, _ = fmt.Fprintln(out, "  show          - Show flake information")
 	_, _ = fmt.Fprintln(out, "  lock          - Update flake.lock")
 	_, _ = fmt.Fprintln(out, "  metadata      - Show flake metadata")
 	_, _ = fmt.Fprintln(out)
-	_, _ = fmt.Fprintln(out, utils.FormatTip("Full flake management coming soon"))
+	_, _ = fmt.Fprintln(out, utils.FormatTip("All commands run nix flake operations with proper error handling"))
 }
 
-// runFlakeCmd executes the flake command directly
+func runFlakeValidate(args []string, out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("✅ Validating Flake Configuration"))
+	_, _ = fmt.Fprintln(out)
+
+	// Determine the correct flake path using user config or arguments
+	var flakePath string
+	if len(args) > 0 {
+		// Use argument if provided
+		flakePath = args[0]
+	} else {
+		// Load user configuration to get NixOS path
+		userCfg, err := config.LoadUserConfig()
+		if err == nil && userCfg.NixosFolder != "" {
+			configPath := utils.ExpandHome(userCfg.NixosFolder)
+			_, _ = fmt.Fprintln(out, utils.FormatInfo(fmt.Sprintf("Using NixOS configuration path from user config: %s", configPath)))
+
+			// Check if the path is a directory containing flake.nix or a direct file path
+			if utils.IsDirectory(configPath) {
+				flakePath = filepath.Join(configPath, "flake.nix")
+			} else if strings.HasSuffix(configPath, "flake.nix") {
+				flakePath = configPath
+			} else {
+				// Try to find flake.nix in the directory
+				flakePath = filepath.Join(configPath, "flake.nix")
+			}
+		} else {
+			// Fallback to auto-detection
+			commonPaths := []string{
+				os.ExpandEnv("$HOME/.config/nixos/flake.nix"),
+				"/etc/nixos/flake.nix",
+				"./flake.nix", // Current directory as last resort
+			}
+
+			for _, p := range commonPaths {
+				if utils.IsFile(p) {
+					flakePath = p
+					_, _ = fmt.Fprintln(out, utils.FormatInfo(fmt.Sprintf("Auto-detected flake.nix at: %s", p)))
+					break
+				}
+			}
+
+			if flakePath == "" {
+				flakePath = "./flake.nix" // Default if nothing found
+			}
+		}
+	}
+
+	// Check if flake.nix exists
+	if !utils.IsFile(flakePath) {
+		_, _ = fmt.Fprintln(out, utils.FormatError("No flake.nix found at: "+flakePath))
+		_, _ = fmt.Fprintln(out, utils.FormatTip("Ensure you're in the correct directory or specify the path with --nixos-path"))
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Flake File", flakePath))
+	_, _ = fmt.Fprintln(out, utils.FormatInfo("Running flake validation..."))
+
+	// Get the directory containing the flake.nix for the command
+	flakeDir := filepath.Dir(flakePath)
+
+	// Run nix flake check command from the flake directory
+	cmd := exec.Command("nix", "flake", "check")
+	cmd.Dir = flakeDir
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Flake validation failed: "+err.Error()))
+		if len(output) > 0 {
+			_, _ = fmt.Fprintln(out, utils.FormatSubsection("Error Details", ""))
+			_, _ = fmt.Fprintln(out, string(output))
+		}
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("✅ Flake validation completed successfully"))
+	if len(output) > 0 {
+		_, _ = fmt.Fprintln(out, utils.FormatSubsection("Validation Output", ""))
+		_, _ = fmt.Fprintln(out, string(output))
+	}
+}
+
+func runFlakeInit(args []string, out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("🔧 Initializing New Flake"))
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, utils.FormatInfo("Creating basic flake.nix template..."))
+
+	// Run nix flake init
+	var cmd *exec.Cmd
+	if len(args) > 0 {
+		cmd = exec.Command("nix", "flake", "init", "--template", args[0])
+	} else {
+		cmd = exec.Command("nix", "flake", "init")
+	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Flake initialization failed: "+err.Error()))
+		if len(output) > 0 {
+			_, _ = fmt.Fprintln(out, string(output))
+		}
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("✅ Flake initialized successfully"))
+	if len(output) > 0 {
+		_, _ = fmt.Fprintln(out, string(output))
+	}
+}
+
+func runFlakeUpdate(args []string, out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("🔄 Updating Flake Inputs"))
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, utils.FormatInfo("Updating flake inputs..."))
+
+	// Run nix flake update
+	cmd := exec.Command("nix", "flake", "update")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Flake update failed: "+err.Error()))
+		if len(output) > 0 {
+			_, _ = fmt.Fprintln(out, string(output))
+		}
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("✅ Flake inputs updated successfully"))
+	if len(output) > 0 {
+		_, _ = fmt.Fprintln(out, string(output))
+	}
+}
+
+func runFlakeShow(args []string, out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("📊 Showing Flake Information"))
+	_, _ = fmt.Fprintln(out)
+
+	// Run nix flake show
+	cmd := exec.Command("nix", "flake", "show")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to show flake information: "+err.Error()))
+		if len(output) > 0 {
+			_, _ = fmt.Fprintln(out, string(output))
+		}
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("Flake outputs:"))
+	_, _ = fmt.Fprintln(out, string(output))
+}
+
+func runFlakeLock(args []string, out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("🔒 Updating Flake Lock"))
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, utils.FormatInfo("Updating flake.lock file..."))
+
+	// Run nix flake lock
+	cmd := exec.Command("nix", "flake", "lock")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Flake lock update failed: "+err.Error()))
+		if len(output) > 0 {
+			_, _ = fmt.Fprintln(out, string(output))
+		}
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("✅ Flake lock file updated successfully"))
+	if len(output) > 0 {
+		_, _ = fmt.Fprintln(out, string(output))
+	}
+}
+
+func runFlakeMetadata(args []string, out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("📋 Flake Metadata"))
+	_, _ = fmt.Fprintln(out)
+
+	// Run nix flake metadata
+	cmd := exec.Command("nix", "flake", "metadata")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to get flake metadata: "+err.Error()))
+		if len(output) > 0 {
+			_, _ = fmt.Fprintln(out, string(output))
+		}
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("Flake metadata:"))
+	_, _ = fmt.Fprintln(out, string(output))
+}
+
 func runFlakeCmd(args []string, out io.Writer) {
 	if len(args) == 0 {
 		showFlakeOptions(out)
 		return
 	}
-	_, _ = fmt.Fprintln(out, "Running flake operation:", args[0])
-	_, _ = fmt.Fprintln(out, "Operation complete.")
+
+	subcommand := args[0]
+	switch subcommand {
+	case "validate":
+		runFlakeValidate(args[1:], out)
+	case "check":
+		runFlakeValidate(args[1:], out) // check and validate do the same thing
+	case "init":
+		runFlakeInit(args[1:], out)
+	case "update":
+		runFlakeUpdate(args[1:], out)
+	case "show":
+		runFlakeShow(args[1:], out)
+	case "lock":
+		runFlakeLock(args[1:], out)
+	case "metadata":
+		runFlakeMetadata(args[1:], out)
+	default:
+		_, _ = fmt.Fprintln(out, utils.FormatWarning("Unknown or unimplemented flake subcommand: "+subcommand))
+		_, _ = fmt.Fprintln(out, utils.FormatTip("Available commands: validate, check, init, update, show, lock, metadata"))
+	}
 }
 
 // Learning helper functions
@@ -392,6 +770,42 @@ func runLogsCmd(args []string, out io.Writer) {
 		showLogsOptions(out)
 		return
 	}
+
+	subcommand := args[0]
+
+	// Handle logs subcommands by calling the core analysis functions directly
+	switch subcommand {
+	case "system":
+		analyzeSystemLogs(out)
+		return
+	case "boot":
+		// TODO: Create analyzeBootLogs function
+		_, _ = fmt.Fprintln(out, utils.FormatHeader("🚀 Boot Logs Analysis"))
+		_, _ = fmt.Fprintln(out, utils.FormatInfo("Boot logs analysis functionality coming soon"))
+		return
+	case "service":
+		// TODO: Create analyzeServiceLogs function
+		_, _ = fmt.Fprintln(out, utils.FormatHeader("🔧 Service Logs Analysis"))
+		_, _ = fmt.Fprintln(out, utils.FormatInfo("Service logs analysis functionality coming soon"))
+		return
+	case "errors":
+		// TODO: Create analyzeErrorLogs function
+		_, _ = fmt.Fprintln(out, utils.FormatHeader("🚨 Error Logs Analysis"))
+		_, _ = fmt.Fprintln(out, utils.FormatInfo("Error logs analysis functionality coming soon"))
+		return
+	case "build":
+		// TODO: Create analyzeBuildLogs function
+		_, _ = fmt.Fprintln(out, utils.FormatHeader("🔨 Build Logs Analysis"))
+		_, _ = fmt.Fprintln(out, utils.FormatInfo("Build logs analysis functionality coming soon"))
+		return
+	case "analyze":
+		// TODO: Create analyzeSpecificLogFile function
+		_, _ = fmt.Fprintln(out, utils.FormatHeader("🔍 Log File Analysis"))
+		_, _ = fmt.Fprintln(out, utils.FormatInfo("Log file analysis functionality coming soon"))
+		return
+	}
+
+	// Original file-based analysis logic for direct file paths
 	file := args[0]
 	if utils.IsFile(file) {
 		data, err := os.ReadFile(file)
@@ -424,8 +838,8 @@ func runLogsCmd(args []string, out io.Writer) {
 		_, _ = fmt.Fprintln(out, utils.RenderMarkdown(resp))
 		return
 	}
-	_, _ = fmt.Fprintln(out, "Analyzing logs for:", args[0])
-	_, _ = fmt.Fprintln(out, "No critical issues detected.")
+	_, _ = fmt.Fprintln(out, utils.FormatWarning("Unknown logs command: "+subcommand))
+	_, _ = fmt.Fprintln(out, "Use 'logs' without arguments to see available options.")
 }
 
 // MCP Server helper functions
@@ -478,20 +892,7 @@ func showNeovimSetupOptions(out io.Writer) {
 
 // runNeovimSetupCmd executes the neovim-setup command directly
 func runNeovimSetupCmd(args []string, out io.Writer) {
-	if len(args) == 0 {
-		showNeovimSetupOptions(out)
-		return
-	}
-	switch args[0] {
-	case "install":
-		_, _ = fmt.Fprintln(out, "Installing Neovim integration...")
-	case "configure":
-		_, _ = fmt.Fprintln(out, "Configuring Neovim integration...")
-	case "check":
-		_, _ = fmt.Fprintln(out, "Neovim integration is healthy.")
-	default:
-		_, _ = fmt.Fprintln(out, utils.FormatWarning("Unknown or unimplemented neovim-setup subcommand: "+args[0]))
-	}
+	runCobraCommand(NewNeovimSetupCmd(), args, out)
 }
 
 // Package Repo helper functions
@@ -509,12 +910,21 @@ func showPackageRepoOptions(out io.Writer) {
 
 // runPackageRepoCmd executes the package-repo command directly
 func runPackageRepoCmd(args []string, out io.Writer) {
-	if len(args) == 0 {
-		showPackageRepoOptions(out)
-		return
+	runCobraCommand(NewPackageRepoCommand(), args, out)
+}
+
+// NewPackageRepoCommand returns a fresh package-repo command
+func NewPackageRepoCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     packageRepoCmd.Use,
+		Short:   packageRepoCmd.Short,
+		Long:    packageRepoCmd.Long,
+		Example: packageRepoCmd.Example,
+		Run:     packageRepoCmd.Run,
 	}
-	_, _ = fmt.Fprintln(out, "Analyzing repo or directory:", args[0])
-	_, _ = fmt.Fprintln(out, "Nix derivation generation coming soon.")
+	cmd.PersistentFlags().AddFlagSet(packageRepoCmd.PersistentFlags())
+	cmd.Flags().AddFlagSet(packageRepoCmd.Flags())
+	return cmd
 }
 
 // Machines helper functions
@@ -538,9 +948,21 @@ func runMachinesCmd(args []string, out io.Writer) {
 	}
 	switch args[0] {
 	case "list":
-		_, _ = fmt.Fprintln(out, utils.FormatHeader("🖧 Machines List"))
-		_, _ = fmt.Fprintln(out, "- machine1 (example)")
-		_, _ = fmt.Fprintln(out, "- machine2 (example)")
+		// Get real hosts from flake.nix using utils.GetFlakeHosts()
+		hosts, err := utils.GetFlakeHosts("")
+		if err != nil {
+			_, _ = fmt.Fprintln(out, utils.FormatError("Failed to enumerate hosts from flake.nix: "+err.Error()))
+			return
+		}
+		if len(hosts) == 0 {
+			_, _ = fmt.Fprintln(out, utils.FormatInfo("No hosts found in flake.nix nixosConfigurations."))
+			return
+		}
+
+		_, _ = fmt.Fprintln(out, utils.FormatHeader("NixOS Hosts from flake.nix:"))
+		for _, h := range hosts {
+			_, _ = fmt.Fprintf(out, "- %s\n", h)
+		}
 	case "add":
 		if len(args) < 2 {
 			_, _ = fmt.Fprintln(out, utils.FormatWarning("Usage: machines add <name>"))
@@ -566,8 +988,7 @@ func runMachinesCmd(args []string, out io.Writer) {
 
 // Build command
 func runBuildCmd(args []string, out io.Writer) {
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("🛠️ Build Troubleshooting & Optimization"))
-	_, _ = fmt.Fprintln(out, "Enhanced build troubleshooting and optimization coming soon.")
+	runCobraCommand(NewBuildCommand(), args, out)
 }
 
 // Completion command
@@ -970,44 +1391,173 @@ func runSearchCmd(args []string, out io.Writer) {
 	}
 }
 
-// Ask command
+// Ask command - Enhanced version with NixOS-specific context and agent integration
 func runAskCmd(args []string, out io.Writer) {
 	if len(args) == 0 {
 		_, _ = fmt.Fprintln(out, utils.FormatError("Usage: ask <question>"))
 		_, _ = fmt.Fprintln(out, utils.FormatTip("Example: ask How do I enable nginx?"))
+		_, _ = fmt.Fprintln(out, utils.FormatTip("Use --role to specify agent role (ask, diagnose, explainer, etc.)"))
 		return
 	}
-	question := ""
-	if len(args) == 1 {
-		question = args[0]
-	} else {
-		question = ""
-		for i, s := range args {
-			if i > 0 {
-				question += " "
-			}
-			question += s
-		}
-	}
+
+	// Join all arguments to form the question
+	question := strings.Join(args, " ")
+
 	_, _ = fmt.Fprintln(out, utils.FormatHeader("🤖 AI Answer to your question:"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Question", question))
+	_, _ = fmt.Fprintln(out)
+
+	// Load configuration
 	cfg, err := config.LoadUserConfig()
 	if err != nil {
 		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to load config: "+err.Error()))
 		return
 	}
-	aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatWarning("Failed to detect NixOS context: "+err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		_, _ = fmt.Fprintln(out, utils.FormatNote("📋 "+contextSummary))
+		_, _ = fmt.Fprintln(out)
+	}
+
+	// Create modern AI provider using new ProviderManager system
+	manager := ai.NewProviderManager(cfg, logger.NewLogger())
+	defaultProvider := cfg.AIModels.SelectionPreferences.DefaultProvider
+	if defaultProvider == "" {
+		defaultProvider = "ollama"
+	}
+
+	provider, err := manager.GetProvider(defaultProvider)
 	if err != nil {
 		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 		return
 	}
-	_, _ = fmt.Fprint(out, utils.FormatInfo("Querying AI provider... "))
-	resp, err := aiProvider.Query(question)
+
+	// Query MCP server for documentation context (with progress indicator)
+	var docExcerpts []string
+	mcpContextAdded := false
+	_, _ = fmt.Fprint(out, utils.FormatInfo("Gathering NixOS documentation context... "))
+
+	mcpBase := cfg.MCPServer.Host
+	if mcpBase != "" {
+		mcpClient := mcp.NewMCPClient(fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port))
+		doc, mcpErr := mcpClient.QueryDocumentation(question)
+		if mcpErr == nil && doc != "" {
+			// Try to parse MCP documentation result
+			opt, fallbackDoc := parseMCPOptionDoc(doc)
+			if opt.Name != "" {
+				// Structured NixOS option documentation
+				context := fmt.Sprintf("NixOS Option Documentation:\nOption: %s\nType: %s\nDefault: %s\nExample: %s\nDescription: %s\nSource: %s\nVersion: %s\nRelated: %v\nLinks: %v",
+					opt.Name, opt.Type, opt.Default, opt.Example, opt.Description, opt.Source, opt.Version, opt.Related, opt.Links)
+				docExcerpts = append(docExcerpts, context)
+				mcpContextAdded = true
+			} else if len(fallbackDoc) > 10 && len(fallbackDoc) < 2000 {
+				// General documentation content
+				docExcerpts = append(docExcerpts, "NixOS Documentation Context:\n"+fallbackDoc)
+				mcpContextAdded = true
+			}
+		}
+	}
+
+	if mcpContextAdded {
+		_, _ = fmt.Fprintln(out, utils.FormatSuccess("found"))
+	} else {
+		_, _ = fmt.Fprintln(out, utils.FormatNote("skipped"))
+	}
+
+	// Add package/service search context to provide accurate information
+	var searchContext []string
+	_, _ = fmt.Fprint(out, utils.FormatInfo("Searching NixOS packages and options... "))
+
+	// Search for relevant packages and options
+	exec := nixos.NewExecutor(cfg.NixosFolder)
+
+	// Extract key terms from the question for search
+	searchTerms := extractSearchTerms(question)
+	for _, term := range searchTerms {
+		if packageInfo, err := exec.SearchNixPackages(term); err == nil && packageInfo != "" {
+			searchContext = append(searchContext, fmt.Sprintf("Package Search for '%s':\n%s", term, packageInfo))
+		}
+	}
+
 	_, _ = fmt.Fprintln(out, utils.FormatSuccess("done"))
+
+	// Build context-aware prompt using the context builder
+	contextBuilder := nixoscontext.NewNixOSContextBuilder()
+
+	// Create base prompt with role template
+	basePrompt := ""
+	if template, exists := roles.RolePromptTemplate[roles.RoleAsk]; exists {
+		basePrompt = template
+	}
+
+	// Add NixOS-specific guidelines
+	nixosGuidelines := "ATTENTION: You are a NixOS expert. NEVER EVER suggest nix-env commands!\n\n" +
+		"CRITICAL RULES:\n" +
+		"❌ NEVER suggest 'nix-env -i' or any nix-env commands\n" +
+		"❌ NEVER recommend manual installation\n\n" +
+		"✅ ALWAYS USE configuration.nix for system packages\n" +
+		"✅ ALWAYS USE services.* options for services\n" +
+		"✅ ALWAYS end with 'sudo nixos-rebuild switch'\n\n"
+
+	// Build context-aware prompt
+	contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt+"\n\n"+nixosGuidelines, nixosCtx)
+
+	// Add documentation context
+	if len(docExcerpts) > 0 {
+		contextualPrompt += "\n\nDOCUMENTATION CONTEXT:\n" + strings.Join(docExcerpts, "\n\n")
+	}
+
+	// Add package search context
+	if len(searchContext) > 0 {
+		contextualPrompt += "\n\nPACKAGE SEARCH CONTEXT:\n" + strings.Join(searchContext, "\n\n")
+		contextualPrompt += "\n\nUse this package information to provide accurate package names and availability."
+	}
+
+	// Add the user question
+	finalPrompt := contextualPrompt + "\n\nUser Question: " + question
+
+	// Query the AI provider
+	_, _ = fmt.Fprint(out, utils.FormatInfo("Generating context-aware NixOS response... "))
+
+	ctx := context.Background()
+	response, err := provider.Query(ctx, finalPrompt)
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("done"))
+	_, _ = fmt.Fprintln(out)
+
 	if err != nil {
 		_, _ = fmt.Fprintln(out, utils.FormatError("AI error: "+err.Error()))
 		return
 	}
-	_, _ = fmt.Fprintln(out, utils.RenderMarkdown(resp))
+
+	// Display the enhanced response
+	_, _ = fmt.Fprintln(out, utils.RenderMarkdown(response))
+
+	// Add helpful next steps
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, utils.FormatDivider())
+	_, _ = fmt.Fprintln(out, utils.FormatTip("💡 **Need more help?**"))
+	_, _ = fmt.Fprintln(out, utils.FormatNote("• Use `nixai diagnose` if you encounter errors"))
+	_, _ = fmt.Fprintln(out, utils.FormatNote("• Use `nixai search <term>` to find packages or options"))
+	_, _ = fmt.Fprintln(out, utils.FormatNote("• Use `nixai explain-option <option>` for detailed option info"))
+	_, _ = fmt.Fprintln(out, utils.FormatNote("• Use `nixai doctor` for system health checks"))
+	if mcpContextAdded {
+		_, _ = fmt.Fprintln(out, utils.FormatNote("• This answer used live NixOS documentation for accuracy"))
+	}
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		_, _ = fmt.Fprintln(out, utils.FormatNote("• This answer was personalized for your NixOS configuration"))
+	}
 }
 
 // RunDirectCommand executes commands directly from interactive mode

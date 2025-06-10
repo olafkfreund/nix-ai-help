@@ -8,6 +8,88 @@
 
 **nixai: Your AI-powered, privacy-first NixOS assistant with 24+ specialized commands — automate, troubleshoot, and master NixOS from your terminal with intelligent agents and role-based expertise.**
 
+## 🆕 Latest Updates (June 2025)
+
+### ✨ **Modern TUI Interface** - **NEWLY COMPLETED!**
+
+- **🎨 Icon-Free Design**: 100% accessible text-based interface without Unicode dependencies
+- **📖 Enhanced Typography**: Larger, more readable text with improved visual hierarchy
+- **📜 Smart Scrolling**: Text-based scroll indicators with Page Up/Down support
+- **ℹ️ Version Display**: nixai version prominently shown in status bar
+- **📰 Changelog Popup**: Press F1 to view latest features and updates
+- **⌨️ Better Navigation**: Improved keyboard shortcuts and panel switching
+- **🔧 Interactive Parameter Input**: All complex commands now support TUI parameter configuration
+- **📊 Real-Time Output**: Command execution with live output display within TUI
+- **🎯 Command Discovery**: Enhanced command browser with `[INPUT]` indicators for configurable commands
+
+### 🚀 **Enhanced Command System** - **8 MAJOR COMMANDS UPGRADED!**
+
+- **🔨 Build System**: 10 specialized subcommands for comprehensive build troubleshooting and optimization
+- **📦 Package Analysis**: AI-powered Git repository analysis with automatic Nix derivation generation
+- **🩺 Advanced Diagnostics**: Multi-format log analysis with AI-powered issue detection and fixes
+- **⚙️ Interactive Configuration**: 8-flag NixOS configuration generator with desktop, server, and minimal presets
+- **🗑️ Intelligent Garbage Collection**: 4 subcommands for AI-guided safe cleanup and generation management
+- **💻 Hardware Optimization**: 6 specialized hardware tools with auto-detection and performance tuning
+- **🔄 Migration Assistant**: AI-powered channel-to-flakes migration with backup and rollback support
+- **📝 Neovim Integration**: Complete Neovim setup with 5 management commands and MCP integration
+
+### 🚀 **Recent Feature Additions**
+
+- **Modern TUI Architecture**: Complete `/internal/tui/` system with Bubble Tea framework
+- **Context-Aware System**: Intelligent NixOS context detection with 4 management commands
+- **Enhanced Hardware Management**: 6 specialized subcommands for comprehensive system analysis
+- **AI Provider Flexibility**: Configuration-driven provider selection with fallback support
+- **MCP Integration**: Model Context Protocol server for enhanced documentation queries
+- **Developer Tools**: Advanced flake management, package analysis, and development environments
+
+---
+
+## 🎮 Modern TUI Experience
+
+The newly modernized Terminal User Interface provides a professional, accessible experience:
+
+### 🖥️ Interface Layout
+
+```text
+┌─ Commands (24 total) ──────────────┬─ Execution Panel ─────────────────┐
+│                                    │                                   │
+│ ask [INPUT]                        │ Welcome to nixai TUI!             │
+│   Ask any NixOS question           │ Select a command from the left    │
+│ search [INPUT]                     │ panel to get started.             │
+│   Search for packages/services     │                                   │
+│ explain-option [INPUT]             │ Latest Updates:                   │
+│   Explain a NixOS option           │ • Interactive parameter input     │
+│ hardware detect                    │ • 8 major commands upgraded       │
+│   Comprehensive hardware analysis  │ • Real-time TUI output            │
+│ build [INPUT]                      │ • Enhanced command discovery      │
+│   Advanced build troubleshooting   │ • Live execution feedback         │
+│                                    │                                   │
+│ (Showing 1-10 of 24)               │ [INPUT] = Interactive Parameters  │
+└────────────────────────────────────┴───────────────────────────────────┘
+Commands | F1:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.2.3
+```
+
+### ✨ Key TUI Features
+
+- **🎯 Accessibility-First**: 100% text-based design without Unicode icon dependencies
+- **📖 Enhanced Readability**: Larger, bolder text with improved spacing and visual hierarchy
+- **🔄 Smooth Navigation**: Arrow keys, Tab switching, Page Up/Down scrolling with indicators
+- **📰 Feature Discovery**: F1 popup shows latest updates and changelog
+- **⌨️ Keyboard Efficient**: Complete keyboard navigation without mouse requirement
+- **🎨 Professional Design**: Clean two-panel layout with status bar and real-time feedback
+
+### 🧠 **Context-Aware Intelligence**
+
+Every command in nixai now features **intelligent context detection** that automatically understands your NixOS setup:
+
+- **🔍 Automatic System Detection**: Seamlessly detects NixOS configuration type, Home Manager setup, and system services
+- **📋 Intelligent Context Display**: Every command shows personalized system summary: `📋 System: nixos | Flakes: Yes | Home Manager: standalone`
+- **⚡ Performance Optimized**: Context caching system for instant access with intelligent refresh triggers
+- **🎯 Personalized Assistance**: AI responses adapt to your specific NixOS setup (flakes vs channels, Home Manager type, enabled services)
+- **🛠️ Context Management**: 4 specialized commands for complete control over context detection and validation
+- **📊 Health Monitoring**: Context system status monitoring with error detection and recovery suggestions
+- **🔄 Smart Refresh**: Automatic context invalidation when system configuration changes significantly
+
 ---
 
 ## 📖 User Manual & Command Reference
@@ -155,12 +237,43 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 
 ## ✨ Key Features
 
+### 🖥️ **Modern Terminal User Interface**
+
+- **📱 Professional TUI Experience**: Beautiful two-panel layout with commands and execution areas
+- **🎯 Accessibility-First Design**: 100% text-based interface without icon dependencies
+- **📖 Enhanced Typography**: Large, readable text with improved visual hierarchy and spacing
+- **🔄 Smart Navigation**: Tab-based panel switching, arrow key navigation, and search functionality
+- **📜 Intelligent Scrolling**: Text-based scroll indicators with smooth Page Up/Down support
+- **ℹ️ Status Information**: Version display and real-time command execution feedback
+- **📰 Feature Discovery**: F1 changelog popup for viewing latest updates and features
+- **⌨️ Keyboard Shortcuts**: Comprehensive keyboard navigation without mouse dependency
+
+**TUI Interface Preview:**
+
+```text
+┌─ Commands (24 total) ──────────────┬─ Execution Panel ─────────────────┐
+│                                    │                                   │
+│ ask [INPUT]                        │ Welcome to nixai TUI!             │
+│   Ask any NixOS question           │ Select a command from the left    │
+│ search [INPUT]                     │ panel to get started.            │
+│   Search for packages/services     │                                   │
+│ explain-option [INPUT]             │ Latest Updates:                   │
+│   Explain a NixOS option           │ • Icon-free accessible design    │
+│ hardware detect                    │ • Enhanced typography             │
+│   Comprehensive hardware analysis  │ • Smart scrolling system         │
+│                                    │ • Version display                │
+│ (Showing 1-8 of 24)               │ • F1 changelog popup             │
+└────────────────────────────────────┴───────────────────────────────────┘
+Commands | F1:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.2.3
+```
+
 ### 🤖 AI-Powered Command System
 
 - **24+ Specialized Commands**: Complete command-line toolkit for all NixOS tasks and operations
 - **Intelligent Agent Architecture**: Role-based AI behavior with specialized expertise domains
 - **Direct Question Interface**: `nixai -a "your question"` for instant AI-powered assistance
-- **Context-Aware Responses**: Commands adapt behavior based on role, context, and system state
+- **Context-Aware Responses**: Commands adapt behavior based on detected system configuration, role, and context
+- **Smart Context Detection**: Automatic detection of flakes vs channels, Home Manager type, NixOS version, and system services
 - **Multi-Provider AI Support**: Local Ollama (privacy-first), LlamaCpp (CPU-optimized), OpenAI, Gemini with intelligent fallback
 
 ### 🩺 System Management & Diagnostics
@@ -173,12 +286,23 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 
 ### 🔧 Enhanced Hardware Management
 
-- **Comprehensive Hardware Detection**: `nixai hardware detect` for detailed system analysis
-- **Intelligent Optimization**: `nixai hardware optimize` with AI-powered configuration recommendations
-- **Driver Management**: `nixai hardware drivers` for automatic driver and firmware configuration
-- **Laptop Support**: `nixai hardware laptop` with power management and mobile-specific optimizations
-- **Hardware Comparison**: `nixai hardware compare` for current vs optimal settings analysis
-- **Function Interface**: `nixai hardware function` for advanced hardware function calling
+- **Comprehensive Hardware Detection**: `nixai hardware detect` for detailed system analysis and component identification
+- **Intelligent Optimization**: `nixai hardware optimize` with AI-powered configuration recommendations and performance tuning
+- **Driver Management**: `nixai hardware drivers` for automatic driver and firmware configuration and updates
+- **Laptop Support**: `nixai hardware laptop` with power management, thermal control, and mobile-specific optimizations
+- **Hardware Comparison**: `nixai hardware compare` for current vs optimal settings analysis and recommendations
+- **Function Interface**: `nixai hardware function` for advanced hardware function calling and direct system control
+- **Performance Monitoring**: Real-time hardware metrics and optimization suggestions
+
+### 🎯 Context-Aware System Management
+
+- **Intelligent Context Detection**: Automatic detection of NixOS configuration type (flakes vs channels), Home Manager setup, system version, and enabled services
+- **Context Management Commands**: `nixai context` with 4 specialized subcommands for complete context control
+- **System-Aware Responses**: All commands provide personalized assistance based on your actual NixOS configuration
+- **Context Caching**: Performance-optimized context detection with intelligent caching and refresh capabilities
+- **Context Validation**: Health checks and status monitoring for context detection system
+- **Multiple Output Formats**: JSON output support for scripting and automation integration
+- **Interactive Management**: User-friendly context reset and refresh with confirmation prompts
 
 ### 🔍 Search & Discovery
 
@@ -207,18 +331,22 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 
 ### 🌐 Community & Collaboration
 
-- **Community Resources**: `nixai community` for NixOS community links and support channels
-- **MCP Server**: `nixai mcp-server` for Model Context Protocol integration with editors
-- **Neovim Integration**: `nixai neovim-setup` for seamless editor integration
-- **Interactive Shell**: `nixai interactive` for guided assistance and exploration
+- **Community Resources**: `nixai community` for NixOS community links, forums, and support channels
+- **MCP Server Integration**: `nixai mcp-server` for Model Context Protocol integration with editors and IDEs
+- **Neovim Integration**: `nixai neovim-setup` for seamless editor integration with AI-powered assistance
+- **Interactive Shell**: `nixai interactive` with modern TUI for guided assistance and command exploration
+- **Configuration Sharing**: Community templates and snippets for common use cases
+- **Documentation Contributions**: User-contributed guides and best practices
 
 ### 🎨 User Experience
 
 - **Beautiful Terminal Output**: Colorized, formatted output with syntax highlighting via glamour
-- **Interactive & CLI Modes**: Use interactively or via CLI, with piped input support
+- **Modern TUI Interface**: Professional two-panel layout with real-time command execution
+- **Interactive & CLI Modes**: Use interactively via TUI or directly via CLI, with piped input support
 - **Progress Indicators**: Real-time feedback during API calls and long-running operations
 - **Role & Agent Selection**: `--role` and `--agent` flags for specialized behavior and expertise
-- **TUI Mode**: `--tui` flag for terminal user interface on supported commands
+- **Intelligent Help System**: Context-aware help and feature discovery with F1 changelog popup
+- **Accessibility Features**: Screen reader compatible, keyboard-only navigation, high contrast themes
 
 ### 🔒 Privacy & Performance
 
@@ -422,6 +550,13 @@ nixai doctor  # Includes provider health checks
 
 > For all commands, options, and real-world examples, see the [User Manual](docs/MANUAL.md).
 
+**Launch the modern TUI interface:**
+
+```zsh
+nixai interactive                               # Modern TUI with full navigation
+nixai interactive --classic                    # Classic text-based interactive mode
+```
+
 **Ask questions with intelligent AI assistance:**
 
 ```zsh
@@ -443,10 +578,98 @@ nixai deps                                       # Analyze configuration depende
 
 ```zsh
 nixai hardware detect                            # Comprehensive hardware analysis
-nixai hardware optimize --dry-run               # Preview optimization recommendations
+nixai hardware optimize --dry-run               # Preview optimization recommendations  
 nixai hardware drivers --auto-install           # Automatic driver configuration
 nixai hardware laptop --power-save              # Laptop-specific optimizations
 nixai hardware compare                          # Compare current vs optimal settings
+nixai hardware function --operation detect     # Advanced hardware function calling
+```
+
+**Enhanced build system troubleshooting:**
+
+```zsh
+nixai build debug                               # Deep build failure analysis with pattern recognition
+nixai build retry --smart-cache                # Intelligent retry with automated fixes
+nixai build cache-miss                         # Analyze cache miss reasons and optimization
+nixai build environment                        # Build environment analysis and recommendations
+nixai build dependencies                       # Dependency conflict analysis and resolution
+nixai build performance                        # Build performance optimization
+nixai build cleanup                           # Build cache and artifact cleanup
+nixai build validate                          # Build configuration validation
+nixai build monitor                           # Real-time build monitoring
+nixai build compare                           # Build configuration comparison
+```
+
+**AI-powered package repository analysis:**
+
+```zsh
+nixai package-repo https://github.com/user/project              # Analyze remote repository
+nixai package-repo --local ./my-project                        # Analyze local project
+nixai package-repo <url> --output derivation.nix               # Generate Nix derivation
+nixai package-repo <url> --name custom-package --analyze-only  # Analysis without generation
+```
+
+**Advanced diagnostics and issue resolution:**
+
+```zsh
+nixai diagnose /var/log/nixos-rebuild.log       # Analyze specific log file
+nixai diagnose --file /var/log/messages         # Diagnose from file
+nixai diagnose --type system --context "boot failure"  # System-specific diagnosis
+nixai diagnose --output json                    # JSON output for automation
+journalctl -xe | nixai diagnose                # Pipe logs for analysis
+```
+
+**Interactive NixOS configuration generation:**
+
+```zsh
+nixai configure                                 # Interactive configuration wizard
+nixai configure --search "web server nginx"    # Generate configuration with search context
+nixai configure --output my-config.nix         # Save configuration to file
+nixai configure --advanced --desktop           # Advanced desktop configuration
+nixai configure --server --minimal             # Minimal server configuration
+nixai configure --home --flake                 # Home Manager configuration with flakes
+```
+
+**AI-guided garbage collection and cleanup:**
+
+```zsh
+nixai gc analyze                               # Analyze store usage and cleanup opportunities
+nixai gc safe-clean                          # AI-guided safe cleanup with explanations
+nixai gc compare-generations                  # Compare generations with recommendations
+nixai gc disk-usage                          # Visualize store usage with recommendations
+nixai gc --dry-run --keep-generations 10     # Preview cleanup keeping 10 generations
+```
+
+**AI-powered migration assistance:**
+
+```zsh
+nixai migrate analyze                         # Analyze current setup and migration complexity
+nixai migrate to-flakes                      # Convert from channels to flakes
+nixai migrate --backup-name "pre-migration"  # Migration with custom backup name
+nixai migrate to-flakes --dry-run           # Preview migration steps without executing
+```
+
+**Comprehensive Neovim integration:**
+
+```zsh
+nixai neovim-setup install                   # Install Neovim integration with nixai
+nixai neovim-setup status                    # Check integration status
+nixai neovim-setup configure                 # Configure integration settings
+nixai neovim-setup update                    # Update integration to latest version
+nixai neovim-setup remove                    # Remove integration
+nixai neovim-setup install --config-dir ~/.config/nvim --socket-path /tmp/custom.sock
+```
+
+**Context management and system awareness:**
+
+```zsh
+nixai context detect                            # Force re-detection of system context
+nixai context show                             # Display current NixOS context information
+nixai context show --detailed                  # Show detailed context with services and packages
+nixai context show --format json              # Output context in JSON format for scripts
+nixai context reset                           # Clear cache and force fresh detection
+nixai context reset --confirm                 # Skip confirmation prompt
+nixai context status                          # Show context system health and status
 ```
 
 **Search and discovery:**
@@ -488,11 +711,25 @@ nixai machines show my-machine --role system-architect
 **Advanced features:**
 
 ```zsh
-nixai interactive                               # Launch interactive AI shell
+nixai interactive                               # Launch modern TUI interface
+nixai interactive --classic                    # Classic interactive mode
 nixai gc analyze                               # AI-powered garbage collection
 nixai store backup                             # Nix store management
 nixai community                                # Access community resources
 nixai learn nix-language                       # Interactive learning modules
+nixai mcp-server start                         # Start MCP server for editor integration
+```
+
+**TUI Navigation (Interactive Mode):**
+
+```zsh
+# In the modern TUI interface:
+# ↑↓ arrows: Navigate command list
+# Tab: Switch between panels  
+# Enter: Select/execute commands
+# /: Search commands
+# F1: Show changelog and latest features
+# Ctrl+C: Exit
 ```
 
 ---
@@ -550,6 +787,7 @@ go build -o nixai cmd/nixai/main.go
 - Follow the modular architecture patterns in `internal/`
 - Use the configuration system in `configs/default.yaml`
 - Maintain documentation for new features and commands
+- TUI development uses Bubble Tea framework in `internal/tui/`
 
 ### Testing & Quality
 
@@ -558,6 +796,8 @@ just test                    # Run all tests
 just test-coverage          # Generate coverage report
 just lint                   # Run linters
 just format                 # Format code
+just build                  # Build nixai binary
+just run                    # Build and run locally
 ```
 
 ### Contributing
@@ -578,6 +818,8 @@ For detailed development guidelines, see the [User Manual](docs/MANUAL.md) and i
 ### 📖 Documentation
 
 - [User Manual & Command Reference](docs/MANUAL.md) - Complete guide to all 24+ commands
+- [TUI Usage Guide](docs/TUI_INPUT_COMMANDS_GUIDE.md) - Modern terminal interface guide
+- [TUI Modernization Report](docs/TUI_MODERNIZATION_COMPLETION_REPORT.md) - Latest interface improvements
 - [Hardware Guide](docs/hardware.md) - Comprehensive hardware detection and optimization
 - [Agent Architecture](docs/agents.md) - AI agent system and role-based behavior
 - [Flake Integration Guide](docs/FLAKE_INTEGRATION_GUIDE.md) - Advanced flake setup and integration
@@ -587,6 +829,7 @@ For detailed development guidelines, see the [User Manual](docs/MANUAL.md) and i
 - [VS Code Integration](docs/MCP_VSCODE_INTEGRATION.md) - Model Context Protocol integration
 - [Neovim Integration](docs/neovim-integration.md) - Editor integration and MCP setup
 - [Community Resources](docs/community.md) - Community support and contribution guides
+- [TUI Modernization Plan](docs/TUI_MODERNIZATION_PROJECT_PLAN.md) - Technical implementation details
 
 ### 📋 Examples & References
 
@@ -598,6 +841,7 @@ For detailed development guidelines, see the [User Manual](docs/MANUAL.md) and i
 
 Individual command guides available in `docs/`:
 
+- [context.md](docs/context.md) - Context management and system awareness
 - [diagnose.md](docs/diagnose.md) - System diagnostics and troubleshooting
 - [hardware.md](docs/hardware.md) - Hardware detection and optimization
 - [package-repo.md](docs/package-repo.md) - Repository analysis and packaging
@@ -640,6 +884,10 @@ nix build --rebuild
 - **Vendor hash mismatches**: The current vendor hash is `sha256-pGyNwzTkHuOzEDOjmkzx0sfb1jHsqb/1FcojsCGR6CY=`
 - **Hardware detection issues**: Ensure you have appropriate permissions for hardware access
 - **AI provider failures**: Verify Ollama is running (`ollama list`) or check API keys for cloud providers
+- **TUI display issues**: Ensure your terminal supports Unicode and has sufficient size (80x24 minimum)
+- **Interactive mode problems**: Try `nixai interactive --classic` for compatibility with older terminals
+- **Context detection problems**: Use `nixai context status` to check system health, or `nixai context reset` to force refresh
+- **Outdated context information**: Run `nixai context detect` after major system configuration changes
 
 ### Getting Help
 
@@ -658,6 +906,25 @@ nixai --version              # Should show "nixai version 0.1.0"
 nixai doctor                 # Run comprehensive health check
 nixai hardware detect       # Test hardware detection
 nixai -a "test question"     # Test AI functionality
+nixai interactive           # Launch modern TUI interface
+```
+
+### Latest Features Verification
+
+Test the newly completed TUI modernization and context system:
+
+```zsh
+nixai interactive           # Launch modern TUI
+# In TUI: Press F1 to view changelog
+# In TUI: Use Tab to switch panels
+# In TUI: Type / to search commands
+# In TUI: Use ↑↓ arrows to navigate
+
+# Test context management system
+nixai context status       # Check context system health
+nixai context show         # View current system context
+nixai context detect -v    # Force re-detection with verbose output
+nixai ask "How do I configure SSH?" # See context-aware response
 ```
 
 ---

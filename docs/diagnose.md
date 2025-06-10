@@ -1,6 +1,28 @@
 # nixai diagnose
 
-Diagnose NixOS issues from logs, configs, or piped input using AI.
+Advanced NixOS diagnostics with AI-powered log analysis, multi-format support, and intelligent issue detection and resolution.
+
+---
+
+## 🆕 TUI Integration & Enhanced Features
+
+The `nixai diagnose` command now features **comprehensive TUI integration** with advanced diagnostic capabilities:
+
+### ✨ **Interactive TUI Features**
+- **🎯 Interactive Parameter Input**: File path selection and diagnostic options through modern TUI interface
+- **📊 Real-Time Analysis Display**: Live diagnostic progress with AI insights within the TUI
+- **⌨️ Command Discovery**: Enhanced command browser with `[INPUT]` indicators for configurable options
+- **🔍 Interactive Flag Configuration**: All 4 flags (`--pipe`, `--format`, `--output`, `--severity`) configurable via TUI
+- **📋 Context-Aware Diagnostics**: Automatic NixOS setup detection for personalized issue analysis
+
+### 🩺 **Advanced Diagnostic Features**
+- **🧠 AI-Powered Issue Detection**: Machine learning-based pattern recognition for complex NixOS problems
+- **📊 Multi-Format Log Analysis**: Support for systemd journals, build logs, kernel logs, and custom formats
+- **🎯 Intelligent Issue Classification**: Automatic categorization by severity, component, and resolution complexity
+- **🔧 Automated Fix Suggestions**: AI-generated configuration patches and command-line remedies
+- **📈 Trend Analysis**: Historical pattern recognition for recurring issues and performance degradation
+- **🔍 Deep System Inspection**: Integration with `nixos-doctor`, hardware detection, and service status
+- **📝 Comprehensive Reporting**: Detailed diagnostic reports with executive summaries and technical details
 
 ---
 

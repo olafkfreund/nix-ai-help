@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,14 +9,15 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/ai/agent"
+	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/ai/roles"
 	"nix-ai-help/internal/config"
-	"nix-ai-help/internal/learning"
 	"nix-ai-help/internal/mcp"
 	"nix-ai-help/internal/neovim"
 	"nix-ai-help/internal/nixos"
@@ -158,6 +160,20 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&globalTUI, "tui", false, "Launch TUI mode for any command")
 	mcpServerCmd.Flags().BoolVarP(&daemonMode, "daemon", "d", false, "Run MCP server in background/daemon mode")
 	doctorCmd.Flags().BoolP("verbose", "v", false, "Show detailed output and progress information")
+
+	// Add package-repo command flags
+	packageRepoCmd.Flags().String("local", "", "Analyze local repository path instead of cloning")
+	packageRepoCmd.Flags().String("output", "", "Output file path for generated derivation")
+	packageRepoCmd.Flags().String("name", "", "Override package name for the derivation")
+	packageRepoCmd.Flags().Bool("analyze-only", false, "Only analyze repository without generating derivation")
+
+	// Add logs subcommands
+	logsCmd.AddCommand(logsSystemCmd)
+	logsCmd.AddCommand(logsBootCmd)
+	logsCmd.AddCommand(logsServiceCmd)
+	logsCmd.AddCommand(logsErrorsCmd)
+	logsCmd.AddCommand(logsBuildCmd)
+	logsCmd.AddCommand(logsAnalyzeCmd)
 }
 
 // Helper functions for agent/role/context handling
@@ -440,6 +456,23 @@ var searchCmd = &cobra.Command{
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 			os.Exit(1)
 		}
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		if nixosPath != "" {
 			cfg.NixosFolder = nixosPath
 		}
@@ -492,8 +525,14 @@ var searchCmd = &cobra.Command{
 		} else {
 			docExcerpts = append(docExcerpts, "\n"+promptInstruction)
 		}
+
+		// Build context-aware prompt
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		basePrompt := fmt.Sprintf("How to search, install, and configure %s in NixOS?", query)
+		contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
 		promptCtx := ai.PromptContext{
-			Question:     query,
+			Question:     contextualPrompt,
 			DocExcerpts:  docExcerpts,
 			Intent:       "explain",
 			OutputFormat: "markdown",
@@ -525,12 +564,29 @@ var explainHomeOptionCmd = &cobra.Command{
 		fmt.Println(utils.FormatHeader("🏠 Home Manager Option: " + option))
 		fmt.Println()
 
-		// Load configuration
+		// Load configuration first
 		cfg, err := config.LoadUserConfig()
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 			os.Exit(1)
 		}
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
@@ -572,13 +628,18 @@ var explainHomeOptionCmd = &cobra.Command{
 			Provider:     providerName,
 		}
 		builder := ai.DefaultPromptBuilder{}
-		prompt, err := builder.BuildPrompt(promptCtx)
+		basePrompt, err := builder.BuildPrompt(promptCtx)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Prompt build error: "+err.Error()))
 			os.Exit(1)
 		}
+
+		// Build context-aware prompt using the context builder
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
 		fmt.Print(utils.FormatInfo("Querying AI provider... "))
-		aiResp, aiErr := aiProvider.Query(prompt)
+		aiResp, aiErr := aiProvider.Query(contextualPrompt)
 		fmt.Println(utils.FormatSuccess("done"))
 		if aiErr != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+aiErr.Error()))
@@ -602,11 +663,30 @@ func NewExplainOptionCommand() *cobra.Command {
 			format, _ := cmd.Flags().GetString("format")
 			providerFlag, _ := cmd.Flags().GetString("provider")
 			examplesOnly, _ := cmd.Flags().GetBool("examples-only")
+
+			// Load configuration first
 			cfg, err := config.LoadUserConfig()
 			if err != nil {
 				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 				os.Exit(1)
 			}
+
+			// Initialize context detector and get NixOS context
+			contextDetector := nixos.NewContextDetector(logger.NewLogger())
+			nixosCtx, err := contextDetector.GetContext(cfg)
+			if err != nil {
+				fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+				nixosCtx = nil
+			}
+
+			// Display detected context summary if available
+			if nixosCtx != nil && nixosCtx.CacheValid {
+				contextBuilder := nixoscontext.NewNixOSContextBuilder()
+				contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+				fmt.Println(utils.FormatNote("📋 " + contextSummary))
+				fmt.Println()
+			}
+
 			mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
 			mcpClient := mcp.NewMCPClient(mcpURL)
 			fmt.Print(utils.FormatInfo("Querying documentation... "))
@@ -641,14 +721,19 @@ func NewExplainOptionCommand() *cobra.Command {
 				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 				os.Exit(1)
 			}
-			var prompt string
+
+			// Build context-aware prompt using the context builder
+			var basePrompt string
 			if examplesOnly {
-				prompt = buildExamplesOnlyPrompt(option, doc, format, source, version)
+				basePrompt = buildExamplesOnlyPrompt(option, doc, format, source, version)
 			} else {
-				prompt = buildEnhancedExplainOptionPrompt(option, doc, format, source, version)
+				basePrompt = buildEnhancedExplainOptionPrompt(option, doc, format, source, version)
 			}
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
 			fmt.Print(utils.FormatInfo("Querying AI provider... "))
-			aiResp, aiErr := aiProvider.Query(prompt)
+			aiResp, aiErr := aiProvider.Query(contextualPrompt)
 			fmt.Println(utils.FormatSuccess("done"))
 			if aiErr != nil {
 				fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+aiErr.Error()))
@@ -761,6 +846,49 @@ actionable recommendations for resolving problems.`,
 	Run: handleLogsCommand,
 }
 
+// Logs subcommands
+var logsSystemCmd = &cobra.Command{
+	Use:   "system",
+	Short: "Analyze system logs",
+	Long:  "Analyze system logs for issues, patterns, and recommendations.",
+	Run:   handleLogsSystem,
+}
+
+var logsBootCmd = &cobra.Command{
+	Use:   "boot",
+	Short: "Analyze boot logs",
+	Long:  "Analyze boot logs for startup issues, errors, and performance insights.",
+	Run:   handleLogsBoot,
+}
+
+var logsServiceCmd = &cobra.Command{
+	Use:   "service [service-name]",
+	Short: "Analyze service logs",
+	Long:  "Analyze service-specific logs for issues, errors, and troubleshooting recommendations.",
+	Run:   handleLogsService,
+}
+
+var logsErrorsCmd = &cobra.Command{
+	Use:   "errors",
+	Short: "Analyze error logs",
+	Long:  "Analyze system error logs and provide troubleshooting recommendations.",
+	Run:   handleLogsErrors,
+}
+
+var logsBuildCmd = &cobra.Command{
+	Use:   "build",
+	Short: "Analyze build logs",
+	Long:  "Analyze build logs for compilation errors, dependency issues, and optimization suggestions.",
+	Run:   handleLogsBuild,
+}
+
+var logsAnalyzeCmd = &cobra.Command{
+	Use:   "analyze [file]",
+	Short: "Analyze specific log file",
+	Long:  "Analyze a specific log file with AI-powered diagnostics.",
+	Run:   handleLogsAnalyze,
+}
+
 // Neovim setup command implementation
 var neovimSetupCmd = &cobra.Command{
 	Use:   "neovim-setup",
@@ -780,7 +908,102 @@ providing seamless access to NixOS help directly from your editor.`,
 
   # Update integration configuration
   nixai neovim-setup update`,
-	Run: handleNeovimSetupCommand,
+	Run: func(cmd *cobra.Command, args []string) {
+		_ = cmd.Help()
+	},
+}
+
+var neovimSetupInstallCmd = &cobra.Command{
+	Use:   "install",
+	Short: "Install Neovim integration with nixai",
+	Long: `Install Neovim integration by creating the necessary configuration files
+and Lua modules to connect Neovim with the nixai MCP server.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		handleNeovimSetupInstall(cmd, args)
+	},
+}
+
+var neovimSetupConfigureCmd = &cobra.Command{
+	Use:   "configure",
+	Short: "Configure Neovim integration settings",
+	Long: `Configure Neovim integration settings such as socket path,
+key bindings, and other integration options.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		handleNeovimSetupConfigure(cmd, args)
+	},
+}
+
+var neovimSetupStatusCmd = &cobra.Command{
+	Use:   "status",
+	Short: "Check Neovim integration status",
+	Long: `Check the status of Neovim integration, including whether
+configuration files exist and the MCP server is accessible.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		handleNeovimSetupStatus(cmd, args)
+	},
+}
+
+var neovimSetupUpdateCmd = &cobra.Command{
+	Use:   "update",
+	Short: "Update Neovim integration configuration",
+	Long: `Update the Neovim integration configuration files to the
+latest version and apply any new features or bug fixes.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		handleNeovimSetupUpdate(cmd, args)
+	},
+}
+
+var neovimSetupRemoveCmd = &cobra.Command{
+	Use:   "remove",
+	Short: "Remove Neovim integration",
+	Long: `Remove the Neovim integration by deleting configuration files
+and modules that were created for nixai integration.`,
+	Run: func(cmd *cobra.Command, args []string) {
+		handleNeovimSetupRemove(cmd, args)
+	},
+}
+
+func init() {
+	// Add subcommands to neovim-setup
+	neovimSetupCmd.AddCommand(neovimSetupInstallCmd)
+	neovimSetupCmd.AddCommand(neovimSetupConfigureCmd)
+	neovimSetupCmd.AddCommand(neovimSetupStatusCmd)
+	neovimSetupCmd.AddCommand(neovimSetupUpdateCmd)
+	neovimSetupCmd.AddCommand(neovimSetupRemoveCmd)
+
+	// Add flags to install and configure commands
+	neovimSetupInstallCmd.Flags().String("config-dir", "", "Neovim configuration directory (default: auto-detect)")
+	neovimSetupInstallCmd.Flags().String("socket-path", "/tmp/nixai-mcp.sock", "MCP server socket path")
+
+	neovimSetupConfigureCmd.Flags().String("config-dir", "", "Neovim configuration directory (default: auto-detect)")
+	neovimSetupConfigureCmd.Flags().String("socket-path", "/tmp/nixai-mcp.sock", "MCP server socket path")
+
+	neovimSetupUpdateCmd.Flags().String("config-dir", "", "Neovim configuration directory (default: auto-detect)")
+	neovimSetupUpdateCmd.Flags().String("socket-path", "/tmp/nixai-mcp.sock", "MCP server socket path")
+}
+
+// NewNeovimSetupCmd creates a new neovim-setup command for TUI mode
+func NewNeovimSetupCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     neovimSetupCmd.Use,
+		Short:   neovimSetupCmd.Short,
+		Long:    neovimSetupCmd.Long,
+		Example: neovimSetupCmd.Example,
+		Run:     neovimSetupCmd.Run,
+	}
+
+	// Add subcommands
+	cmd.AddCommand(neovimSetupInstallCmd)
+	cmd.AddCommand(neovimSetupConfigureCmd)
+	cmd.AddCommand(neovimSetupStatusCmd)
+	cmd.AddCommand(neovimSetupUpdateCmd)
+	cmd.AddCommand(neovimSetupRemoveCmd)
+
+	// Copy flags from existing commands
+	cmd.PersistentFlags().AddFlagSet(neovimSetupCmd.PersistentFlags())
+	cmd.Flags().AddFlagSet(neovimSetupCmd.Flags())
+
+	return cmd
 }
 
 // Package repository analysis command implementation
@@ -1049,6 +1272,23 @@ Examples:
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 			os.Exit(1)
 		}
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Failed to detect NixOS context: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
@@ -1081,6 +1321,13 @@ Examples:
 
 		// Build the prompt based on configuration type and advanced options
 		prompt := buildConfigurePrompt(input, isHome, isAdvanced)
+
+		// Enhance prompt with context-aware information
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextualPrompt := contextBuilder.BuildContextualPrompt(prompt, nixosCtx)
+			prompt = contextualPrompt
+		}
 
 		fmt.Print(utils.FormatInfo("Querying AI provider... "))
 		resp, err := aiProvider.Query(prompt)
@@ -1213,13 +1460,57 @@ var diagnoseCmd = &cobra.Command{
 Examples:
   nixai diagnose /var/log/messages
   journalctl -xe | nixai diagnose
+  nixai diagnose --file /var/log/nixos-rebuild.log
+  nixai diagnose --type system
+  nixai diagnose --context "build failed with dependency error"
 `,
 	Args: conditionalMaximumArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println(utils.FormatHeader("🩺 NixOS Diagnostics"))
 		fmt.Println()
+
+		// Parse command flags
+		inputFile, _ := cmd.Flags().GetString("file")
+		diagType, _ := cmd.Flags().GetString("type")
+		outputFormat, _ := cmd.Flags().GetString("output")
+		additionalContext, _ := cmd.Flags().GetString("context")
+
+		// Load configuration first
+		cfg, err := config.LoadUserConfig()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
+			os.Exit(1)
+		}
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		var logData string
-		if len(args) > 0 {
+
+		// Determine input source based on flags and arguments
+		if inputFile != "" {
+			// Use --file flag
+			data, err := os.ReadFile(inputFile)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to read file: "+err.Error()))
+				os.Exit(1)
+			}
+			logData = string(data)
+		} else if len(args) > 0 {
+			// Use positional argument
 			file := args[0]
 			data, err := os.ReadFile(file)
 			if err != nil {
@@ -1234,30 +1525,68 @@ Examples:
 				input, _ := io.ReadAll(os.Stdin)
 				logData = string(input)
 			} else {
-				fmt.Println(utils.FormatWarning("No log file or piped input provided."))
-				return
+				// No input provided, offer diagnostic options based on type flag
+				if diagType != "" {
+					fmt.Printf("Running %s diagnostics...\n", diagType)
+					logData = fmt.Sprintf("Perform %s diagnostics for NixOS system", diagType)
+				} else {
+					fmt.Println(utils.FormatWarning("No log file, piped input, or diagnostic type provided."))
+					fmt.Println(utils.FormatTip("Usage: nixai diagnose [logfile] or nixai diagnose --type system"))
+					return
+				}
 			}
 		}
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-			os.Exit(1)
-		}
+
 		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 			os.Exit(1)
 		}
-		prompt := "You are a NixOS expert. Analyze the following log or error output and provide a diagnosis, root cause, and step-by-step fix instructions.\n\nLog or error:\n" + logData
+
+		// Build context-aware prompt using the context builder
+		basePrompt := "You are a NixOS expert. Analyze the following log or error output and provide a diagnosis, root cause, and step-by-step fix instructions.\n\n"
+
+		if diagType != "" {
+			basePrompt += fmt.Sprintf("Focus on %s-related issues. ", diagType)
+		}
+
+		if additionalContext != "" {
+			basePrompt += fmt.Sprintf("Additional context: %s\n\n", additionalContext)
+		}
+
+		basePrompt += "Log or error:\n" + logData
+
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
 		fmt.Print(utils.FormatInfo("Querying AI provider... "))
-		resp, err := aiProvider.Query(prompt)
+		resp, err := aiProvider.Query(contextualPrompt)
 		fmt.Println(utils.FormatSuccess("done"))
 		if err != nil {
 			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
 			os.Exit(1)
 		}
-		fmt.Println(utils.RenderMarkdown(resp))
+
+		// Format output based on output format flag
+		switch outputFormat {
+		case "plain":
+			fmt.Println(resp)
+		case "json":
+			// Simple JSON wrapper
+			fmt.Printf(`{"diagnosis": %q}`, resp)
+			fmt.Println()
+		default: // markdown
+			fmt.Println(utils.RenderMarkdown(resp))
+		}
 	},
+}
+
+func init() {
+	// Add flags to diagnose command
+	diagnoseCmd.Flags().StringP("file", "f", "", "Specify log file path to analyze")
+	diagnoseCmd.Flags().StringP("type", "t", "", "Diagnostic type (system, config, services, network, hardware, performance)")
+	diagnoseCmd.Flags().StringP("output", "o", "markdown", "Output format (markdown, plain, json)")
+	diagnoseCmd.Flags().StringP("context", "c", "", "Additional context information to include in analysis")
 }
 
 var doctorCmd = &cobra.Command{
@@ -1292,11 +1621,27 @@ func runDoctorCommand(cmd *cobra.Command, args []string) {
 	fmt.Println(utils.FormatHeader("🩻 NixOS Doctor: Comprehensive Health Check"))
 	fmt.Println()
 
-	// Load configuration
+	// Load configuration first
 	cfg, err := config.LoadUserConfig()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
 		os.Exit(1)
+	}
+
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		fmt.Println(utils.FormatNote("📋 " + contextSummary))
+		fmt.Println()
 	}
 
 	// Determine check type
@@ -1333,8 +1678,12 @@ func runDoctorCommand(cmd *cobra.Command, args []string) {
 		fmt.Println(utils.FormatHeader("🤖 AI-Powered Analysis"))
 		fmt.Print(utils.FormatInfo("Analyzing results with AI... "))
 
-		analysisPrompt := buildAnalysisPrompt(healthResults, checkType)
-		analysis, err := aiProvider.Query(analysisPrompt)
+		// Build context-aware prompt using the context builder
+		baseAnalysisPrompt := buildAnalysisPrompt(healthResults, checkType)
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextualPrompt := contextBuilder.BuildContextualPrompt(baseAnalysisPrompt, nixosCtx)
+
+		analysis, err := aiProvider.Query(contextualPrompt)
 
 		fmt.Println(utils.FormatSuccess("done"))
 		if err != nil {
@@ -2300,671 +2649,814 @@ func handleMCPServerQuery(cfg *config.UserConfig, query string, sources ...strin
 	return nil
 }
 
-// Handler functions for the CLI commands
+// Missing command handlers
 
-// Flake subcommand handlers
-func handleFlakeCreate(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("🔧 Creating Flake Configuration"))
-	fmt.Println()
-
-	fmt.Println(utils.FormatInfo("Available flake creation modes:"))
-	fmt.Println("  1. Basic flake template")
-	fmt.Println("  2. Convert existing configuration.nix")
-	fmt.Println("  3. Interactive guided setup")
-
-	fmt.Println(utils.FormatTip("Use 'nixai migrate to-flake' for full migration assistance"))
-}
-
-func handleFlakeValidate(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("✅ Validating Flake Configuration"))
-	fmt.Println()
-
-	// Check for flake.nix in current directory or specified path
-	flakePath := "./flake.nix"
-	if len(args) > 0 {
-		flakePath = args[0]
-	}
-
-	if _, err := os.Stat(flakePath); err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("No flake.nix found at: "+flakePath))
+// handleFlakeCommand handles the flake command
+func handleFlakeCommand(cmd *cobra.Command, args []string) {
+	if globalTUI {
+		LaunchTUIMode(cmd, args)
 		return
 	}
 
-	fmt.Println(utils.FormatKeyValue("Flake File", flakePath))
-	fmt.Println(utils.FormatInfo("Running flake validation..."))
-
-	// TODO: Add actual validation logic using nix flake check
-	fmt.Println(utils.FormatSuccess("✅ Flake validation completed"))
+	// TODO: Implement flake command functionality
+	fmt.Println("Flake command functionality is coming soon!")
 }
 
-func handleFlakeMigrate(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("🔄 Migrating to Flake Configuration"))
-	fmt.Println()
-
-	fmt.Println(utils.FormatInfo("Starting migration analysis..."))
-	fmt.Println(utils.FormatTip("For complete migration assistance, use: 'nixai migrate to-flake'"))
-
-	// Show basic migration guidance
-	fmt.Println(utils.FormatInfo("Migration steps:"))
-	fmt.Println("  1. Backup your current configuration")
-	fmt.Println("  2. Create flake.nix template")
-	fmt.Println("  3. Import existing configuration.nix")
-	fmt.Println("  4. Test the new flake configuration")
-}
-
-func handleFlakeAnalyze(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("🔍 Analyzing Flake Configuration"))
-	fmt.Println()
-
-	cfg, err := config.LoadUserConfig()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-		os.Exit(1)
-	}
-
-	// Initialize AI provider for analysis
-	aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
-	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
-		os.Exit(1)
-	}
-
-	// Read flake.nix if exists
-	flakePath := "./flake.nix"
-	if len(args) > 0 {
-		flakePath = args[0]
-	}
-
-	flakeContent, err := os.ReadFile(flakePath)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to read flake.nix: "+err.Error()))
+// handleLearnCommand handles the learn command
+func handleLearnCommand(cmd *cobra.Command, args []string) {
+	if globalTUI {
+		LaunchTUIMode(cmd, args)
 		return
 	}
 
-	prompt := fmt.Sprintf("Analyze this NixOS flake configuration and provide recommendations for improvements, best practices, and potential issues:\n\n%s", string(flakeContent))
-
-	fmt.Print(utils.FormatInfo("Analyzing flake with AI... "))
-	result, err := aiProvider.Query(prompt)
-	fmt.Println(utils.FormatSuccess("done"))
-
-	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("AI analysis failed: "+err.Error()))
-		return
-	}
-
-	fmt.Println(utils.RenderMarkdown(result))
+	// TODO: Implement learn command functionality
+	fmt.Println("Learn command functionality is coming soon!")
 }
 
-// Learning subcommand handlers
-func handleLearnList(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("📚 Available Learning Modules"))
-	fmt.Println()
-
-	// Use existing learning system
-	modules, err := learning.LoadModules()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load modules: "+err.Error()))
+// handleLogsCommand is the main handler for the logs command
+func handleLogsCommand(cmd *cobra.Command, args []string) {
+	if globalTUI {
+		LaunchTUIMode(cmd, args)
 		return
 	}
 
-	if len(modules) == 0 {
-		fmt.Println(utils.FormatInfo("No learning modules currently available"))
-		fmt.Println(utils.FormatTip("Modules are being developed and will be added in future updates"))
-		return
-	}
-
-	for _, module := range modules {
-		fmt.Println(utils.FormatKeyValue("Module", module.Title))
-		fmt.Println(utils.FormatKeyValue("Level", module.Level))
-		fmt.Println(utils.FormatKeyValue("Description", module.Description))
-		fmt.Println()
-	}
-}
-
-func handleLearnStart(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("🎓 Starting Learning Module"))
-	fmt.Println()
-
+	// If no subcommand specified, show help
 	if len(args) == 0 {
-		fmt.Println(utils.FormatError("Please specify a module to start"))
-		fmt.Println(utils.FormatTip("Use 'nixai learn list' to see available modules"))
+		cmd.Help()
 		return
 	}
 
-	moduleName := args[0]
-	fmt.Println(utils.FormatKeyValue("Starting Module", moduleName))
-	fmt.Println(utils.FormatInfo("Loading module content..."))
-
-	// TODO: Implement module loading and interactive learning
-	fmt.Println(utils.FormatTip("Interactive learning modules are being developed"))
+	// This should not be reached as subcommands handle specific operations
+	fmt.Println("Use 'nixai logs --help' to see available subcommands")
 }
 
-func handleLearnProgress(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("📈 Learning Progress"))
-	fmt.Println()
-
-	progress, err := learning.LoadProgress()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load progress: "+err.Error()))
-		return
-	}
-
-	fmt.Println(utils.FormatKeyValue("Completed Modules", fmt.Sprintf("%d", len(progress.CompletedModules))))
-	fmt.Println(utils.FormatKeyValue("Quiz Scores", fmt.Sprintf("%d quizzes taken", len(progress.QuizScores))))
-
-	if len(progress.CompletedModules) > 0 {
-		fmt.Println()
-		fmt.Println(utils.FormatSubsection("Completed Modules", ""))
-		for module := range progress.CompletedModules {
-			fmt.Println("  ✅ " + module)
-		}
-	}
-}
-
-func handleLearnQuiz(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("🧠 Learning Quiz"))
-	fmt.Println()
-
-	if len(args) == 0 {
-		fmt.Println(utils.FormatError("Please specify a quiz topic"))
-		return
-	}
-
-	topic := args[0]
-	fmt.Println(utils.FormatKeyValue("Quiz Topic", topic))
-	fmt.Println(utils.FormatInfo("Loading quiz questions..."))
-
-	// TODO: Implement quiz functionality
-	fmt.Println(utils.FormatTip("Interactive quizzes are being developed"))
-}
-
-// Log analysis subcommand handlers
-func handleLogsAnalyze(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("🔍 Analyzing System Logs"))
-	fmt.Println()
-
-	cfg, err := config.LoadUserConfig()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-		os.Exit(1)
-	}
-
-	// Initialize AI provider
-	aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
-	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
-		os.Exit(1)
-	}
-
-	// Read log data
-	var logData string
-	if len(args) > 0 && args[0] == "--file" && len(args) > 1 {
-		// Read from specified file
-		data, err := os.ReadFile(args[1])
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to read log file: "+err.Error()))
-			return
-		}
-		logData = string(data)
-	} else {
-		// Read from stdin if available
-		stat, _ := os.Stdin.Stat()
-		if (stat.Mode() & os.ModeCharDevice) == 0 {
-			input, _ := io.ReadAll(os.Stdin)
-			logData = string(input)
-		} else {
-			fmt.Println(utils.FormatInfo("No log data provided. Use --file <path> or pipe log data"))
-			return
-		}
-	}
-
-	// Parse logs using existing parser
-	entries, err := nixos.ParseLog(logData)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to parse logs: "+err.Error()))
-		return
-	}
-
-	fmt.Println(utils.FormatKeyValue("Parsed Entries", fmt.Sprintf("%d", len(entries))))
-	fmt.Print(utils.FormatInfo("Analyzing logs with AI... "))
-
-	prompt := fmt.Sprintf("Analyze these NixOS system log entries and identify issues, errors, or recommendations:\n\n%s", logData)
-	result, err := aiProvider.Query(prompt)
-	fmt.Println(utils.FormatSuccess("done"))
-
-	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("AI analysis failed: "+err.Error()))
-		return
-	}
-
-	fmt.Println(utils.RenderMarkdown(result))
-}
-
-func handleLogsParse(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("📊 Parsing Log Structure"))
-	fmt.Println()
-
-	var logData string
-	if len(args) > 0 {
-		// Read from file
-		data, err := os.ReadFile(args[0])
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to read log file: "+err.Error()))
-			return
-		}
-		logData = string(data)
-	} else {
-		// Read from stdin
-		input, _ := io.ReadAll(os.Stdin)
-		logData = string(input)
-	}
-
-	entries, err := nixos.ParseLog(logData)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to parse logs: "+err.Error()))
-		return
-	}
-
-	fmt.Println(utils.FormatKeyValue("Total Entries", fmt.Sprintf("%d", len(entries))))
-	fmt.Println()
-
-	// Show sample entries
-	sampleSize := 5
-	if len(entries) < sampleSize {
-		sampleSize = len(entries)
-	}
-
-	fmt.Println(utils.FormatSubsection("Sample Parsed Entries", ""))
-	for i := 0; i < sampleSize; i++ {
-		entry := entries[i]
-		fmt.Printf("Entry %d:\n", i+1)
-		if entry.Timestamp != "" {
-			fmt.Println(utils.FormatKeyValue("  Timestamp", entry.Timestamp))
-		}
-		if entry.Level != "" {
-			fmt.Println(utils.FormatKeyValue("  Level", entry.Level))
-		}
-		if entry.Unit != "" {
-			fmt.Println(utils.FormatKeyValue("  Unit", entry.Unit))
-		}
-		fmt.Println(utils.FormatKeyValue("  Message", entry.Message))
-		fmt.Println()
-	}
-}
-
+// handleLogsErrors handles error log analysis
 func handleLogsErrors(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("❌ Recent Critical Errors"))
-	fmt.Println()
-
-	// Use journalctl to get recent errors
-	fmt.Println(utils.FormatInfo("Fetching recent system errors..."))
-	fmt.Println(utils.FormatTip("This would integrate with journalctl to show recent ERROR and CRITICAL level messages"))
-
-	// TODO: Implement journalctl integration
-	fmt.Println(utils.FormatKeyValue("Status", "Feature in development"))
-}
-
-func handleLogsWatch(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("👀 Watching System Logs"))
-	fmt.Println()
-
-	fmt.Println(utils.FormatInfo("Starting real-time log monitoring..."))
-	fmt.Println(utils.FormatTip("This would provide real-time log analysis and alerts"))
-
-	// TODO: Implement real-time log watching
-	fmt.Println(utils.FormatKeyValue("Status", "Feature in development"))
-}
-
-// Neovim integration subcommand handlers
-func handleNeovimInstall(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("📦 Installing Neovim Integration"))
-	fmt.Println()
-
-	cfg, err := config.LoadUserConfig()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-		os.Exit(1)
-	}
-
-	// Get Neovim config directory
-	configDir, err := neovim.GetUserConfigDir()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to get Neovim config directory: "+err.Error()))
+	if globalTUI {
+		LaunchTUIMode(cmd, args)
 		return
 	}
 
-	fmt.Println(utils.FormatKeyValue("Neovim Config Dir", configDir))
+	fmt.Println(utils.FormatHeader("🚨 Error Logs Analysis"))
+	fmt.Println()
 
-	// Create integration using existing functionality
-	socketPath := cfg.MCPServer.SocketPath
-	if socketPath == "" {
-		socketPath = "/tmp/nixai-mcp.sock"
+	fmt.Println(utils.FormatProgress("Fetching error logs..."))
+
+	// Get error logs with various patterns
+	command := "journalctl --priority=err --lines=50 --no-pager"
+	logData, err := runCommand(command)
+	if err != nil {
+		// Try with sudo if regular access fails
+		fmt.Println(utils.FormatWarning("Standard access failed, trying with elevated privileges..."))
+		if output, sudoErr := runCommandWithSudo(command); sudoErr == nil {
+			logData = output
+		} else {
+			fmt.Println(utils.FormatError("Failed to fetch error logs: " + sudoErr.Error()))
+			return
+		}
 	}
 
-	fmt.Print(utils.FormatInfo("Creating Neovim module... "))
-	err = neovim.CreateNeovimModule(socketPath, configDir)
-	if err != nil {
-		fmt.Println(utils.FormatError("failed"))
-		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to create module: "+err.Error()))
+	if logData == "" {
+		fmt.Println(utils.FormatSuccess("No error logs found - system appears healthy!"))
 		return
 	}
+
+	// Initialize logs agent
+	logsAgent, err := initializeLogsAgent()
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Failed to initialize AI agent, using basic analysis: " + err.Error()))
+		displayBasicLogSummary(logData, "errors")
+		return
+	}
+
+	// Analyze with AI
+	fmt.Print(utils.FormatInfo("Analyzing error logs with AI... "))
+
+	ctx := context.Background()
+	analysis, err := logsAgent.Query(ctx, fmt.Sprintf("Analyze these error logs, prioritize critical issues, and provide step-by-step troubleshooting recommendations:\n\n%s", logData))
 
 	fmt.Println(utils.FormatSuccess("done"))
-	fmt.Println()
-	fmt.Println(utils.FormatSuccess("✅ Neovim integration installed successfully"))
-	fmt.Println(utils.FormatTip("Restart Neovim to load the nixai integration"))
-}
 
-func handleNeovimStatus(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("📊 Neovim Integration Status"))
-	fmt.Println()
-
-	configDir, err := neovim.GetUserConfigDir()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to get Neovim config directory: "+err.Error()))
+		fmt.Println(utils.FormatError("AI analysis failed: " + err.Error()))
+		displayBasicLogSummary(logData, "errors")
 		return
 	}
+
+	fmt.Println(utils.RenderMarkdown(analysis))
+}
+
+// handleLogsAnalyze handles analysis of specific log files
+func handleLogsAnalyze(cmd *cobra.Command, args []string) {
+	if globalTUI {
+		LaunchTUIMode(cmd, args)
+		return
+	}
+
+	fmt.Println(utils.FormatHeader("🔍 Log File Analysis"))
+	fmt.Println()
+
+	var logData string
+	var err error
+
+	// Check if log file was provided
+	if len(args) > 0 {
+		logFile := args[0]
+		fmt.Printf("Reading log file: %s\n", logFile)
+
+		data, err := os.ReadFile(logFile)
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to read log file: " + err.Error()))
+			return
+		}
+		logData = string(data)
+	} else {
+		// Read from stdin if no file provided
+		fmt.Println(utils.FormatInfo("Reading log data from stdin... (press Ctrl+D to finish)"))
+
+		reader := bufio.NewReader(os.Stdin)
+		var logLines []string
+		for {
+			line, err := reader.ReadString('\n')
+			if err != nil {
+				break // EOF or error
+			}
+			logLines = append(logLines, line)
+		}
+		logData = strings.Join(logLines, "")
+	}
+
+	if logData == "" {
+		fmt.Println(utils.FormatError("No log data to analyze"))
+		fmt.Println(utils.FormatInfo("Usage: nixai logs analyze <file> or pipe data to stdin"))
+		return
+	}
+
+	// Initialize logs agent
+	logsAgent, err := initializeLogsAgent()
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Failed to initialize AI agent, using basic analysis: " + err.Error()))
+		displayBasicLogSummary(logData, "file")
+		return
+	}
+
+	// Analyze with AI
+	fmt.Print(utils.FormatInfo("Analyzing log file with AI... "))
+
+	ctx := context.Background()
+	analysis, err := logsAgent.Query(ctx, fmt.Sprintf("Analyze this log file, identify patterns, issues, and provide actionable recommendations:\n\n%s", logData))
+
+	fmt.Println(utils.FormatSuccess("done"))
+
+	if err != nil {
+		fmt.Println(utils.FormatError("AI analysis failed: " + err.Error()))
+		displayBasicLogSummary(logData, "file")
+		return
+	}
+
+	fmt.Println(utils.RenderMarkdown(analysis))
+}
+
+// handleNeovimSetupCommand handles the neovim-setup command
+func handleNeovimSetupCommand(cmd *cobra.Command, args []string) {
+	if globalTUI {
+		LaunchTUIMode(cmd, args)
+		return
+	}
+
+	// TODO: Implement neovim setup functionality
+	fmt.Println("Neovim setup functionality is coming soon!")
+}
+
+// Neovim setup subcommand handlers
+func handleNeovimSetupInstall(cmd *cobra.Command, args []string) {
+	configDir, _ := cmd.Flags().GetString("config-dir")
+	socketPath, _ := cmd.Flags().GetString("socket-path")
+
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("🔧 Installing Neovim Integration"))
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Use default config directory if not specified
+	if configDir == "" {
+		var err error
+		configDir, err = neovim.GetUserConfigDir()
+		if err != nil {
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Failed to get config directory: "+err.Error()))
+			return
+		}
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Config Directory", configDir))
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Socket Path", socketPath))
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Create the Neovim module
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Creating nixai.lua module..."))
+	err := neovim.CreateNeovimModule(socketPath, configDir)
+	if err != nil {
+		fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Failed to create Neovim module: "+err.Error()))
+		return
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess("Neovim integration installed successfully!"))
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSubsection("📝 Next Steps", ""))
+	fmt.Fprintln(cmd.OutOrStdout(), "1. Add the following to your init.lua:")
+	fmt.Fprintln(cmd.OutOrStdout())
+	initConfig := neovim.GenerateInitConfig(socketPath)
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatCodeBlock(initConfig, "lua"))
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), "2. Restart Neovim to load the integration")
+	fmt.Fprintln(cmd.OutOrStdout(), "3. Use <leader>na to ask nixai questions from Neovim")
+}
+
+func handleNeovimSetupConfigure(cmd *cobra.Command, args []string) {
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("⚙️ Configuring Neovim Integration"))
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), "Configuration options:")
+	fmt.Fprintln(cmd.OutOrStdout(), "• Use --socket-path to specify custom MCP socket")
+	fmt.Fprintln(cmd.OutOrStdout(), "• Use --config-dir to specify custom Neovim config directory")
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Run 'nixai neovim-setup install' to apply configuration"))
+}
+
+func handleNeovimSetupStatus(cmd *cobra.Command, args []string) {
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("📊 Neovim Integration Status"))
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Check if config directory exists
+	configDir, err := neovim.GetUserConfigDir()
+	if err != nil {
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Config Directory", "❌ Not found"))
+		return
+	}
+
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Config Directory", "✅ "+configDir))
 
 	// Check if nixai.lua exists
-	nixaiLuaPath := configDir + "/lua/nixai.lua"
+	nixaiLuaPath := filepath.Join(configDir, "lua", "nixai.lua")
 	if _, err := os.Stat(nixaiLuaPath); err == nil {
-		fmt.Println(utils.FormatKeyValue("Integration Status", "✅ Installed"))
-		fmt.Println(utils.FormatKeyValue("Module Path", nixaiLuaPath))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("nixai.lua Module", "✅ Installed"))
 	} else {
-		fmt.Println(utils.FormatKeyValue("Integration Status", "❌ Not installed"))
-		fmt.Println(utils.FormatTip("Run 'nixai neovim-setup install' to set up integration"))
-	}
-
-	fmt.Println(utils.FormatKeyValue("Config Directory", configDir))
-}
-
-func handleNeovimRemove(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("🗑️  Removing Neovim Integration"))
-	fmt.Println()
-
-	configDir, err := neovim.GetUserConfigDir()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to get Neovim config directory: "+err.Error()))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("nixai.lua Module", "❌ Not found"))
+		fmt.Fprintln(cmd.OutOrStdout())
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatTip("Run 'nixai neovim-setup install' to install integration"))
 		return
 	}
 
-	nixaiLuaPath := configDir + "/lua/nixai.lua"
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatKeyValue("Integration Status", "✅ Ready"))
+}
 
-	fmt.Print(utils.FormatInfo("Removing nixai.lua module... "))
-	if err := os.Remove(nixaiLuaPath); err != nil {
-		fmt.Println(utils.FormatError("failed"))
-		if !os.IsNotExist(err) {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to remove module: "+err.Error()))
+func handleNeovimSetupUpdate(cmd *cobra.Command, args []string) {
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("🔄 Updating Neovim Integration"))
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	// Re-run installation to update files
+	handleNeovimSetupInstall(cmd, args)
+
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatNote("Integration updated to latest version"))
+}
+
+func handleNeovimSetupRemove(cmd *cobra.Command, args []string) {
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatHeader("🗑️ Removing Neovim Integration"))
+	fmt.Fprintln(cmd.OutOrStdout())
+
+	configDir, err := neovim.GetUserConfigDir()
+	if err != nil {
+		fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Failed to get config directory: "+err.Error()))
+		return
+	}
+
+	nixaiLuaPath := filepath.Join(configDir, "lua", "nixai.lua")
+	if _, err := os.Stat(nixaiLuaPath); err == nil {
+		err := os.Remove(nixaiLuaPath)
+		if err != nil {
+			fmt.Fprintln(cmd.ErrOrStderr(), utils.FormatError("Failed to remove nixai.lua: "+err.Error()))
 			return
 		}
-		fmt.Println(utils.FormatWarning("Module was not installed"))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatSuccess("nixai.lua module removed"))
 	} else {
-		fmt.Println(utils.FormatSuccess("done"))
-		fmt.Println(utils.FormatSuccess("✅ Neovim integration removed"))
+		fmt.Fprintln(cmd.OutOrStdout(), utils.FormatNote("nixai.lua module not found"))
 	}
+
+	fmt.Fprintln(cmd.OutOrStdout())
+	fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("Manual cleanup required:"))
+	fmt.Fprintln(cmd.OutOrStdout(), "• Remove nixai setup code from your init.lua")
+	fmt.Fprintln(cmd.OutOrStdout(), "• Restart Neovim to complete removal")
 }
 
-func handleNeovimUpdate(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("🔄 Updating Neovim Integration"))
-	fmt.Println()
+// handlePackageRepoCommand handles the package-repo command
+func handlePackageRepoCommand(cmd *cobra.Command, args []string) {
+	// Parse command flags
+	localPath, _ := cmd.Flags().GetString("local")
+	outputPath, _ := cmd.Flags().GetString("output")
+	packageName, _ := cmd.Flags().GetString("name")
+	analyzeOnly, _ := cmd.Flags().GetBool("analyze-only")
 
-	// Remove and reinstall
-	handleNeovimRemove(cmd, args)
-	fmt.Println()
-	handleNeovimInstall(cmd, args)
-}
+	// Determine repository URL or local path
+	var repoURL string
+	if localPath == "" && len(args) > 0 {
+		repoURL = args[0]
+	}
 
-// Package repository analysis handler
-func handlePackageRepoAnalysis(cmd *cobra.Command, args []string) {
-	fmt.Println(utils.FormatHeader("📦 Analyzing Package Repository"))
-	fmt.Println()
+	// Validate input
+	if localPath == "" && repoURL == "" {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Either repository URL or --local path must be provided"))
+		fmt.Fprintln(os.Stderr, utils.FormatTip("Usage: nixai package-repo <repo-url> [flags] or nixai package-repo --local <path> [flags]"))
+		return
+	}
 
+	// Load configuration
 	cfg, err := config.LoadUserConfig()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-		os.Exit(1)
+		return
 	}
 
-	// Initialize AI provider
-	aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+	// Initialize AI provider (using the legacy interface for packaging service)
+	legacyAIProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
-		os.Exit(1)
+		return
 	}
 
-	// Initialize MCP client for documentation
+	// Initialize MCP client
 	mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
 	mcpClient := mcp.NewMCPClient(mcpURL)
 
 	// Create packaging service
 	tempDir := "/tmp/nixai-packaging"
-	logger := &logger.Logger{} // Simple logger for now
-	packagingService := packaging.NewPackagingService(aiProvider, mcpClient, tempDir, logger)
+	packagingService := packaging.NewPackagingService(
+		legacyAIProvider, // Use legacy AI provider directly
+		mcpClient,
+		tempDir,
+		logger.NewLogger(),
+	)
 
-	// Parse command line arguments for packaging request
-	req := &packaging.PackageRequest{
-		Quiet: false,
+	// Create package request
+	request := &packaging.PackageRequest{
+		RepoURL:     repoURL,
+		LocalPath:   localPath,
+		OutputPath:  outputPath,
+		PackageName: packageName,
+		Quiet:       false,
 	}
 
-	if len(args) > 0 {
-		// First argument could be URL or with --local flag
-		if args[0] == "--local" && len(args) > 1 {
-			req.LocalPath = args[1]
-		} else {
-			req.RepoURL = args[0]
-		}
+	// Display header
+	if localPath != "" {
+		fmt.Println(utils.FormatHeader("📦 Analyzing Local Repository: " + localPath))
+	} else {
+		fmt.Println(utils.FormatHeader("📦 Analyzing Repository: " + repoURL))
 	}
-
-	// Parse additional flags (basic implementation)
-	for i, arg := range args {
-		switch arg {
-		case "--name":
-			if i+1 < len(args) {
-				req.PackageName = args[i+1]
-			}
-		case "--output":
-			if i+1 < len(args) {
-				req.OutputPath = args[i+1]
-			}
-		case "--quiet":
-			req.Quiet = true
-		}
-	}
-
-	if req.RepoURL == "" && req.LocalPath == "" {
-		fmt.Println(utils.FormatError("Please provide a repository URL or local path"))
-		return
-	}
-
-	fmt.Print(utils.FormatInfo("Starting repository analysis... "))
-
-	// Run packaging analysis
-	ctx := context.Background()
-	result, err := packagingService.PackageRepository(ctx, req)
-	if err != nil {
-		fmt.Println(utils.FormatError("failed"))
-		fmt.Fprintln(os.Stderr, utils.FormatError("Analysis failed: "+err.Error()))
-		return
-	}
-
-	fmt.Println(utils.FormatSuccess("done"))
 	fmt.Println()
 
-	// Display results
-	if result.Analysis != nil {
-		fmt.Println(utils.FormatSubsection("📊 Repository Analysis", ""))
-		fmt.Println(utils.FormatKeyValue("Language", result.Analysis.Language))
-		fmt.Println(utils.FormatKeyValue("Build System", string(result.Analysis.BuildSystem)))
-		fmt.Println(utils.FormatKeyValue("Dependencies", fmt.Sprintf("%d found", len(result.Analysis.Dependencies))))
-		if result.Analysis.License != "" {
-			fmt.Println(utils.FormatKeyValue("License", result.Analysis.License))
-		}
-		if result.Analysis.Description != "" {
-			fmt.Println(utils.FormatKeyValue("Description", result.Analysis.Description))
-		}
+	// Execute packaging
+	ctx := context.Background()
+	result, err := packagingService.PackageRepository(ctx, request)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to package repository: "+err.Error()))
+		return
 	}
 
-	if result.Derivation != "" {
+	// Display analysis results
+	fmt.Println(utils.FormatHeader("🔍 Repository Analysis"))
+	fmt.Println(utils.FormatKeyValue("Project Name", result.Analysis.ProjectName))
+	fmt.Println(utils.FormatKeyValue("Language", result.Analysis.Language))
+	fmt.Println(utils.FormatKeyValue("Build System", string(result.Analysis.BuildSystem))) // Convert BuildSystem to string
+	fmt.Println(utils.FormatKeyValue("Dependencies", fmt.Sprintf("%d found", len(result.Analysis.Dependencies))))
+
+	if len(result.Analysis.Dependencies) > 0 {
 		fmt.Println()
-		fmt.Println(utils.FormatSubsection("📄 Generated Derivation", ""))
-		fmt.Println(result.Derivation)
+		fmt.Println(utils.FormatHeader("📋 Dependencies"))
+		for _, dep := range result.Analysis.Dependencies {
+			fmt.Printf("  • %s (%s)\n", dep.Name, dep.Type)
+		}
 	}
 
+	// Display validation issues if any
 	if len(result.ValidationIssues) > 0 {
 		fmt.Println()
-		fmt.Println(utils.FormatSubsection("⚠️  Validation Issues", ""))
+		fmt.Println(utils.FormatHeader("⚠️  Validation Issues"))
 		for _, issue := range result.ValidationIssues {
-			fmt.Println("  • " + issue)
+			fmt.Println(utils.FormatWarning("• " + issue))
 		}
 	}
 
-	if result.OutputFile != "" {
+	// Display derivation if not analyze-only
+	if !analyzeOnly && result.Derivation != "" {
 		fmt.Println()
-		fmt.Println(utils.FormatSuccess("✅ Derivation saved to: " + result.OutputFile))
+		fmt.Println(utils.FormatHeader("📜 Generated Nix Derivation"))
+		fmt.Println(utils.RenderMarkdown("```nix\n" + result.Derivation + "\n```"))
+
+		// Save to file if output path specified
+		if outputPath != "" {
+			err := os.WriteFile(outputPath, []byte(result.Derivation), 0644)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to write derivation to file: "+err.Error()))
+			} else {
+				fmt.Println()
+				fmt.Println(utils.FormatSuccess("✅ Derivation written to: " + outputPath))
+			}
+		}
 	}
+
+	// Display nixpkgs mappings if available
+	if len(result.NixpkgsMappings) > 0 {
+		fmt.Println()
+		fmt.Println(utils.FormatHeader("🗂️  Nixpkgs Mappings"))
+		for dep, nixpkg := range result.NixpkgsMappings {
+			fmt.Println(utils.FormatKeyValue(dep, nixpkg))
+		}
+	}
+
+	fmt.Println()
+	fmt.Println(utils.FormatSuccess("✅ Repository analysis complete!"))
 }
 
-// Handler functions for the CLI commands
+// initializeLogsAgent creates a logs agent with AI provider
+func initializeLogsAgent() (*agent.LogsAgent, error) {
+	cfg, err := config.LoadUserConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
 
-// handleFlakeCommand handles flake management operations
-func handleFlakeCommand(cmd *cobra.Command, args []string) {
-	if len(args) == 0 {
-		fmt.Println(utils.FormatHeader("NixOS Flake Management"))
-		fmt.Println(utils.FormatInfo("Available subcommands:"))
-		fmt.Println("  create    - Create a new flake configuration")
-		fmt.Println("  validate  - Validate existing flake")
-		fmt.Println("  migrate   - Migrate from legacy configuration")
-		fmt.Println("  analyze   - Analyze flake for issues")
-		fmt.Println()
-		fmt.Println(utils.FormatInfo("Use 'nixai flake <subcommand> --help' for more information"))
+	legacyProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize AI provider: %w", err)
+	}
+
+	// Adapt legacy provider to new Provider interface
+	provider := ai.NewLegacyProviderAdapter(legacyProvider)
+	logsAgent := agent.NewLogsAgent(provider)
+	return logsAgent, nil
+}
+
+// Core log analysis functions (can be called from both CLI and TUI)
+
+// analyzeSystemLogs performs system log analysis and outputs to the provided writer
+func analyzeSystemLogs(out io.Writer) {
+	fmt.Fprintln(out, utils.FormatHeader("🖥️ System Logs Analysis"))
+	fmt.Fprintln(out)
+
+	// Check if we need sudo for some system logs
+	var logData string
+	var err error
+
+	fmt.Fprintln(out, utils.FormatProgress("Fetching system logs..."))
+
+	// Try to get system logs
+	if output, err := runCommand("journalctl --system --lines=100 --no-pager"); err == nil {
+		logData = output
+	} else {
+		// Try with sudo if regular access fails
+		fmt.Fprintln(out, utils.FormatWarning("Standard access failed, trying with elevated privileges..."))
+		if output, sudoErr := runCommandWithSudo("journalctl --system --lines=100 --no-pager"); sudoErr == nil {
+			logData = output
+		} else {
+			fmt.Fprintln(out, utils.FormatError("Failed to fetch system logs: "+sudoErr.Error()))
+			return
+		}
+	}
+
+	if logData == "" {
+		fmt.Fprintln(out, utils.FormatWarning("No system log data found"))
 		return
 	}
 
-	subcommand := args[0]
-	switch subcommand {
-	case "create":
-		handleFlakeCreate(cmd, args[1:])
-	case "validate":
-		handleFlakeValidate(cmd, args[1:])
-	case "migrate":
-		handleFlakeMigrate(cmd, args[1:])
-	case "analyze":
-		handleFlakeAnalyze(cmd, args[1:])
-	default:
-		fmt.Fprintf(os.Stderr, utils.FormatError("Unknown flake subcommand: %s\n"), subcommand)
-		fmt.Println(utils.FormatInfo("Run 'nixai flake' to see available subcommands"))
-	}
-}
-
-// handleLearnCommand handles learning system operations
-func handleLearnCommand(cmd *cobra.Command, args []string) {
-	if len(args) == 0 {
-		fmt.Println(utils.FormatHeader("NixOS Learning System"))
-		fmt.Println(utils.FormatInfo("Available subcommands:"))
-		fmt.Println("  list      - List available learning modules")
-		fmt.Println("  start     - Start a learning module")
-		fmt.Println("  progress  - Show learning progress")
-		fmt.Println("  quiz      - Take a quiz on a topic")
-		fmt.Println()
-		fmt.Println(utils.FormatInfo("Use 'nixai learn <subcommand> --help' for more information"))
+	// Initialize logs agent
+	logsAgent, err := initializeLogsAgent()
+	if err != nil {
+		fmt.Fprintln(out, utils.FormatWarning("Failed to initialize AI agent, using basic analysis: "+err.Error()))
+		displayBasicLogSummaryToWriter(out, logData, "system")
 		return
 	}
 
-	subcommand := args[0]
-	switch subcommand {
-	case "list":
-		handleLearnList(cmd, args[1:])
-	case "start":
-		handleLearnStart(cmd, args[1:])
-	case "progress":
-		handleLearnProgress(cmd, args[1:])
-	case "quiz":
-		handleLearnQuiz(cmd, args[1:])
-	default:
-		fmt.Fprintf(os.Stderr, utils.FormatError("Unknown learn subcommand: %s\n"), subcommand)
-		fmt.Println(utils.FormatInfo("Run 'nixai learn' to see available subcommands"))
-	}
-}
+	// Analyze with AI
+	fmt.Fprint(out, utils.FormatInfo("Analyzing system logs with AI... "))
 
-// handleLogsCommand handles log analysis operations
-func handleLogsCommand(cmd *cobra.Command, args []string) {
-	if len(args) == 0 {
-		fmt.Println(utils.FormatHeader("NixOS Log Analysis"))
-		fmt.Println(utils.FormatInfo("Available subcommands:"))
-		fmt.Println("  analyze   - Analyze system logs with AI")
-		fmt.Println("  parse     - Parse log format and structure")
-		fmt.Println("  errors    - Show recent critical errors")
-		fmt.Println("  watch     - Watch logs in real-time")
-		fmt.Println()
-		fmt.Println(utils.FormatInfo("Use 'nixai logs <subcommand> --help' for more information"))
+	ctx := context.Background()
+	analysis, err := logsAgent.Query(ctx, fmt.Sprintf("Analyze these system logs for issues, patterns, and recommendations:\n\n%s", logData))
+
+	fmt.Fprintln(out, utils.FormatSuccess("done"))
+
+	if err != nil {
+		fmt.Fprintln(out, utils.FormatError("AI analysis failed: "+err.Error()))
+		displayBasicLogSummaryToWriter(out, logData, "system")
 		return
 	}
 
-	subcommand := args[0]
-	switch subcommand {
-	case "analyze":
-		handleLogsAnalyze(cmd, args[1:])
-	case "parse":
-		handleLogsParse(cmd, args[1:])
-	case "errors":
-		handleLogsErrors(cmd, args[1:])
-	case "watch":
-		handleLogsWatch(cmd, args[1:])
-	default:
-		fmt.Fprintf(os.Stderr, utils.FormatError("Unknown logs subcommand: %s\n"), subcommand)
-		fmt.Println(utils.FormatInfo("Run 'nixai logs' to see available subcommands"))
-	}
+	fmt.Fprintln(out, utils.RenderMarkdown(analysis))
 }
 
-// handleNeovimSetupCommand handles Neovim integration setup
-func handleNeovimSetupCommand(cmd *cobra.Command, args []string) {
-	if len(args) == 0 {
-		fmt.Println(utils.FormatHeader("Neovim Integration Setup"))
-		fmt.Println(utils.FormatInfo("Available subcommands:"))
-		fmt.Println("  install   - Install Neovim integration")
-		fmt.Println("  status    - Check integration status")
-		fmt.Println("  remove    - Remove integration")
-		fmt.Println("  update    - Update integration configuration")
-		fmt.Println()
-		fmt.Println(utils.FormatInfo("Use 'nixai neovim-setup <subcommand> --help' for more information"))
+// handleLogsSystem handles system log analysis
+func handleLogsSystem(cmd *cobra.Command, args []string) {
+	if globalTUI {
+		LaunchTUIMode(cmd, args)
 		return
 	}
 
-	subcommand := args[0]
-	switch subcommand {
-	case "install":
-		handleNeovimInstall(cmd, args[1:])
-	case "status":
-		handleNeovimStatus(cmd, args[1:])
-	case "remove":
-		handleNeovimRemove(cmd, args[1:])
-	case "update":
-		handleNeovimUpdate(cmd, args[1:])
-	default:
-		fmt.Fprintf(os.Stderr, utils.FormatError("Unknown neovim-setup subcommand: %s\n"), subcommand)
-		fmt.Println(utils.FormatInfo("Run 'nixai neovim-setup' to see available subcommands"))
-	}
+	analyzeSystemLogs(os.Stdout)
 }
 
-// handlePackageRepoCommand handles package repository analysis
-func handlePackageRepoCommand(cmd *cobra.Command, args []string) {
-	if len(args) == 0 {
-		fmt.Println(utils.FormatHeader("Package Repository Analysis"))
-		fmt.Println(utils.FormatInfo("Analyze Git repositories and generate Nix derivations"))
-		fmt.Println()
-		fmt.Println(utils.FormatInfo("Usage:"))
-		fmt.Println("  nixai package-repo <repository-url>")
-		fmt.Println("  nixai package-repo --local <local-path>")
-		fmt.Println()
-		fmt.Println(utils.FormatInfo("Options:"))
-		fmt.Println("  --local    Use local repository path")
-		fmt.Println("  --name     Custom package name")
-		fmt.Println("  --output   Output file for derivation")
-		fmt.Println("  --quiet    Suppress progress output")
+// handleLogsBoot handles boot log analysis
+func handleLogsBoot(cmd *cobra.Command, args []string) {
+	if globalTUI {
+		LaunchTUIMode(cmd, args)
 		return
 	}
 
-	handlePackageRepoAnalysis(cmd, args)
+	fmt.Println(utils.FormatHeader("🚀 Boot Logs Analysis"))
+	fmt.Println()
+
+	fmt.Println(utils.FormatProgress("Fetching boot logs..."))
+
+	// Get boot logs
+	var logData string
+	var err error
+
+	if output, err := runCommand("journalctl --boot --lines=200 --no-pager"); err == nil {
+		logData = output
+	} else {
+		// Try with sudo if regular access fails
+		fmt.Println(utils.FormatWarning("Standard access failed, trying with elevated privileges..."))
+		if output, sudoErr := runCommandWithSudo("journalctl --boot --lines=200 --no-pager"); sudoErr == nil {
+			logData = output
+		} else {
+			fmt.Println(utils.FormatError("Failed to fetch boot logs: " + sudoErr.Error()))
+			return
+		}
+	}
+
+	if logData == "" {
+		fmt.Println(utils.FormatWarning("No boot log data found"))
+		return
+	}
+
+	// Initialize logs agent
+	logsAgent, err := initializeLogsAgent()
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Failed to initialize AI agent, using basic analysis: " + err.Error()))
+		displayBasicLogSummary(logData, "boot")
+		return
+	}
+
+	// Analyze with AI
+	fmt.Print(utils.FormatInfo("Analyzing boot logs with AI... "))
+
+	ctx := context.Background()
+	analysis, err := logsAgent.Query(ctx, fmt.Sprintf("Analyze these boot logs for startup issues, errors, and performance insights:\n\n%s", logData))
+
+	fmt.Println(utils.FormatSuccess("done"))
+
+	if err != nil {
+		fmt.Println(utils.FormatError("AI analysis failed: " + err.Error()))
+		displayBasicLogSummary(logData, "boot")
+		return
+	}
+
+	fmt.Println(utils.RenderMarkdown(analysis))
+}
+
+// handleLogsService handles service-specific log analysis
+func handleLogsService(cmd *cobra.Command, args []string) {
+	if globalTUI {
+		LaunchTUIMode(cmd, args)
+		return
+	}
+
+	fmt.Println(utils.FormatHeader("🔧 Service Logs Analysis"))
+	fmt.Println()
+
+	var serviceName string
+	if len(args) > 0 {
+		serviceName = args[0]
+	} else {
+		fmt.Print("Enter service name: ")
+		reader := bufio.NewReader(os.Stdin)
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to read service name: " + err.Error()))
+			return
+		}
+		serviceName = strings.TrimSpace(input)
+	}
+
+	if serviceName == "" {
+		fmt.Println(utils.FormatError("Service name is required"))
+		fmt.Println(utils.FormatInfo("Usage: nixai logs service <service-name>"))
+		fmt.Println(utils.FormatInfo("Example: nixai logs service nginx"))
+		return
+	}
+
+	fmt.Printf("Fetching logs for service: %s\n", utils.FormatKeyValue("Service", serviceName))
+
+	// Get service logs
+	command := fmt.Sprintf("journalctl --unit=%s --lines=100 --no-pager", serviceName)
+	logData, err := runCommand(command)
+	if err != nil {
+		// Try with sudo if regular access fails
+		fmt.Println(utils.FormatWarning("Standard access failed, trying with elevated privileges..."))
+		if output, sudoErr := runCommandWithSudo(command); sudoErr == nil {
+			logData = output
+		} else {
+			fmt.Printf("Failed to fetch logs for service %s: %s\n", serviceName, sudoErr.Error())
+			return
+		}
+	}
+
+	if logData == "" {
+		fmt.Printf("No log data found for service: %s\n", serviceName)
+		return
+	}
+
+	// Initialize logs agent
+	logsAgent, err := initializeLogsAgent()
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Failed to initialize AI agent, using basic analysis: " + err.Error()))
+		displayBasicLogSummary(logData, "service")
+		return
+	}
+
+	// Analyze with AI
+	fmt.Print(utils.FormatInfo("Analyzing service logs with AI... "))
+
+	ctx := context.Background()
+	analysis, err := logsAgent.Query(ctx, fmt.Sprintf("Analyze these service logs for %s, identify issues, errors, and provide troubleshooting recommendations:\n\n%s", serviceName, logData))
+
+	fmt.Println(utils.FormatSuccess("done"))
+
+	if err != nil {
+		fmt.Println(utils.FormatError("AI analysis failed: " + err.Error()))
+		displayBasicLogSummary(logData, "service")
+		return
+	}
+
+	fmt.Println(utils.RenderMarkdown(analysis))
+}
+
+// handleLogsBuild handles build log analysis
+func handleLogsBuild(cmd *cobra.Command, args []string) {
+	if globalTUI {
+		LaunchTUIMode(cmd, args)
+		return
+	}
+
+	fmt.Println(utils.FormatHeader("🔨 Build Logs Analysis"))
+	fmt.Println()
+
+	var logData string
+	var err error
+
+	// Check if log file was provided
+	if len(args) > 0 {
+		logFile := args[0]
+		fmt.Printf("Reading build log from file: %s\n", logFile)
+
+		data, err := os.ReadFile(logFile)
+		if err != nil {
+			fmt.Println(utils.FormatError("Failed to read log file: " + err.Error()))
+			return
+		}
+		logData = string(data)
+	} else {
+		// Try to get recent build logs from nixos-rebuild
+		fmt.Println(utils.FormatProgress("Searching for recent build logs..."))
+
+		command := "journalctl --unit=nixos-rebuild --lines=200 --no-pager"
+		if output, err := runCommand(command); err == nil && strings.TrimSpace(output) != "" {
+			logData = output
+		} else {
+			// Check for nix build logs
+			command = "journalctl --identifier=nix --lines=200 --no-pager"
+			if output, err := runCommand(command); err == nil && strings.TrimSpace(output) != "" {
+				logData = output
+			} else {
+				fmt.Println(utils.FormatWarning("No recent build logs found"))
+				fmt.Println(utils.FormatInfo("Usage: nixai logs build [log-file]"))
+				fmt.Println(utils.FormatInfo("Example: nixai logs build /var/log/nixos-rebuild.log"))
+				return
+			}
+		}
+	}
+
+	if logData == "" {
+		fmt.Println(utils.FormatWarning("No build log data found"))
+		return
+	}
+
+	// Initialize logs agent
+	logsAgent, err := initializeLogsAgent()
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Failed to initialize AI agent, using basic analysis: " + err.Error()))
+		displayBasicLogSummary(logData, "build")
+		return
+	}
+
+	// Analyze with AI
+	fmt.Print(utils.FormatInfo("Analyzing build logs with AI... "))
+
+	ctx := context.Background()
+	analysis, err := logsAgent.Query(ctx, fmt.Sprintf("Analyze these build logs for compilation errors, dependency issues, and build optimization suggestions:\n\n%s", logData))
+
+	fmt.Println(utils.FormatSuccess("done"))
+
+	if err != nil {
+		fmt.Println(utils.FormatError("AI analysis failed: " + err.Error()))
+		displayBasicLogSummary(logData, "build")
+		return
+	}
+
+	fmt.Println(utils.RenderMarkdown(analysis))
+}
+
+// displayBasicLogSummary provides a basic log summary when AI is unavailable
+func displayBasicLogSummary(logData, logType string) {
+	lines := strings.Split(logData, "\n")
+
+	fmt.Println(utils.FormatSubsection("📊 Basic Log Summary", ""))
+	fmt.Println(utils.FormatKeyValue("Log Type", logType))
+	fmt.Println(utils.FormatKeyValue("Total Lines", fmt.Sprintf("%d", len(lines))))
+
+	// Count log levels
+	errorCount := 0
+	warningCount := 0
+	infoCount := 0
+
+	for _, line := range lines {
+		lowerLine := strings.ToLower(line)
+		if strings.Contains(lowerLine, "error") || strings.Contains(lowerLine, "failed") || strings.Contains(lowerLine, "critical") {
+			errorCount++
+		} else if strings.Contains(lowerLine, "warning") || strings.Contains(lowerLine, "warn") {
+			warningCount++
+		} else if strings.Contains(lowerLine, "info") {
+			infoCount++
+		}
+	}
+
+	fmt.Println(utils.FormatKeyValue("Errors", fmt.Sprintf("%d", errorCount)))
+	fmt.Println(utils.FormatKeyValue("Warnings", fmt.Sprintf("%d", warningCount)))
+	fmt.Println(utils.FormatKeyValue("Info Messages", fmt.Sprintf("%d", infoCount)))
+
+	// Show recent entries
+	if len(lines) > 0 {
+		fmt.Println(utils.FormatSubsection("📋 Recent Entries", ""))
+		recentCount := 5
+		if len(lines) < recentCount {
+			recentCount = len(lines)
+		}
+
+		startIdx := len(lines) - recentCount
+		for i := startIdx; i < len(lines); i++ {
+			if strings.TrimSpace(lines[i]) != "" {
+				fmt.Printf("  %s\n", lines[i])
+			}
+		}
+	}
+}
+
+// displayBasicLogSummaryToWriter provides a basic log summary to an io.Writer when AI is unavailable
+func displayBasicLogSummaryToWriter(out io.Writer, logData, logType string) {
+	lines := strings.Split(logData, "\n")
+
+	fmt.Fprintln(out, utils.FormatSubsection("📊 Basic Log Summary", ""))
+	fmt.Fprintln(out, utils.FormatKeyValue("Log Type", logType))
+	fmt.Fprintln(out, utils.FormatKeyValue("Total Lines", fmt.Sprintf("%d", len(lines))))
+
+	// Count log levels
+	errorCount := 0
+	warningCount := 0
+	infoCount := 0
+
+	for _, line := range lines {
+		lowerLine := strings.ToLower(line)
+		if strings.Contains(lowerLine, "error") || strings.Contains(lowerLine, "failed") || strings.Contains(lowerLine, "critical") {
+			errorCount++
+		} else if strings.Contains(lowerLine, "warning") || strings.Contains(lowerLine, "warn") {
+			warningCount++
+		} else if strings.Contains(lowerLine, "info") {
+			infoCount++
+		}
+	}
+
+	fmt.Fprintln(out, utils.FormatKeyValue("Errors", fmt.Sprintf("%d", errorCount)))
+	fmt.Fprintln(out, utils.FormatKeyValue("Warnings", fmt.Sprintf("%d", warningCount)))
+	fmt.Fprintln(out, utils.FormatKeyValue("Info Messages", fmt.Sprintf("%d", infoCount)))
+
+	// Show recent entries
+	if len(lines) > 0 {
+		fmt.Fprintln(out, utils.FormatSubsection("📋 Recent Entries", ""))
+		recentCount := 5
+		if len(lines) < recentCount {
+			recentCount = len(lines)
+		}
+
+		startIdx := len(lines) - recentCount
+		for i := startIdx; i < len(lines); i++ {
+			if strings.TrimSpace(lines[i]) != "" {
+				fmt.Fprintf(out, "  %s\n", lines[i])
+			}
+		}
+	}
 }
 
 // initializeCommands adds all commands to the root command
@@ -2985,6 +3477,7 @@ func initializeCommands() {
 	rootCmd.AddCommand(enhancedBuildCmd)
 	rootCmd.AddCommand(devenvCmd)
 	rootCmd.AddCommand(NewDepsCommand())
+	rootCmd.AddCommand(contextCmd)
 	// Register stub commands for missing features
 	rootCmd.AddCommand(communityCmd)
 	rootCmd.AddCommand(configCmd)

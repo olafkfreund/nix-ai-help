@@ -12,7 +12,9 @@ import (
 	"time"
 
 	"nix-ai-help/internal/ai"
+	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
@@ -111,6 +113,22 @@ This command provides:
 			os.Exit(1)
 		}
 
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		// Create GC manager
 		log := logger.NewLoggerWithLevel(cfg.LogLevel)
 		gcm := NewGCManager(log)
@@ -130,8 +148,8 @@ This command provides:
 			os.Exit(1)
 		}
 
-		// Display results
-		gcm.DisplayAnalysis(analysis, aiProvider)
+		// Display results with contextual analysis
+		gcm.DisplayAnalysisWithContext(analysis, aiProvider, nixosCtx)
 	},
 }
 
@@ -167,6 +185,22 @@ This command:
 		// Create GC manager
 		log := logger.NewLoggerWithLevel(cfg.LogLevel)
 		gcm := NewGCManager(log)
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(log)
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
 
 		// Use the new ProviderManager system
 		aiProvider, err := GetLegacyAIProvider(cfg, log)
@@ -212,6 +246,22 @@ This command analyzes:
 		log := logger.NewLoggerWithLevel(cfg.LogLevel)
 		gcm := NewGCManager(log)
 
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(log)
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		// Use the new ProviderManager system
 		aiProvider, err := GetLegacyAIProvider(cfg, log)
 		if err != nil {
@@ -219,7 +269,7 @@ This command analyzes:
 			os.Exit(1)
 		}
 
-		// Compare generations
+		// Compare generations with context
 		err = gcm.CompareGenerations(aiProvider, keepCount)
 		if err != nil {
 			fmt.Println(utils.FormatError("Error comparing generations: " + err.Error()))
@@ -254,6 +304,22 @@ Shows:
 		log := logger.NewLoggerWithLevel(cfg.LogLevel)
 		gcm := NewGCManager(log)
 
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(log)
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
+		}
+
 		// Use the new ProviderManager system
 		aiProvider, err := GetLegacyAIProvider(cfg, log)
 		if err != nil {
@@ -261,7 +327,7 @@ Shows:
 			os.Exit(1)
 		}
 
-		// Analyze disk usage
+		// Analyze disk usage with context
 		err = gcm.AnalyzeDiskUsage(aiProvider)
 		if err != nil {
 			fmt.Println(utils.FormatError("Error analyzing disk usage: " + err.Error()))
@@ -586,6 +652,80 @@ func (gcm *GCManager) DisplayAnalysis(analysis *GCAnalysis, aiProvider ai.AIProv
 		fmt.Println(utils.FormatWarning("Could not get AI analysis: " + err.Error()))
 	} else {
 		fmt.Println(utils.FormatSubsection("🤖 AI Analysis & Recommendations", ""))
+		fmt.Println(utils.RenderMarkdown(aiAnalysis))
+	}
+
+	fmt.Println()
+	fmt.Println(utils.FormatTip("Use 'nixai gc safe-clean --dry-run' to preview cleanup operations"))
+	fmt.Println(utils.FormatTip("Use 'nixai gc compare-generations' to analyze generations in detail"))
+}
+
+// DisplayAnalysisWithContext displays the analysis results with AI enhancement and NixOS context
+func (gcm *GCManager) DisplayAnalysisWithContext(analysis *GCAnalysis, aiProvider ai.AIProvider, nixosCtx *config.NixOSContext) {
+	// Display basic metrics
+	fmt.Println(utils.FormatSubsection("📊 Storage Overview", ""))
+	fmt.Println(utils.FormatKeyValue("Store Size", formatBytes(analysis.StoreSize)))
+	fmt.Println(utils.FormatKeyValue("Available Space", formatBytes(analysis.AvailableSpace)))
+	fmt.Println(utils.FormatKeyValue("Total Space", formatBytes(analysis.TotalSpace)))
+
+	usagePercent := float64(analysis.TotalSpace-analysis.AvailableSpace) / float64(analysis.TotalSpace) * 100
+	fmt.Println(utils.FormatKeyValue("Disk Usage", fmt.Sprintf("%.1f%%", usagePercent)))
+	fmt.Println()
+
+	// Display generations
+	fmt.Println(utils.FormatSubsection("🕒 System Generations", ""))
+	fmt.Printf("Found %d generation(s):\n\n", len(analysis.Generations))
+
+	for i, gen := range analysis.Generations {
+		if i >= 10 {
+			fmt.Println(utils.FormatNote(fmt.Sprintf("... and %d more generations", len(analysis.Generations)-10)))
+			break
+		}
+
+		status := ""
+		if gen.Current {
+			status = " (current)"
+		} else if gen.Safe {
+			status = " (safe to remove)"
+		} else {
+			status = " (recent, keep)"
+		}
+
+		fmt.Printf("  %s: %s%s\n",
+			utils.FormatNote(fmt.Sprintf("#%d", gen.Number)),
+			gen.Date.Format("2006-01-02 15:04"),
+			utils.FormatNote(status))
+	}
+	fmt.Println()
+
+	// Display cleanup opportunities
+	fmt.Println(utils.FormatSubsection("🧹 Cleanup Opportunities", ""))
+	fmt.Println(utils.FormatKeyValue("Potential Savings", formatBytes(analysis.PotentialSavings)))
+	fmt.Println(utils.FormatKeyValue("Risk Level", analysis.RiskLevel))
+	fmt.Println()
+
+	if len(analysis.RecommendedClean) > 0 {
+		fmt.Println("Recommended cleanup actions:")
+		for _, item := range analysis.RecommendedClean {
+			fmt.Printf("  • %s (%s, %s risk)\n",
+				item.Description,
+				formatBytes(item.Size),
+				strings.ToLower(item.Risk))
+		}
+		fmt.Println()
+	}
+
+	// Get context-aware AI analysis
+	fmt.Println(utils.FormatProgress("Getting context-aware AI analysis and recommendations..."))
+	contextBuilder := nixoscontext.NewNixOSContextBuilder()
+	basePrompt := gcm.buildAnalysisPrompt(analysis)
+	contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
+	aiAnalysis, err := aiProvider.Query(contextualPrompt)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Could not get AI analysis: " + err.Error()))
+	} else {
+		fmt.Println(utils.FormatSubsection("🤖 Context-Aware AI Analysis & Recommendations", ""))
 		fmt.Println(utils.RenderMarkdown(aiAnalysis))
 	}
 

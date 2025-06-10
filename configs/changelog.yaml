@@ -1,0 +1,91 @@
+changelog:
+  - version: "1.3.0"
+    date: "2025-06-10"
+    highlights:
+      - "Context-Aware Intelligence System"
+      - "4 new context management commands"
+      - "Personalized AI responses for all commands"
+      - "Performance-optimized context caching"
+    features:
+      - title: "Context Detection System"
+        description: "Automatic detection of NixOS configuration type, Home Manager setup, and system services"
+      - title: "Context Management Commands"
+        description: "4 specialized commands: detect, show, reset, status for complete context control"
+      - title: "System-Aware Responses"
+        description: "All commands now provide personalized assistance based on your actual NixOS configuration"
+      - title: "Context Display"
+        description: "Every command shows personalized system summary with flakes/channels, Home Manager type"
+      - title: "JSON Output Support"
+        description: "Context commands support JSON output for scripting and automation"
+    improvements:
+      - "Context caching for instant access with intelligent refresh triggers"
+      - "Health monitoring for context detection system"
+      - "Interactive context reset with confirmation prompts"
+      - "Automatic context invalidation when system configuration changes"
+    fixes:
+      - "Improved context detection reliability across different NixOS setups"
+      - "Fixed context caching issues and memory optimization"
+
+  - version: "1.2.3"
+    date: "2025-06-09"
+    highlights:
+      - "Enhanced TUI with modern design"
+      - "Removed icon dependencies for accessibility"
+      - "Improved scrolling throughout interface"
+      - "Added version display in status bar"
+    features:
+      - title: "Icon-Free Interface"
+        description: "Complete removal of Unicode icons for better accessibility"
+      - title: "Enhanced Typography"
+        description: "Larger, bolder text with improved visual hierarchy"
+      - title: "Smart Scrolling"
+        description: "Scroll indicators and smooth navigation with Page Up/Down"
+      - title: "Version Display"
+        description: "nixai version prominently shown in status bar"
+    improvements:
+      - "Better command description layout with multi-line support"
+      - "Enhanced search functionality with visual feedback"
+      - "Improved keyboard navigation and shortcuts"
+      - "More prominent selected item styling"
+    fixes:
+      - "Fixed command execution flow in modern TUI"
+      - "Resolved icon rendering issues"
+      - "Fixed scroll offset calculations"
+
+  - version: "1.2.2"
+    date: "2025-06-01" 
+    highlights:
+      - "Improved AI provider integration"
+      - "Enhanced NixOS diagnostics"
+      - "Better MCP server stability"
+    features:
+      - title: "Multi-Provider AI Support"
+        description: "Support for Ollama, OpenAI, Gemini, and other providers"
+      - title: "Advanced Diagnostics"
+        description: "Better error analysis and recovery suggestions"
+    improvements:
+      - "Faster package search performance"
+      - "Better error messages and recovery"
+      - "Enhanced logging system"
+    fixes:
+      - "Fixed MCP server connection issues"
+      - "Resolved configuration loading problems"
+
+  - version: "1.2.1"
+    date: "2025-05-15"
+    highlights:
+      - "Community features expansion"
+      - "Learning system improvements"
+      - "Hardware detection enhancements"
+    features:
+      - title: "Community Integration"
+        description: "Connect with NixOS community and share configurations"
+      - title: "Learning Modules"
+        description: "Interactive NixOS learning and tutorials"
+    improvements:
+      - "Better hardware detection and recommendations"
+      - "Enhanced flake management"
+      - "Improved development environment setup"
+    fixes:
+      - "Fixed hardware detection on ARM systems"
+      - "Resolved community API connectivity issues"

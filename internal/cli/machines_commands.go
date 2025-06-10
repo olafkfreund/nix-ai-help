@@ -6,6 +6,10 @@ import (
 	"os"
 	"strings"
 
+	nixoscontext "nix-ai-help/internal/ai/context"
+	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/nixos"
+	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
 	"github.com/spf13/cobra"
@@ -55,6 +59,25 @@ Examples:
 		Run: func(cmd *cobra.Command, args []string) {
 			format, _ := cmd.Flags().GetString("format")
 			debug := os.Getenv("NIXAI_DEBUG") == "1"
+
+			// Load configuration for context detection
+			cfg, err := config.LoadUserConfig()
+			if err != nil {
+				fmt.Printf("Warning: Failed to load config for context detection: %v\n", err)
+			} else {
+				// Initialize context detector and get NixOS context
+				contextDetector := nixos.NewContextDetector(logger.NewLogger())
+				nixosCtx, err := contextDetector.GetContext(cfg)
+				if err != nil {
+					fmt.Printf("Warning: Context detection failed: %v\n", err)
+				} else if nixosCtx != nil && nixosCtx.CacheValid {
+					contextBuilder := nixoscontext.NewNixOSContextBuilder()
+					contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+					fmt.Println(utils.FormatNote("📋 " + contextSummary))
+					fmt.Println()
+				}
+			}
+
 			hosts, err := utils.GetFlakeHosts("", debug)
 			if err != nil {
 				fmt.Printf("Error: Failed to enumerate hosts from flake.nix: %v\n", err)
@@ -95,6 +118,24 @@ This command will:
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Println(utils.FormatHeader("🚀 Configuration Deployment"))
 			fmt.Println()
+
+			// Load configuration for context detection
+			cfg, err := config.LoadUserConfig()
+			if err != nil {
+				fmt.Println(utils.FormatWarning("Failed to load config for context detection: " + err.Error()))
+			} else {
+				// Initialize context detector and get NixOS context
+				contextDetector := nixos.NewContextDetector(logger.NewLogger())
+				nixosCtx, err := contextDetector.GetContext(cfg)
+				if err != nil {
+					fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+				} else if nixosCtx != nil && nixosCtx.CacheValid {
+					contextBuilder := nixoscontext.NewNixOSContextBuilder()
+					contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+					fmt.Println(utils.FormatNote("📋 " + contextSummary))
+					fmt.Println()
+				}
+			}
 
 			method, _ := cmd.Flags().GetString("method")
 			machine := cmd.Flag("machine").Value.String()
@@ -194,6 +235,24 @@ Examples:
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Println(utils.FormatHeader("🚀 Deploy-rs Configuration Setup"))
 			fmt.Println()
+
+			// Load configuration for context detection
+			cfg, err := config.LoadUserConfig()
+			if err != nil {
+				fmt.Println(utils.FormatWarning("Failed to load config for context detection: " + err.Error()))
+			} else {
+				// Initialize context detector and get NixOS context
+				contextDetector := nixos.NewContextDetector(logger.NewLogger())
+				nixosCtx, err := contextDetector.GetContext(cfg)
+				if err != nil {
+					fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+				} else if nixosCtx != nil && nixosCtx.CacheValid {
+					contextBuilder := nixoscontext.NewNixOSContextBuilder()
+					contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+					fmt.Println(utils.FormatNote("📋 " + contextSummary))
+					fmt.Println()
+				}
+			}
 
 			// Get flake directory
 			flakeDir := "."

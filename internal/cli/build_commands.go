@@ -12,7 +12,9 @@ import (
 	"golang.org/x/text/language"
 
 	"nix-ai-help/internal/ai"
+	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 )
@@ -70,6 +72,22 @@ Enhanced monitoring:
 		} else {
 			fmt.Fprintf(os.Stderr, "Warning: Failed to load config, using defaults: %v\n", err)
 			provider = ai.NewOllamaLegacyProvider("llama3")
+		}
+
+		// Initialize context detector and get NixOS context
+		contextDetector := nixos.NewContextDetector(logger.NewLogger())
+		nixosCtx, err := contextDetector.GetContext(cfg)
+		if err != nil {
+			fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+			nixosCtx = nil
+		}
+
+		// Display detected context summary if available
+		if nixosCtx != nil && nixosCtx.CacheValid {
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+			fmt.Println(utils.FormatNote("📋 " + contextSummary))
+			fmt.Println()
 		}
 
 		// Run nix build with AI assistance
@@ -139,10 +157,13 @@ Enhanced monitoring:
 				fmt.Println(problemSummary)
 			}
 
-			// Get AI assistance
-			prompt := buildBasicFailurePrompt(strings.Join(args, " "), string(out))
+			// Get AI assistance with context
+			contextBuilder := nixoscontext.NewNixOSContextBuilder()
+			basePrompt := buildBasicFailurePrompt(strings.Join(args, " "), string(out))
+			contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
 			fmt.Println(utils.FormatProgress("Getting AI assistance..."))
-			aiResp, aiErr := provider.Query(prompt)
+			aiResp, aiErr := provider.Query(contextualPrompt)
 			if aiErr == nil && aiResp != "" {
 				fmt.Println(utils.FormatSubsection("🤖 AI Suggestions", ""))
 				fmt.Println(utils.RenderMarkdown(aiResp))
@@ -260,6 +281,22 @@ func runBuildDebug(packageName string, cmd *cobra.Command) {
 		os.Exit(1)
 	}
 
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		fmt.Println(utils.FormatNote("📋 " + contextSummary))
+		fmt.Println()
+	}
+
 	// Create logger
 	log := logger.NewLoggerWithLevel(cfg.LogLevel)
 
@@ -274,9 +311,12 @@ func runBuildDebug(packageName string, cmd *cobra.Command) {
 	if buildErr != nil {
 		fmt.Println(utils.FormatSubsection("🚨 Build Failed - Analyzing Failure", ""))
 
-		// Analyze build failure with AI
-		analysisPrompt := buildFailureAnalysisPrompt(packageName, buildOutput)
-		analysis, aiErr := aiProvider.Query(analysisPrompt)
+		// Analyze build failure with AI and context
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		basePrompt := buildFailureAnalysisPrompt(packageName, buildOutput)
+		contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
+		analysis, aiErr := aiProvider.Query(contextualPrompt)
 		if aiErr != nil {
 			fmt.Println(utils.FormatError("Failed to get AI analysis: " + aiErr.Error()))
 		} else {
@@ -285,9 +325,12 @@ func runBuildDebug(packageName string, cmd *cobra.Command) {
 	} else {
 		fmt.Println(utils.FormatSuccess("✅ Build completed successfully!"))
 
-		// Even on success, provide optimization analysis
-		optimizationPrompt := buildOptimizationPrompt(packageName, buildOutput)
-		optimization, aiErr := aiProvider.Query(optimizationPrompt)
+		// Even on success, provide optimization analysis with context
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		basePrompt := buildOptimizationPrompt(packageName, buildOutput)
+		contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
+		optimization, aiErr := aiProvider.Query(contextualPrompt)
 		if aiErr == nil {
 			fmt.Println(utils.FormatSubsection("⚡ Build Optimization Suggestions", ""))
 			fmt.Println(utils.RenderMarkdown(optimization))
@@ -306,6 +349,22 @@ func runBuildRetry(cmd *cobra.Command) {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, utils.FormatError("Error loading config: "+err.Error()))
 		os.Exit(1)
+	}
+
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		fmt.Println(utils.FormatNote("📋 " + contextSummary))
+		fmt.Println()
 	}
 
 	// Initialize AI provider
@@ -339,9 +398,12 @@ func runBuildRetry(cmd *cobra.Command) {
 	if err != nil {
 		fmt.Println(utils.FormatWarning("Recovery system analysis failed, falling back to basic AI analysis"))
 
-		// Fallback to basic AI analysis
-		retryPrompt := buildRetryPrompt(lastFailure)
-		fixes, aiErr := aiProvider.Query(retryPrompt)
+		// Fallback to basic AI analysis with context
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		basePrompt := buildRetryPrompt(lastFailure)
+		contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
+		fixes, aiErr := aiProvider.Query(contextualPrompt)
 		if aiErr != nil {
 			fmt.Println(utils.FormatError("Failed to get AI fixes: " + aiErr.Error()))
 			return
@@ -394,6 +456,22 @@ func runBuildCacheMiss(cmd *cobra.Command) {
 		os.Exit(1)
 	}
 
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		fmt.Println(utils.FormatNote("📋 " + contextSummary))
+		fmt.Println()
+	}
+
 	// Initialize AI provider
 	aiProvider := initializeAIProvider(cfg)
 
@@ -405,9 +483,12 @@ func runBuildCacheMiss(cmd *cobra.Command) {
 	fmt.Println(utils.FormatSubsection("📈 Cache Performance Metrics", ""))
 	displayCacheStats(cacheStats)
 
-	// Get AI analysis of cache performance
-	cachePrompt := buildCacheAnalysisPrompt(cacheStats)
-	analysis, aiErr := aiProvider.Query(cachePrompt)
+	// Get AI analysis of cache performance with context
+	contextBuilder := nixoscontext.NewNixOSContextBuilder()
+	basePrompt := buildCacheAnalysisPrompt(cacheStats)
+	contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
+	analysis, aiErr := aiProvider.Query(contextualPrompt)
 	if aiErr != nil {
 		fmt.Println(utils.FormatError("Failed to get AI analysis: " + aiErr.Error()))
 		return
@@ -428,6 +509,22 @@ func runBuildSandboxDebug(cmd *cobra.Command) {
 		os.Exit(1)
 	}
 
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		fmt.Println(utils.FormatNote("📋 " + contextSummary))
+		fmt.Println()
+	}
+
 	// Initialize AI provider
 	aiProvider := initializeAIProvider(cfg)
 
@@ -439,9 +536,12 @@ func runBuildSandboxDebug(cmd *cobra.Command) {
 	fmt.Println(utils.FormatSubsection("🔒 Sandbox Environment", ""))
 	displaySandboxInfo(sandboxInfo)
 
-	// Get AI analysis
-	sandboxPrompt := buildSandboxAnalysisPrompt(sandboxInfo)
-	analysis, aiErr := aiProvider.Query(sandboxPrompt)
+	// Get AI analysis with context
+	contextBuilder := nixoscontext.NewNixOSContextBuilder()
+	basePrompt := buildSandboxAnalysisPrompt(sandboxInfo)
+	contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
+	analysis, aiErr := aiProvider.Query(contextualPrompt)
 	if aiErr != nil {
 		fmt.Println(utils.FormatError("Failed to get AI analysis: " + aiErr.Error()))
 		return
@@ -465,6 +565,22 @@ func runBuildProfile(packageName string, cmd *cobra.Command) {
 		os.Exit(1)
 	}
 
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		fmt.Println(utils.FormatWarning("Context detection failed: " + err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		fmt.Println(utils.FormatNote("📋 " + contextSummary))
+		fmt.Println()
+	}
+
 	// Initialize AI provider
 	aiProvider := initializeAIProvider(cfg)
 
@@ -476,9 +592,12 @@ func runBuildProfile(packageName string, cmd *cobra.Command) {
 	fmt.Println(utils.FormatSubsection("📊 Build Performance Metrics", ""))
 	displayProfileData(profileData)
 
-	// Get AI analysis
-	profilePrompt := buildProfileAnalysisPrompt(packageName, profileData)
-	analysis, aiErr := aiProvider.Query(profilePrompt)
+	// Get AI analysis with context
+	contextBuilder := nixoscontext.NewNixOSContextBuilder()
+	basePrompt := buildProfileAnalysisPrompt(packageName, profileData)
+	contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt, nixosCtx)
+
+	analysis, aiErr := aiProvider.Query(contextualPrompt)
 	if aiErr != nil {
 		fmt.Println(utils.FormatError("Failed to get AI analysis: " + aiErr.Error()))
 		return
@@ -1182,6 +1301,39 @@ func init() {
 	enhancedBuildCmd.Flags().Bool("verbose", false, "Show verbose build output")
 	enhancedBuildCmd.Flags().String("out-link", "", "Path where the symlink to the output will be stored")
 	buildProfileCmd.Flags().String("package", "", "Specific package to profile")
+}
+
+// NewBuildCommand creates a new build command with all subcommands and flags
+func NewBuildCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   enhancedBuildCmd.Use,
+		Short: enhancedBuildCmd.Short,
+		Long:  enhancedBuildCmd.Long,
+		Args:  enhancedBuildCmd.Args,
+		Run:   enhancedBuildCmd.Run,
+	}
+
+	// Add all subcommands
+	cmd.AddCommand(buildDebugCmd)
+	cmd.AddCommand(buildRetryCmd)
+	cmd.AddCommand(buildCacheMissCmd)
+	cmd.AddCommand(buildSandboxDebugCmd)
+	cmd.AddCommand(buildProfileCmd)
+
+	// Add enhanced monitoring and management commands
+	cmd.AddCommand(buildWatchCmd)
+	cmd.AddCommand(buildStatusCmd)
+	cmd.AddCommand(buildStopCmd)
+	cmd.AddCommand(buildBackgroundCmd)
+	cmd.AddCommand(buildQueueCmd)
+
+	// Add flags
+	cmd.Flags().Bool("flake", false, "Use flake mode for building")
+	cmd.Flags().Bool("dry-run", false, "Show what would be built without actually building")
+	cmd.Flags().Bool("verbose", false, "Show verbose build output")
+	cmd.Flags().String("out-link", "", "Path where the symlink to the output will be stored")
+
+	return cmd
 }
 
 // extractPackageFromFailure attempts to extract the package name from build failure output

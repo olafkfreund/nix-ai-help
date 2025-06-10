@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"nix-ai-help/internal/tui/styles"
+	"nix-ai-help/pkg/version"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -95,7 +96,7 @@ func (s *StatusBar) renderLeftStatus() string {
 
 	// Current command indicator
 	if s.currentCommand != "" {
-		cmdIndicator := s.theme.StatusBar.Active.Render(fmt.Sprintf("⏳ %s", s.currentCommand))
+		cmdIndicator := s.theme.StatusBar.Active.Render(fmt.Sprintf("Running: %s", s.currentCommand))
 		indicators = append(indicators, cmdIndicator)
 	}
 
@@ -119,8 +120,19 @@ func (s *StatusBar) renderLeftStatus() string {
 	return lipgloss.JoinHorizontal(lipgloss.Left, indicators...)
 }
 
-// renderRightStatus renders the right side help text
+// renderRightStatus renders the right side help text and version
 func (s *StatusBar) renderRightStatus() string {
+	// Get version info
+	versionInfo := version.Get()
+	versionText := fmt.Sprintf("nixai v%s (%s)", versionInfo.Short(), versionInfo.GitCommit[:7])
+
+	// Version display
+	versionStyle := s.theme.StatusBar.Base.
+		Foreground(s.theme.Primary).
+		Bold(true).
+		Render(versionText)
+
+	// Help text
 	helpItems := []string{
 		"F1:Help",
 		"Tab:Switch",
@@ -135,11 +147,16 @@ func (s *StatusBar) renderRightStatus() string {
 		styledItems = append(styledItems, styled)
 	}
 
-	return lipgloss.JoinHorizontal(
+	helpText := lipgloss.JoinHorizontal(
 		lipgloss.Left,
 		styledItems[0], " │ ",
 		styledItems[1], " │ ",
 		styledItems[2],
+	)
+
+	return lipgloss.JoinHorizontal(
+		lipgloss.Left,
+		helpText, "  ", versionStyle,
 	)
 }
 

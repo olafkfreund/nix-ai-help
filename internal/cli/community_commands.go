@@ -7,8 +7,10 @@ import (
 	"strconv"
 	"strings"
 
+	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/community"
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/nixos"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 
@@ -190,16 +192,48 @@ func runCommunitySearch(query string, limit int, category string, cmd *cobra.Com
 		return
 	}
 
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("Context detection failed: "+err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatNote("📋 "+contextSummary))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout())
+	}
+
 	// Create community manager
 	manager := community.NewManager(cfg)
 
 	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Searching community configurations..."))
 
+	// Enhance search with context if available
+	var contextualQuery string
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		// Build context-aware search query
+		contextInfo := fmt.Sprintf("NixOS %s", nixosCtx.NixOSVersion)
+		if nixosCtx.UsesFlakes {
+			contextInfo += " (flakes)"
+		}
+		if nixosCtx.HasHomeManager {
+			contextInfo += " with Home Manager"
+		}
+		contextualQuery = query + " (compatible with " + contextInfo + ")"
+	} else {
+		contextualQuery = query
+	}
+
 	var results []community.Configuration
 	if category != "" {
-		results, err = manager.SearchByCategory(category, query, limit)
+		results, err = manager.SearchByCategory(category, contextualQuery, limit)
 	} else {
-		results, err = manager.SearchConfigurations(query, limit)
+		results, err = manager.SearchConfigurations(contextualQuery, limit)
 	}
 
 	if err != nil {
@@ -263,6 +297,22 @@ func runCommunityShare(configFile, description, category string, tags []string, 
 		return
 	}
 
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("Context detection failed: "+err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatNote("📋 "+contextSummary))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout())
+	}
+
 	// Create community manager
 	manager := community.NewManager(cfg)
 
@@ -295,6 +345,27 @@ func runCommunityShare(configFile, description, category string, tags []string, 
 		Author:      "anonymous", // Could be enhanced to get from git config
 		Rating:      0,
 		URL:         "", // Will be populated after sharing
+	}
+
+	// Enhance metadata with context if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		// Add context-specific tags
+		contextTags := []string{}
+		if nixosCtx.UsesFlakes {
+			contextTags = append(contextTags, "flakes")
+		}
+		if nixosCtx.UsesChannels {
+			contextTags = append(contextTags, "channels")
+		}
+		if nixosCtx.HasHomeManager {
+			contextTags = append(contextTags, "home-manager")
+		}
+		if nixosCtx.NixOSVersion != "" {
+			contextTags = append(contextTags, "nixos-"+nixosCtx.NixOSVersion)
+		}
+
+		// Merge context tags with user-provided tags
+		config.Tags = append(config.Tags, contextTags...)
 	}
 
 	_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatProgress("Sharing configuration with community..."))
@@ -338,6 +409,22 @@ func runCommunityValidate(configFile string, detailed, fixSuggestions bool, cmd 
 	if err != nil {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Error loading config: "+err.Error()))
 		return
+	}
+
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatWarning("Context detection failed: "+err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatNote("📋 "+contextSummary))
+		_, _ = fmt.Fprintln(cmd.OutOrStdout())
 	}
 
 	// Create community manager
@@ -396,7 +483,14 @@ func runCommunityValidate(configFile string, detailed, fixSuggestions bool, cmd 
 		if err != nil {
 			_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 		} else {
-			prompt := buildValidationFixPrompt(configFile, result)
+			prompt := buildValidationFixPrompt(configFile, result, nixosCtx)
+
+			// Build context-aware prompt if context is available
+			if nixosCtx != nil && nixosCtx.CacheValid {
+				contextBuilder := nixoscontext.NewNixOSContextBuilder()
+				prompt = contextBuilder.BuildContextualPrompt(prompt, nixosCtx)
+			}
+
 			suggestions, aiErr := aiProvider.Query(prompt)
 			if aiErr != nil {
 				_, _ = fmt.Fprintln(cmd.OutOrStdout(), utils.FormatError("Failed to get AI suggestions: "+aiErr.Error()))
@@ -515,8 +609,8 @@ func runCommunityRate(configName string, rating float64, comment string, cmd *co
 
 // Helper functions
 
-func buildValidationFixPrompt(configFile string, result *community.ValidationResult) string {
-	return fmt.Sprintf(`Please analyze this NixOS configuration validation result and provide specific, actionable fix suggestions:
+func buildValidationFixPrompt(configFile string, result *community.ValidationResult, nixosCtx *config.NixOSContext) string {
+	basePrompt := fmt.Sprintf(`Please analyze this NixOS configuration validation result and provide specific, actionable fix suggestions:
 
 Configuration File: %s
 Validation Score: %.1f/10
@@ -539,6 +633,30 @@ Focus on practical, copy-pasteable solutions that follow NixOS conventions.`,
 		result.Score,
 		strings.Join(result.Issues, "\n"),
 		strings.Join(result.Suggestions, "\n"))
+
+	// Add context information if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextInfo := fmt.Sprintf(`
+
+Current System Context:
+- NixOS Version: %s
+- Uses Flakes: %t
+- Uses Channels: %t
+- Has Home Manager: %t (%s)
+- System Type: %s
+
+Please tailor your suggestions to this specific system configuration.`,
+			nixosCtx.NixOSVersion,
+			nixosCtx.UsesFlakes,
+			nixosCtx.UsesChannels,
+			nixosCtx.HasHomeManager,
+			nixosCtx.HomeManagerType,
+			nixosCtx.SystemType)
+
+		basePrompt += contextInfo
+	}
+
+	return basePrompt
 }
 
 // Add community commands to the main community command

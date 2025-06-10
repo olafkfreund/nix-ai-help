@@ -1,10 +1,18 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
+	"time"
+
+	"nix-ai-help/internal/config"
+	"nix-ai-help/pkg/utils"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -48,9 +56,15 @@ func initialModelWithCommand(command string, args []string) tuiModel {
 		for i, cmd := range model.commands {
 			if cmd.name == command {
 				model.selectedCommand = i
-				// If the command has args, execute it immediately
+				// Store initial command and args for execution in Init
+				model.selectedCmdName = command
 				if len(args) > 0 {
-					model.commandOutput = fmt.Sprintf("Executing: %s %s", command, strings.Join(args, " "))
+					// Store args in optionValues for later use
+					if model.optionValues == nil {
+						model.optionValues = make(map[string]string)
+					}
+					model.optionValues["__initial_args__"] = strings.Join(args, " ")
+					model.commandOutput = fmt.Sprintf("Preparing to execute: %s %s", command, strings.Join(args, " "))
 				}
 				break
 			}
@@ -62,10 +76,9 @@ func initialModelWithCommand(command string, args []string) tuiModel {
 
 // InteractiveModeTUI starts the modern TUI interface for nixai
 func InteractiveModeTUI() {
-	// Create the TUI application
+	// Create the TUI application without AltScreen to avoid terminal compatibility issues
 	app := tea.NewProgram(
 		initialModel(),
-		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)
 
@@ -95,12 +108,16 @@ type tuiModel struct {
 	commandOptions     []commandOption
 	selectedOption     int
 	optionValues       map[string]string
+
+	// Streaming output support
+	streamingOutput []string
+	isStreaming     bool
+	currentCommand  string
 }
 
 type commandItem struct {
 	name        string
 	description string
-	icon        string
 	needsInput  bool
 	options     []commandOption
 	subcommands []subcommandItem
@@ -148,6 +165,18 @@ type executeCommandMsg struct {
 	output  string
 }
 
+// streamingOutputMsg represents streaming command output
+type streamingOutputMsg struct {
+	command string
+	output  string
+	isEnd   bool
+}
+
+// commandExecutionStartMsg represents the start of command execution
+type commandExecutionStartMsg struct {
+	command string
+}
+
 // Define styles
 var (
 	titleStyle = lipgloss.NewStyle().
@@ -191,6 +220,9 @@ func initialModel() tuiModel {
 		commandOutput:   "Welcome to nixai TUI! Select a command from the left panel to get started.",
 		currentState:    stateCommandList,
 		optionValues:    make(map[string]string),
+		streamingOutput: make([]string, 0),
+		isStreaming:     false,
+		currentCommand:  "",
 	}
 }
 
@@ -200,7 +232,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "ask",
 			description: "Ask any NixOS question",
-			icon:        "🤖",
 			needsInput:  true,
 			options: []commandOption{
 				{name: "Question", flag: "question", description: "Your NixOS question", required: true, hasValue: true, optionType: "string"},
@@ -212,7 +243,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "search",
 			description: "Search for NixOS packages/services",
-			icon:        "🔍",
 			needsInput:  true,
 			options: []commandOption{
 				{name: "Package", flag: "package", description: "Package name to search", required: true, hasValue: true, optionType: "string"},
@@ -223,7 +253,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "explain-option",
 			description: "Explain a NixOS option",
-			icon:        "🖥️",
 			needsInput:  true,
 			options: []commandOption{
 				{name: "Option", flag: "option", description: "NixOS option to explain", required: true, hasValue: true, optionType: "string"},
@@ -235,7 +264,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "community",
 			description: "Community resources and support",
-			icon:        "🌐",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -249,7 +277,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "devenv",
 			description: "Create and manage development environments",
-			icon:        "🧪",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -261,7 +288,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "mcp-server",
 			description: "Start or manage the MCP server",
-			icon:        "🛰️",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -275,7 +301,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "machines",
 			description: "Manage configurations across multiple machines",
-			icon:        "🖧",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -287,7 +312,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "doctor",
 			description: "Run comprehensive NixOS health checks and get AI-powered diagnostics",
-			icon:        "🩻",
 			needsInput:  false,
 			options: []commandOption{
 				{name: "Verbose", flag: "verbose", description: "Show detailed output and progress information", required: false, hasValue: false, optionType: "bool"},
@@ -306,7 +330,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "flake",
 			description: "Nix flake utilities",
-			icon:        "🧊",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -321,7 +344,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "learn",
 			description: "NixOS learning and training commands",
-			icon:        "📚",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -336,7 +358,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "logs",
 			description: "Analyze and parse NixOS logs",
-			icon:        "📝",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -351,7 +372,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "templates",
 			description: "Manage NixOS configuration templates",
-			icon:        "📄",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -366,7 +386,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "snippets",
 			description: "Manage NixOS configuration snippets",
-			icon:        "🔖",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -380,7 +399,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "store",
 			description: "Manage, backup, and analyze the Nix store",
-			icon:        "💾",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -393,7 +411,6 @@ func getAvailableCommands() []commandItem {
 		{
 			name:        "deps",
 			description: "Analyze NixOS configuration dependencies",
-			icon:        "🔗",
 			needsInput:  false,
 			options:     []commandOption{},
 			subcommands: []subcommandItem{
@@ -404,16 +421,97 @@ func getAvailableCommands() []commandItem {
 				{name: "graph", description: "Generate dependency graph", options: []commandOption{}},
 			},
 		},
+		{
+			name:        "build",
+			description: "Enhanced build troubleshooting and optimization",
+			needsInput:  false,
+			options:     []commandOption{},
+			subcommands: []subcommandItem{
+				{name: "debug", description: "Deep build failure analysis with pattern recognition", options: []commandOption{}},
+				{name: "retry", description: "Intelligent retry with automated fixes", options: []commandOption{}},
+				{name: "cache-miss", description: "Analyze cache miss reasons and optimization", options: []commandOption{}},
+				{name: "sandbox-debug", description: "Debug sandbox-related build issues", options: []commandOption{}},
+				{name: "profile", description: "Build performance analysis and optimization", options: []commandOption{}},
+				{name: "watch", description: "Real-time build monitoring with AI insights", options: []commandOption{}},
+				{name: "status", description: "Check status of background builds", options: []commandOption{}},
+				{name: "stop", description: "Cancel a running background build", options: []commandOption{}},
+				{name: "background", description: "Start a build in the background", options: []commandOption{}},
+				{name: "queue", description: "Build multiple packages sequentially", options: []commandOption{}},
+			},
+		},
 		// Simple commands without subcommands
-		{name: "build", description: "Enhanced build troubleshooting and optimization", icon: "🛠️", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "package-repo", description: "Analyze Git repos and generate Nix derivations", icon: "📦", needsInput: true, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "diagnose", description: "Diagnose NixOS issues", icon: "🩺", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "config", description: "Manage nixai configuration", icon: "⚙️", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "configure", description: "Configure NixOS interactively", icon: "🧑‍💻", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "gc", description: "AI-powered garbage collection analysis", icon: "🧹", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "hardware", description: "AI-powered hardware configuration optimizer", icon: "💻", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "migrate", description: "AI-powered migration assistant", icon: "🔀", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
-		{name: "neovim-setup", description: "Neovim integration setup", icon: "📝", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{
+			name:        "package-repo",
+			description: "Analyze Git repos and generate Nix derivations",
+			needsInput:  true,
+			options: []commandOption{
+				{name: "Repository URL", flag: "repo-url", description: "Git repository URL to analyze", required: false, hasValue: true, optionType: "string"},
+				{name: "Local Path", flag: "local", description: "Local repository path", required: false, hasValue: true, optionType: "string"},
+				{name: "Output Path", flag: "output", description: "Output file path for derivation", required: false, hasValue: true, optionType: "string"},
+				{name: "Package Name", flag: "name", description: "Custom package name", required: false, hasValue: true, optionType: "string"},
+				{name: "Analyze Only", flag: "analyze-only", description: "Only analyze, don't generate derivation", required: false, hasValue: false, optionType: "bool"},
+			},
+			subcommands: []subcommandItem{},
+		},
+		{name: "diagnose", description: "Diagnose NixOS issues", needsInput: true, options: []commandOption{
+			{name: "Input File", flag: "file", description: "Specify log file path to analyze", required: false, hasValue: true, optionType: "string"},
+			{name: "Diagnostic Type", flag: "type", description: "Type: system, config, services, network, hardware, performance", required: false, hasValue: true, optionType: "string"},
+			{name: "Output Format", flag: "output", description: "Output format: markdown, plain, json", required: false, hasValue: true, optionType: "string"},
+			{name: "Additional Context", flag: "context", description: "Additional context information", required: false, hasValue: true, optionType: "string"},
+		}, subcommands: []subcommandItem{}},
+		{name: "config", description: "Manage nixai configuration", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{name: "configure", description: "Configure NixOS interactively", needsInput: true, options: []commandOption{
+			{name: "Search Query", flag: "search", description: "Search query for configuration type (e.g., 'web server nginx', 'desktop')", required: false, hasValue: true, optionType: "string"},
+			{name: "Output File", flag: "output", description: "Output file path for generated configuration", required: false, hasValue: true, optionType: "string"},
+			{name: "Advanced Mode", flag: "advanced", description: "Generate advanced configuration with detailed options", required: false, hasValue: false, optionType: "bool"},
+			{name: "Home Manager", flag: "home", description: "Generate Home Manager configuration instead of NixOS", required: false, hasValue: false, optionType: "bool"},
+		}, subcommands: []subcommandItem{}},
+		{name: "gc", description: "AI-powered garbage collection analysis", needsInput: true, options: []commandOption{
+			{name: "Dry Run", flag: "dry-run", description: "Show what would be done without making changes", required: false, hasValue: false, optionType: "bool"},
+			{name: "Keep Generations", flag: "keep-generations", description: "Number of recent generations to keep (default: 5)", required: false, hasValue: true, optionType: "string"},
+			{name: "Keep Count", flag: "keep", description: "Number of generations to recommend keeping", required: false, hasValue: true, optionType: "string"},
+		}, subcommands: []subcommandItem{
+			{name: "analyze", description: "Analyze store usage and show cleanup opportunities"},
+			{name: "safe-clean", description: "AI-guided safe cleanup with explanations"},
+			{name: "compare-generations", description: "Compare generations with recommendations"},
+			{name: "disk-usage", description: "Visualize store usage with recommendations"},
+		}},
+		{name: "hardware", description: "AI-powered hardware configuration optimizer", needsInput: true, options: []commandOption{
+			{name: "Dry Run", flag: "dry-run", description: "Show optimization recommendations without applying changes", required: false, hasValue: false, optionType: "bool"},
+			{name: "Auto Install", flag: "auto-install", description: "Provide installation commands for recommended drivers", required: false, hasValue: false, optionType: "bool"},
+			{name: "Power Save", flag: "power-save", description: "Optimize for maximum battery life", required: false, hasValue: false, optionType: "bool"},
+			{name: "Performance", flag: "performance", description: "Optimize for maximum performance", required: false, hasValue: false, optionType: "bool"},
+			{name: "Operation", flag: "operation", description: "Specify the hardware operation to perform", required: false, hasValue: true, optionType: "string"},
+			{name: "Component", flag: "component", description: "Specify the hardware component for the operation", required: false, hasValue: true, optionType: "string"},
+			{name: "Format", flag: "format", description: "Specify the output format for the operation", required: false, hasValue: true, optionType: "string"},
+			{name: "Detailed", flag: "detailed", description: "Enable detailed output for the operation", required: false, hasValue: false, optionType: "bool"},
+			{name: "Include Drivers", flag: "include-drivers", description: "Include driver information in the operation", required: false, hasValue: false, optionType: "bool"},
+		}, subcommands: []subcommandItem{
+			{name: "detect", description: "Detect and analyze system hardware"},
+			{name: "optimize", description: "Apply hardware-specific optimizations"},
+			{name: "drivers", description: "Auto-configure drivers and firmware"},
+			{name: "compare", description: "Compare current vs optimal settings"},
+			{name: "laptop", description: "Laptop-specific optimizations"},
+			{name: "function", description: "Use hardware function calling interface"},
+		}},
+		{name: "migrate", description: "AI-powered migration assistant", needsInput: true, options: []commandOption{
+			{name: "Verbose", flag: "verbose", description: "Show detailed analysis", required: false, hasValue: false, optionType: "bool"},
+			{name: "Backup Name", flag: "backup-name", description: "Custom backup name", required: false, hasValue: true, optionType: "string"},
+			{name: "Dry Run", flag: "dry-run", description: "Show migration steps without executing", required: false, hasValue: false, optionType: "bool"},
+		}, subcommands: []subcommandItem{
+			{name: "analyze", description: "Analyze current setup and migration complexity"},
+			{name: "to-flakes", description: "Convert from channels to flakes"},
+		}},
+		{name: "neovim-setup", description: "Neovim integration setup", needsInput: true, options: []commandOption{
+			{name: "Config Directory", flag: "config-dir", description: "Neovim configuration directory (default: auto-detect)", required: false, hasValue: true, optionType: "string"},
+			{name: "Socket Path", flag: "socket-path", description: "MCP server socket path", required: false, hasValue: true, defaultValue: "/tmp/nixai-mcp.sock", optionType: "string"},
+		}, subcommands: []subcommandItem{
+			{name: "install", description: "Install Neovim integration with nixai"},
+			{name: "configure", description: "Configure Neovim integration settings"},
+			{name: "status", description: "Check Neovim integration status"},
+			{name: "update", description: "Update Neovim integration configuration"},
+			{name: "remove", description: "Remove Neovim integration"},
+		}},
 	}
 
 	return commands
@@ -421,6 +519,22 @@ func getAvailableCommands() []commandItem {
 
 // Init is called when the model is first created
 func (m tuiModel) Init() tea.Cmd {
+	// If we have initial command args, execute the command immediately
+	if args, exists := m.optionValues["__initial_args__"]; exists && m.selectedCmdName != "" {
+		// Remove the initial args marker
+		delete(m.optionValues, "__initial_args__")
+
+		// Parse the args and execute
+		argList := strings.Fields(args)
+		return tea.Batch(
+			func() tea.Msg {
+				return commandExecutionStartMsg{
+					command: fmt.Sprintf("%s %s", m.selectedCmdName, args),
+				}
+			},
+			m.executeCommandWithParams(m.selectedCmdName, argList),
+		)
+	}
 	return nil
 }
 
@@ -436,6 +550,27 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.isExecuting = false
 		m.currentState = stateResults
 		m.focused = focusOutput
+
+	case commandExecutionStartMsg:
+		m.isStreaming = true
+		m.isExecuting = true
+		m.currentCommand = msg.command
+		m.streamingOutput = []string{fmt.Sprintf("$ %s", msg.command)}
+		m.commandOutput = strings.Join(m.streamingOutput, "\n")
+		m.currentState = stateExecuting
+
+	case streamingOutputMsg:
+		if m.isStreaming && msg.command == m.currentCommand {
+			if msg.isEnd {
+				m.isStreaming = false
+				m.isExecuting = false
+				m.currentState = stateResults
+				m.focused = focusOutput
+			} else {
+				m.streamingOutput = append(m.streamingOutput, msg.output)
+				m.commandOutput = strings.Join(m.streamingOutput, "\n")
+			}
+		}
 
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
@@ -1012,7 +1147,7 @@ func (m tuiModel) renderCommandsPanel(width, height int) string {
 		inputHeader := fmt.Sprintf("Enter parameter for '%s':", m.selectedCmdName)
 		content.WriteString(inputHeader + "\n\n")
 
-		inputLine := fmt.Sprintf("📝 Input: %s_", m.parameterInput)
+		inputLine := fmt.Sprintf("Input: %s_", m.parameterInput)
 		if m.focused == focusInput {
 			inputLine = selectedStyle.Render(inputLine)
 		} else {
@@ -1022,7 +1157,7 @@ func (m tuiModel) renderCommandsPanel(width, height int) string {
 		content.WriteString("Press Enter to execute, Esc to cancel\n")
 	} else if m.searchMode {
 		// Add search bar if in search mode
-		searchBar := fmt.Sprintf("🔍 Search: %s_", m.searchQuery)
+		searchBar := fmt.Sprintf("Search: %s_", m.searchQuery)
 		content.WriteString(searchBar + "\n\n")
 	} else {
 		content.WriteString("Commands (Press / to search):\n\n")
@@ -1035,11 +1170,11 @@ func (m tuiModel) renderCommandsPanel(width, height int) string {
 
 		// Render command list
 		for i, cmd := range filteredCommands {
-			line := fmt.Sprintf("%s %s", cmd.icon, cmd.name)
+			line := cmd.name
 
 			// Add indicator for commands that need input
 			if cmd.needsInput {
-				line += " 📝"
+				line += " [INPUT]"
 			}
 
 			if i == m.selectedCommand && m.focused == focusCommands {
@@ -1071,7 +1206,9 @@ func (m tuiModel) renderCommandsPanel(width, height int) string {
 func (m tuiModel) renderOutputPanel(width, height int) string {
 	content := m.commandOutput
 
-	if m.isExecuting {
+	if m.isStreaming {
+		content = "⚡ Executing command (real-time output)...\n\n" + content
+	} else if m.isExecuting {
 		content = "⏳ Executing command...\n\n" + content
 	}
 
@@ -1091,7 +1228,7 @@ func (m tuiModel) renderOptionsPanel(width, height int) string {
 		// Show input mode for current option
 		if len(m.commandOptions) > 0 && m.selectedOption < len(m.commandOptions) {
 			opt := m.commandOptions[m.selectedOption]
-			content.WriteString(fmt.Sprintf("📝 Enter value for '%s':\n", opt.name))
+			content.WriteString(fmt.Sprintf("Enter value for '%s':\n", opt.name))
 			content.WriteString(fmt.Sprintf("Description: %s\n\n", opt.description))
 
 			inputDisplay := fmt.Sprintf("Value: %s█", m.parameterInput)
@@ -1141,7 +1278,7 @@ func (m tuiModel) renderOptionsPanel(width, height int) string {
 
 		// Add "Execute Command" option at the bottom
 		content.WriteString("\n")
-		executeOption := "🚀 Execute Command"
+		executeOption := "Execute Command"
 		if m.selectedOption == len(m.commandOptions) && m.focused == focusOptions {
 			executeOption = selectedStyle.Render(executeOption)
 		} else {
@@ -1227,9 +1364,9 @@ func (m tuiModel) renderStatusBar(width int) string {
 	case stateCommandList:
 		switch m.focused {
 		case focusCommands:
-			statusItems = append(statusItems, "📋 Commands")
+			statusItems = append(statusItems, "Commands")
 		case focusOutput:
-			statusItems = append(statusItems, "💻 Output")
+			statusItems = append(statusItems, "Output")
 		}
 		statusItems = append(statusItems, "Tab: Switch Panel")
 		statusItems = append(statusItems, "↑↓/Ctrl+jk: Navigate")
@@ -1240,11 +1377,11 @@ func (m tuiModel) renderStatusBar(width int) string {
 	case stateSubcommandSelection:
 		switch m.focused {
 		case focusCommands:
-			statusItems = append(statusItems, "📋 Commands")
+			statusItems = append(statusItems, "Commands")
 		case focusSubcommands:
-			statusItems = append(statusItems, "⚡ Subcommands")
+			statusItems = append(statusItems, "Subcommands")
 		case focusOutput:
-			statusItems = append(statusItems, "💻 Output")
+			statusItems = append(statusItems, "Output")
 		}
 		statusItems = append(statusItems, "Tab: Switch Panel")
 		statusItems = append(statusItems, "↑↓/Ctrl+jk: Navigate")
@@ -1255,13 +1392,13 @@ func (m tuiModel) renderStatusBar(width int) string {
 	case stateCommandOptions:
 		switch m.focused {
 		case focusCommands:
-			statusItems = append(statusItems, "📋 Commands (Enter: Execute)")
+			statusItems = append(statusItems, "Commands (Enter: Execute)")
 		case focusOptions:
-			statusItems = append(statusItems, "⚙️ Options (Enter: Configure)")
+			statusItems = append(statusItems, "Options (Enter: Configure)")
 		case focusOutput:
-			statusItems = append(statusItems, "💻 Output")
+			statusItems = append(statusItems, "Output")
 		case focusInput:
-			statusItems = append(statusItems, "📝 Input")
+			statusItems = append(statusItems, "Input")
 		}
 		if m.inputMode {
 			statusItems = append(statusItems, "Type text")
@@ -1342,6 +1479,18 @@ func (m tuiModel) executeCommand(cmdName string) tea.Cmd {
 
 // executeCommandWithParams executes a command with parameters and returns a tea.Cmd
 func (m tuiModel) executeCommandWithParams(cmdName string, args []string) tea.Cmd {
+	// Check if this is a command that supports streaming
+	if cmdName == "flake" && len(args) > 0 && args[0] == "validate" {
+		return tea.Batch(
+			func() tea.Msg {
+				return commandExecutionStartMsg{
+					command: fmt.Sprintf("%s %s", cmdName, strings.Join(args, " ")),
+				}
+			},
+			m.executeFlakeValidateStreaming(args[1:]),
+		)
+	}
+
 	return func() tea.Msg {
 		// Create a buffer to capture command output
 		var outputBuffer bytes.Buffer
@@ -1399,6 +1548,188 @@ func (m tuiModel) executeCommandWithSubcommand(cmdName, subcommandName string, a
 		return executeCommandMsg{
 			command: fmt.Sprintf("%s %s %s", cmdName, subcommandName, strings.Join(args, " ")),
 			output:  output,
+		}
+	}
+}
+
+// executeCommandWithStreaming executes a command with real-time streaming output
+func (m tuiModel) executeCommandWithStreaming(cmdName string, args []string) tea.Cmd {
+	return tea.Sequence(
+		// Send start message
+		func() tea.Msg {
+			return commandExecutionStartMsg{
+				command: fmt.Sprintf("%s %s", cmdName, strings.Join(args, " ")),
+			}
+		},
+		// Execute command with streaming
+		func() tea.Msg {
+			return m.streamCommand(cmdName, args)()
+		},
+	)
+}
+
+// streamCommand creates a streaming command execution
+func (m tuiModel) streamCommand(cmdName string, args []string) tea.Cmd {
+	return func() tea.Msg {
+		command := fmt.Sprintf("%s %s", cmdName, strings.Join(args, " "))
+
+		// Check if this is a flake validate command that should use real-time execution
+		if cmdName == "flake" && len(args) > 0 && args[0] == "validate" {
+			return m.executeFlakeValidateStreaming(args[1:])()
+		}
+
+		// For other commands, fall back to regular execution
+		var outputBuffer bytes.Buffer
+		handled, err := RunDirectCommand(cmdName, args, &outputBuffer)
+
+		var output string
+		if err != nil {
+			output = fmt.Sprintf("❌ Error executing command '%s': %v", command, err)
+		} else if !handled {
+			output = fmt.Sprintf("Command '%s' not yet implemented.\n\nUse 'help' to see available commands.", command)
+		} else {
+			output = outputBuffer.String()
+			if output == "" {
+				output = fmt.Sprintf("✅ Command '%s' executed successfully", command)
+			}
+		}
+
+		return streamingOutputMsg{
+			command: command,
+			output:  output,
+			isEnd:   true,
+		}
+	}
+}
+
+// executeFlakeValidateStreaming executes flake validate with real-time output
+func (m tuiModel) executeFlakeValidateStreaming(args []string) tea.Cmd {
+	return func() tea.Msg {
+		command := "flake validate"
+
+		// Determine the correct flake path using user config or arguments
+		var flakePath string
+		if len(args) > 0 {
+			// Use argument if provided
+			flakePath = args[0]
+		} else {
+			// Load user configuration to get NixOS path
+			userCfg, err := config.LoadUserConfig()
+			if err == nil && userCfg.NixosFolder != "" {
+				configPath := utils.ExpandHome(userCfg.NixosFolder)
+
+				// Check if the path is a directory containing flake.nix or a direct file path
+				if utils.IsDirectory(configPath) {
+					flakePath = filepath.Join(configPath, "flake.nix")
+				} else if strings.HasSuffix(configPath, "flake.nix") {
+					flakePath = configPath
+				} else {
+					flakePath = filepath.Join(configPath, "flake.nix")
+				}
+			} else {
+				// Fallback to auto-detection
+				commonPaths := []string{
+					os.ExpandEnv("$HOME/.config/nixos/flake.nix"),
+					"/etc/nixos/flake.nix",
+					"./flake.nix",
+				}
+
+				for _, p := range commonPaths {
+					if utils.IsFile(p) {
+						flakePath = p
+						break
+					}
+				}
+
+				if flakePath == "" {
+					flakePath = "./flake.nix"
+				}
+			}
+		}
+
+		// Check if flake.nix exists
+		if !utils.IsFile(flakePath) {
+			return streamingOutputMsg{
+				command: command,
+				output:  fmt.Sprintf("❌ No flake.nix found at: %s", flakePath),
+				isEnd:   true,
+			}
+		}
+
+		flakeDir := filepath.Dir(flakePath)
+
+		// Execute the command with live output collection
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+
+		cmd := exec.CommandContext(ctx, "nix", "flake", "check")
+		cmd.Dir = flakeDir
+
+		// Set up pipes for real-time output capture
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return streamingOutputMsg{
+				command: command,
+				output:  fmt.Sprintf("❌ Failed to create stdout pipe: %v", err),
+				isEnd:   true,
+			}
+		}
+
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			return streamingOutputMsg{
+				command: command,
+				output:  fmt.Sprintf("❌ Failed to create stderr pipe: %v", err),
+				isEnd:   true,
+			}
+		}
+
+		// Start the command
+		if err := cmd.Start(); err != nil {
+			return streamingOutputMsg{
+				command: command,
+				output:  fmt.Sprintf("❌ Failed to start command: %v", err),
+				isEnd:   true,
+			}
+		}
+
+		// Read combined output
+		var outputBuilder strings.Builder
+		outputBuilder.WriteString(fmt.Sprintf("🔍 Validating flake: %s\n\n", flakePath))
+
+		// Read stdout
+		stdoutScanner := bufio.NewScanner(stdout)
+		for stdoutScanner.Scan() {
+			line := stdoutScanner.Text()
+			if strings.TrimSpace(line) != "" {
+				outputBuilder.WriteString(line + "\n")
+			}
+		}
+
+		// Read stderr
+		stderrScanner := bufio.NewScanner(stderr)
+		for stderrScanner.Scan() {
+			line := stderrScanner.Text()
+			if strings.TrimSpace(line) != "" {
+				outputBuilder.WriteString(line + "\n")
+			}
+		}
+
+		// Wait for command completion
+		err = cmd.Wait()
+
+		// Final result
+		var finalOutput string
+		if err != nil {
+			finalOutput = fmt.Sprintf("%s\n❌ Flake validation failed: %v", outputBuilder.String(), err)
+		} else {
+			finalOutput = fmt.Sprintf("%s\n✅ Flake validation completed successfully", outputBuilder.String())
+		}
+
+		return streamingOutputMsg{
+			command: command,
+			output:  finalOutput,
+			isEnd:   true,
 		}
 	}
 }
