@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,8 @@ import (
 	"strings"
 
 	"nix-ai-help/internal/ai"
+	"nix-ai-help/internal/ai/agent"
+	"nix-ai-help/internal/ai/roles"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/mcp"
 	"nix-ai-help/internal/nixos"
@@ -27,6 +30,150 @@ func runCobraCommand(cmd *cobra.Command, args []string, out io.Writer) {
 }
 
 // Helper functions for running commands directly in interactive mode
+
+// extractSearchTerms extracts relevant search terms from a user question
+// for NixOS package and option searches
+func extractSearchTerms(question string) []string {
+	// Convert to lowercase for matching
+	lowerQuestion := strings.ToLower(question)
+
+	var terms []string
+
+	// Common NixOS package and service keywords to look for
+	nixosKeywords := map[string][]string{
+		// Desktop environments and window managers
+		"desktop":       {"gnome", "kde", "xfce", "i3", "sway", "hyprland", "plasma", "cinnamon"},
+		"windowmanager": {"i3", "dwm", "awesome", "bspwm", "herbstluftwm", "xmonad", "qtile"},
+		"wayland":       {"sway", "hyprland", "river", "weston", "wayfire"},
+
+		// Web servers and services
+		"webserver": {"nginx", "apache", "caddy", "lighttpd"},
+		"database":  {"postgresql", "mysql", "mariadb", "mongodb", "redis", "sqlite"},
+		"container": {"docker", "podman", "kubernetes", "k3s"},
+
+		// Development tools
+		"editor":  {"vim", "neovim", "emacs", "vscode", "atom", "sublime"},
+		"lang":    {"python", "nodejs", "go", "rust", "java", "php", "ruby", "haskell"},
+		"version": {"git", "mercurial", "subversion", "fossil"},
+
+		// Media and graphics
+		"media": {"vlc", "mpv", "ffmpeg", "obs", "blender", "gimp", "inkscape"},
+		"audio": {"pulseaudio", "pipewire", "alsa", "jack", "spotify", "audacity"},
+
+		// Security and networking
+		"firewall": {"iptables", "nftables", "firewall"},
+		"vpn":      {"openvpn", "wireguard", "strongswan", "nordvpn"},
+		"ssh":      {"openssh", "sshd", "ssh"},
+
+		// System tools
+		"display":    {"xorg", "wayland", "x11", "display-manager", "lightdm", "gdm", "sddm"},
+		"boot":       {"grub", "systemd-boot", "bootloader"},
+		"filesystem": {"zfs", "btrfs", "ext4", "xfs", "ntfs"},
+	}
+
+	// Direct package name matching (common packages users ask about)
+	commonPackages := []string{
+		"firefox", "chromium", "brave", "discord", "telegram", "signal",
+		"steam", "lutris", "wine", "bottles", "heroic",
+		"libreoffice", "thunderbird", "gimp", "blender", "obs-studio",
+		"kitty", "alacritty", "konsole", "gnome-terminal", "wezterm",
+		"tmux", "screen", "zsh", "fish", "bash",
+		"hyprlock", "hyprpaper", "waybar", "rofi", "dmenu",
+	}
+
+	// Check for direct package mentions
+	for _, pkg := range commonPackages {
+		if strings.Contains(lowerQuestion, pkg) {
+			terms = append(terms, pkg)
+		}
+	}
+
+	// Check for keyword categories
+	for category, packages := range nixosKeywords {
+		for _, keyword := range []string{category} {
+			if strings.Contains(lowerQuestion, keyword) {
+				// Add relevant packages from this category
+				for _, pkg := range packages {
+					if strings.Contains(lowerQuestion, pkg) {
+						terms = append(terms, pkg)
+					}
+				}
+				// If no specific package mentioned, add the first few as examples
+				if len(terms) == 0 {
+					for i, pkg := range packages {
+						if i < 2 { // Limit to first 2 to avoid too many searches
+							terms = append(terms, pkg)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Look for "how to install/enable/configure X" patterns
+	installPatterns := []string{
+		"install ", "enable ", "configure ", "setup ", "use ", "run ",
+		"how to ", "setting up ", "getting ", "adding ",
+	}
+
+	for _, pattern := range installPatterns {
+		if idx := strings.Index(lowerQuestion, pattern); idx != -1 {
+			// Extract the word(s) after the pattern
+			afterPattern := lowerQuestion[idx+len(pattern):]
+			words := strings.Fields(afterPattern)
+
+			for i, word := range words {
+				// Clean up the word (remove punctuation)
+				cleaned := strings.Trim(word, ".,!?;:")
+
+				// Stop at common stop words or if we've found enough terms
+				if len(cleaned) > 2 && !isStopWord(cleaned) && i < 3 {
+					terms = append(terms, cleaned)
+				}
+
+				// Stop at question words or conjunctions
+				if isStopWord(cleaned) {
+					break
+				}
+			}
+		}
+	}
+
+	// Remove duplicates and return
+	seen := make(map[string]bool)
+	var uniqueTerms []string
+	for _, term := range terms {
+		if !seen[term] && len(term) > 1 {
+			seen[term] = true
+			uniqueTerms = append(uniqueTerms, term)
+		}
+	}
+
+	// Limit to top 3 terms to avoid too many API calls
+	if len(uniqueTerms) > 3 {
+		uniqueTerms = uniqueTerms[:3]
+	}
+
+	return uniqueTerms
+}
+
+// isStopWord checks if a word should stop the extraction process
+func isStopWord(word string) bool {
+	stopWords := []string{
+		"and", "or", "but", "with", "from", "to", "for", "in", "on", "at",
+		"the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+		"have", "has", "had", "do", "does", "did", "will", "would", "could",
+		"should", "may", "might", "can", "must", "shall", "also", "work",
+		"working", "properly", "correctly", "nixos", "linux", "system",
+	}
+
+	for _, stop := range stopWords {
+		if word == stop {
+			return true
+		}
+	}
+	return false
+}
 
 // Config command wrapper functions that accept io.Writer
 func showConfigWithOutput(out io.Writer) {
@@ -1231,44 +1378,174 @@ func runSearchCmd(args []string, out io.Writer) {
 	}
 }
 
-// Ask command
+// Ask command - Enhanced version with NixOS-specific context and agent integration
 func runAskCmd(args []string, out io.Writer) {
 	if len(args) == 0 {
 		_, _ = fmt.Fprintln(out, utils.FormatError("Usage: ask <question>"))
 		_, _ = fmt.Fprintln(out, utils.FormatTip("Example: ask How do I enable nginx?"))
+		_, _ = fmt.Fprintln(out, utils.FormatTip("Use --role to specify agent role (ask, diagnose, explainer, etc.)"))
 		return
 	}
-	question := ""
-	if len(args) == 1 {
-		question = args[0]
-	} else {
-		question = ""
-		for i, s := range args {
-			if i > 0 {
-				question += " "
-			}
-			question += s
-		}
-	}
+
+	// Join all arguments to form the question
+	question := strings.Join(args, " ")
+
 	_, _ = fmt.Fprintln(out, utils.FormatHeader("🤖 AI Answer to your question:"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Question", question))
+	_, _ = fmt.Fprintln(out)
+
+	// Load configuration
 	cfg, err := config.LoadUserConfig()
 	if err != nil {
 		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to load config: "+err.Error()))
 		return
 	}
-	aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+
+	// Create modern AI provider using new ProviderManager system
+	manager := ai.NewProviderManager(cfg, logger.NewLogger())
+	defaultProvider := cfg.AIModels.SelectionPreferences.DefaultProvider
+	if defaultProvider == "" {
+		defaultProvider = "ollama"
+	}
+
+	provider, err := manager.GetProvider(defaultProvider)
 	if err != nil {
 		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
 		return
 	}
-	_, _ = fmt.Fprint(out, utils.FormatInfo("Querying AI provider... "))
-	resp, err := aiProvider.Query(question)
+
+	// Create AskAgent with enhanced capabilities
+	askAgent := agent.NewAskAgent(provider)
+
+	// Set role if specified in global flags, otherwise use default Ask role
+	if agentRole != "" {
+		if err := askAgent.SetRole(roles.RoleType(agentRole)); err != nil {
+			_, _ = fmt.Fprintln(out, utils.FormatWarning("Invalid role '"+agentRole+"', using default 'ask' role"))
+		}
+	}
+
+	// Query MCP server for documentation context (with progress indicator)
+	var docExcerpts []string
+	mcpContextAdded := false
+	_, _ = fmt.Fprint(out, utils.FormatInfo("Gathering NixOS documentation context... "))
+
+	mcpBase := cfg.MCPServer.Host
+	if mcpBase != "" {
+		mcpClient := mcp.NewMCPClient(fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port))
+		doc, mcpErr := mcpClient.QueryDocumentation(question)
+		if mcpErr == nil && doc != "" {
+			// Try to parse MCP documentation result
+			opt, fallbackDoc := parseMCPOptionDoc(doc)
+			if opt.Name != "" {
+				// Structured NixOS option documentation
+				context := fmt.Sprintf("NixOS Option Documentation:\nOption: %s\nType: %s\nDefault: %s\nExample: %s\nDescription: %s\nSource: %s\nVersion: %s\nRelated: %v\nLinks: %v",
+					opt.Name, opt.Type, opt.Default, opt.Example, opt.Description, opt.Source, opt.Version, opt.Related, opt.Links)
+				docExcerpts = append(docExcerpts, context)
+				mcpContextAdded = true
+			} else if len(fallbackDoc) > 10 && len(fallbackDoc) < 2000 {
+				// General documentation content
+				docExcerpts = append(docExcerpts, "NixOS Documentation Context:\n"+fallbackDoc)
+				mcpContextAdded = true
+			}
+		}
+	}
+
+	if mcpContextAdded {
+		_, _ = fmt.Fprintln(out, utils.FormatSuccess("found"))
+	} else {
+		_, _ = fmt.Fprintln(out, utils.FormatNote("skipped"))
+	}
+
+	// Build enhanced context for the AskAgent
+	askContext := &agent.AskContext{
+		Question: question,
+		Context:  strings.Join(docExcerpts, "\n\n"),
+		Metadata: make(map[string]string),
+	}
+
+	// Add NixOS-specific context information to metadata
+	askContext.Metadata["provider"] = defaultProvider
+	askContext.Metadata["nixos_version"] = "latest"
+	askContext.Metadata["documentation_available"] = fmt.Sprintf("%t", mcpContextAdded)
+
+	// Add package/service search context to provide accurate information
+	var searchContext []string
+	_, _ = fmt.Fprint(out, utils.FormatInfo("Searching NixOS packages and options... "))
+
+	// Search for relevant packages and options
+	exec := nixos.NewExecutor(cfg.NixosFolder)
+
+	// Extract key terms from the question for search
+	searchTerms := extractSearchTerms(question)
+	for _, term := range searchTerms {
+		if packageInfo, err := exec.SearchNixPackages(term); err == nil && packageInfo != "" {
+			searchContext = append(searchContext, fmt.Sprintf("Package Search for '%s':\n%s", term, packageInfo))
+		}
+	}
+
 	_, _ = fmt.Fprintln(out, utils.FormatSuccess("done"))
+
+	// Create enhanced prompt with NixOS expertise and strict guidelines
+	nixosPromptInstruction := "ATTENTION: You are a NixOS expert. NEVER EVER suggest nix-env commands!\n\n" +
+		"CRITICAL RULES:\n" +
+		"❌ NEVER suggest 'nix-env -i' or any nix-env commands\n" +
+		"❌ NEVER recommend manual installation\n\n" +
+		"✅ ALWAYS USE configuration.nix for system packages\n" +
+		"✅ ALWAYS USE services.* options for services\n" +
+		"✅ ALWAYS end with 'sudo nixos-rebuild switch'\n\n" +
+		"For nginx specifically: Use services.nginx.enable = true; in configuration.nix"
+
+	if mcpContextAdded {
+		nixosPromptInstruction += "\n\nIMPORTANT: Use the provided NixOS documentation context to ensure accuracy and provide the most current information."
+	}
+
+	if len(searchContext) > 0 {
+		nixosPromptInstruction += "\n\nPACKAGE SEARCH CONTEXT:\n" + strings.Join(searchContext, "\n\n")
+		nixosPromptInstruction += "\n\nUse this package information to provide accurate package names and availability."
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatNote("[DEBUG] Enhanced prompt ready"))
+
+	// Query the AI provider directly with our enhanced prompt to avoid double-wrapping
+	_, _ = fmt.Fprint(out, utils.FormatInfo("Generating NixOS-specific response... "))
+
+	ctx := context.Background()
+
+	// Construct the final prompt with role template + our detailed instructions + user question
+	finalPrompt := ""
+	if template, exists := roles.RolePromptTemplate[roles.RoleAsk]; exists {
+		finalPrompt = template + "\n\n"
+		_, _ = fmt.Fprintln(out, "\n[DEBUG] Using RoleAsk template")
+	} else {
+		_, _ = fmt.Fprintln(out, "\n[DEBUG] RoleAsk template NOT found!")
+	}
+	finalPrompt += nixosPromptInstruction + "\n\nUser Question: " + question
+
+	// Use provider directly to avoid agent's prompt wrapping
+	response, err := provider.Query(ctx, finalPrompt)
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("done"))
+	_, _ = fmt.Fprintln(out)
+
 	if err != nil {
 		_, _ = fmt.Fprintln(out, utils.FormatError("AI error: "+err.Error()))
 		return
 	}
-	_, _ = fmt.Fprintln(out, utils.RenderMarkdown(resp))
+
+	// Display the enhanced response
+	_, _ = fmt.Fprintln(out, utils.RenderMarkdown(response))
+
+	// Add helpful next steps
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, utils.FormatDivider())
+	_, _ = fmt.Fprintln(out, utils.FormatTip("💡 **Need more help?**"))
+	_, _ = fmt.Fprintln(out, utils.FormatNote("• Use `nixai diagnose` if you encounter errors"))
+	_, _ = fmt.Fprintln(out, utils.FormatNote("• Use `nixai search <term>` to find packages or options"))
+	_, _ = fmt.Fprintln(out, utils.FormatNote("• Use `nixai explain-option <option>` for detailed option info"))
+	_, _ = fmt.Fprintln(out, utils.FormatNote("• Use `nixai doctor` for system health checks"))
+	if mcpContextAdded {
+		_, _ = fmt.Fprintln(out, utils.FormatNote("• This answer used live NixOS documentation for accuracy"))
+	}
 }
 
 // RunDirectCommand executes commands directly from interactive mode
