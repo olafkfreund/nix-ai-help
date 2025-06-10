@@ -11,14 +11,30 @@
 ## 🆕 Latest Updates (June 2025)
 
 ### ✨ **Modern TUI Interface** - **NEWLY COMPLETED!**
+
 - **🎨 Icon-Free Design**: 100% accessible text-based interface without Unicode dependencies
 - **📖 Enhanced Typography**: Larger, more readable text with improved visual hierarchy
 - **📜 Smart Scrolling**: Text-based scroll indicators with Page Up/Down support
 - **ℹ️ Version Display**: nixai version prominently shown in status bar
 - **📰 Changelog Popup**: Press F1 to view latest features and updates
 - **⌨️ Better Navigation**: Improved keyboard shortcuts and panel switching
+- **🔧 Interactive Parameter Input**: All complex commands now support TUI parameter configuration
+- **📊 Real-Time Output**: Command execution with live output display within TUI
+- **🎯 Command Discovery**: Enhanced command browser with `[INPUT]` indicators for configurable commands
+
+### 🚀 **Enhanced Command System** - **8 MAJOR COMMANDS UPGRADED!**
+
+- **🔨 Build System**: 10 specialized subcommands for comprehensive build troubleshooting and optimization
+- **📦 Package Analysis**: AI-powered Git repository analysis with automatic Nix derivation generation
+- **🩺 Advanced Diagnostics**: Multi-format log analysis with AI-powered issue detection and fixes
+- **⚙️ Interactive Configuration**: 8-flag NixOS configuration generator with desktop, server, and minimal presets
+- **🗑️ Intelligent Garbage Collection**: 4 subcommands for AI-guided safe cleanup and generation management
+- **💻 Hardware Optimization**: 6 specialized hardware tools with auto-detection and performance tuning
+- **🔄 Migration Assistant**: AI-powered channel-to-flakes migration with backup and rollback support
+- **📝 Neovim Integration**: Complete Neovim setup with 5 management commands and MCP integration
 
 ### 🚀 **Recent Feature Additions**
+
 - **Modern TUI Architecture**: Complete `/internal/tui/` system with Bubble Tea framework
 - **Context-Aware System**: Intelligent NixOS context detection with 4 management commands
 - **Enhanced Hardware Management**: 6 specialized subcommands for comprehensive system analysis
@@ -34,19 +50,21 @@ The newly modernized Terminal User Interface provides a professional, accessible
 
 ### 🖥️ Interface Layout
 
-```
+```text
 ┌─ Commands (24 total) ──────────────┬─ Execution Panel ─────────────────┐
 │                                    │                                   │
 │ ask [INPUT]                        │ Welcome to nixai TUI!             │
 │   Ask any NixOS question           │ Select a command from the left    │
-│ search [INPUT]                     │ panel to get started.            │
+│ search [INPUT]                     │ panel to get started.             │
 │   Search for packages/services     │                                   │
 │ explain-option [INPUT]             │ Latest Updates:                   │
-│   Explain a NixOS option           │ • Icon-free accessible design    │
-│ hardware detect                    │ • Enhanced typography             │
-│   Comprehensive hardware analysis  │ • Smart scrolling system         │
-│                                    │ • Version display                │
-│ (Showing 1-8 of 24)               │ • F1 changelog popup             │
+│   Explain a NixOS option           │ • Interactive parameter input     │
+│ hardware detect                    │ • 8 major commands upgraded       │
+│   Comprehensive hardware analysis  │ • Real-time TUI output            │
+│ build [INPUT]                      │ • Enhanced command discovery      │
+│   Advanced build troubleshooting   │ • Live execution feedback         │
+│                                    │                                   │
+│ (Showing 1-10 of 24)               │ [INPUT] = Interactive Parameters  │
 └────────────────────────────────────┴───────────────────────────────────┘
 Commands | F1:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.2.3
 ```
@@ -560,10 +578,86 @@ nixai deps                                       # Analyze configuration depende
 
 ```zsh
 nixai hardware detect                            # Comprehensive hardware analysis
-nixai hardware optimize --dry-run               # Preview optimization recommendations
+nixai hardware optimize --dry-run               # Preview optimization recommendations  
 nixai hardware drivers --auto-install           # Automatic driver configuration
 nixai hardware laptop --power-save              # Laptop-specific optimizations
 nixai hardware compare                          # Compare current vs optimal settings
+nixai hardware function --operation detect     # Advanced hardware function calling
+```
+
+**Enhanced build system troubleshooting:**
+
+```zsh
+nixai build debug                               # Deep build failure analysis with pattern recognition
+nixai build retry --smart-cache                # Intelligent retry with automated fixes
+nixai build cache-miss                         # Analyze cache miss reasons and optimization
+nixai build environment                        # Build environment analysis and recommendations
+nixai build dependencies                       # Dependency conflict analysis and resolution
+nixai build performance                        # Build performance optimization
+nixai build cleanup                           # Build cache and artifact cleanup
+nixai build validate                          # Build configuration validation
+nixai build monitor                           # Real-time build monitoring
+nixai build compare                           # Build configuration comparison
+```
+
+**AI-powered package repository analysis:**
+
+```zsh
+nixai package-repo https://github.com/user/project              # Analyze remote repository
+nixai package-repo --local ./my-project                        # Analyze local project
+nixai package-repo <url> --output derivation.nix               # Generate Nix derivation
+nixai package-repo <url> --name custom-package --analyze-only  # Analysis without generation
+```
+
+**Advanced diagnostics and issue resolution:**
+
+```zsh
+nixai diagnose /var/log/nixos-rebuild.log       # Analyze specific log file
+nixai diagnose --file /var/log/messages         # Diagnose from file
+nixai diagnose --type system --context "boot failure"  # System-specific diagnosis
+nixai diagnose --output json                    # JSON output for automation
+journalctl -xe | nixai diagnose                # Pipe logs for analysis
+```
+
+**Interactive NixOS configuration generation:**
+
+```zsh
+nixai configure                                 # Interactive configuration wizard
+nixai configure --search "web server nginx"    # Generate configuration with search context
+nixai configure --output my-config.nix         # Save configuration to file
+nixai configure --advanced --desktop           # Advanced desktop configuration
+nixai configure --server --minimal             # Minimal server configuration
+nixai configure --home --flake                 # Home Manager configuration with flakes
+```
+
+**AI-guided garbage collection and cleanup:**
+
+```zsh
+nixai gc analyze                               # Analyze store usage and cleanup opportunities
+nixai gc safe-clean                          # AI-guided safe cleanup with explanations
+nixai gc compare-generations                  # Compare generations with recommendations
+nixai gc disk-usage                          # Visualize store usage with recommendations
+nixai gc --dry-run --keep-generations 10     # Preview cleanup keeping 10 generations
+```
+
+**AI-powered migration assistance:**
+
+```zsh
+nixai migrate analyze                         # Analyze current setup and migration complexity
+nixai migrate to-flakes                      # Convert from channels to flakes
+nixai migrate --backup-name "pre-migration"  # Migration with custom backup name
+nixai migrate to-flakes --dry-run           # Preview migration steps without executing
+```
+
+**Comprehensive Neovim integration:**
+
+```zsh
+nixai neovim-setup install                   # Install Neovim integration with nixai
+nixai neovim-setup status                    # Check integration status
+nixai neovim-setup configure                 # Configure integration settings
+nixai neovim-setup update                    # Update integration to latest version
+nixai neovim-setup remove                    # Remove integration
+nixai neovim-setup install --config-dir ~/.config/nvim --socket-path /tmp/custom.sock
 ```
 
 **Context management and system awareness:**

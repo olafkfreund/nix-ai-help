@@ -4,17 +4,28 @@ Enhanced build troubleshooting and optimization with AI-powered analysis, real-t
 
 ---
 
+## 🆕 TUI Integration & Enhanced Features
+
+The `nixai build` command now features **comprehensive TUI integration** with interactive parameter input and real-time execution feedback:
+
+### ✨ **Interactive TUI Features**
+- **🎯 Interactive Parameter Input**: All subcommands support TUI-based parameter configuration
+- **📊 Real-Time Output Display**: Live build progress and AI insights within the TUI interface
+- **⌨️ Command Discovery**: Enhanced command browser with `[INPUT]` indicators for configurable options
+- **🔄 Background Process Management**: TUI-integrated status tracking for background builds
+- **📋 Context-Aware Assistance**: Automatic NixOS setup detection for personalized build guidance
+
 ## Overview
 
 The `nixai build` command provides comprehensive build assistance with advanced features including:
 
-- **AI-Powered Failure Analysis**: Deep analysis of build failures with intelligent fixes
-- **Real-Time Monitoring**: Watch builds progress with live AI insights
-- **Background Build Management**: Run builds in background with status tracking
+- **AI-Powered Failure Analysis**: Deep analysis of build failures with intelligent fixes and pattern recognition
+- **Real-Time TUI Monitoring**: Watch builds progress with live AI insights in modern TUI interface
+- **Background Build Management**: Run builds in background with TUI status tracking and notifications
 - **Intelligent Recovery System**: Automated retry with learned optimizations from failure history
-- **Performance Profiling**: Analyze and optimize build performance with detailed metrics
-- **Cache Analysis**: Optimize binary cache usage and identify miss patterns
-- **Sandbox Debugging**: Resolve permission and environment issues
+- **Performance Profiling**: Analyze and optimize build performance with detailed metrics and visualization
+- **Cache Analysis**: Optimize binary cache usage and identify miss patterns with smart recommendations
+- **Sandbox Debugging**: Resolve permission and environment issues with AI-guided troubleshooting
 
 ---
 
