@@ -19,6 +19,7 @@ import (
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/mcp"
 	"nix-ai-help/internal/nixos"
+	"nix-ai-help/internal/packaging"
 	"nix-ai-help/pkg/logger"
 	"nix-ai-help/pkg/utils"
 	"nix-ai-help/pkg/version"
@@ -157,6 +158,12 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&globalTUI, "tui", false, "Launch TUI mode for any command")
 	mcpServerCmd.Flags().BoolVarP(&daemonMode, "daemon", "d", false, "Run MCP server in background/daemon mode")
 	doctorCmd.Flags().BoolP("verbose", "v", false, "Show detailed output and progress information")
+
+	// Add package-repo command flags
+	packageRepoCmd.Flags().String("local", "", "Analyze local repository path instead of cloning")
+	packageRepoCmd.Flags().String("output", "", "Output file path for generated derivation")
+	packageRepoCmd.Flags().String("name", "", "Override package name for the derivation")
+	packageRepoCmd.Flags().Bool("analyze-only", false, "Only analyze repository without generating derivation")
 
 	// Add logs subcommands
 	logsCmd.AddCommand(logsSystemCmd)
@@ -2669,13 +2676,130 @@ func handleNeovimSetupCommand(cmd *cobra.Command, args []string) {
 
 // handlePackageRepoCommand handles the package-repo command
 func handlePackageRepoCommand(cmd *cobra.Command, args []string) {
-	if globalTUI {
-		LaunchTUIMode(cmd, args)
+	// Parse command flags
+	localPath, _ := cmd.Flags().GetString("local")
+	outputPath, _ := cmd.Flags().GetString("output")
+	packageName, _ := cmd.Flags().GetString("name")
+	analyzeOnly, _ := cmd.Flags().GetBool("analyze-only")
+
+	// Determine repository URL or local path
+	var repoURL string
+	if localPath == "" && len(args) > 0 {
+		repoURL = args[0]
+	}
+
+	// Validate input
+	if localPath == "" && repoURL == "" {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Either repository URL or --local path must be provided"))
+		fmt.Fprintln(os.Stderr, utils.FormatTip("Usage: nixai package-repo <repo-url> [flags] or nixai package-repo --local <path> [flags]"))
 		return
 	}
 
-	// TODO: Implement package-repo functionality
-	fmt.Println("Package repository analysis functionality is coming soon!")
+	// Load configuration
+	cfg, err := config.LoadUserConfig()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
+		return
+	}
+
+	// Initialize AI provider (using the legacy interface for packaging service)
+	legacyAIProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
+	if err != nil {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
+		return
+	}
+
+	// Initialize MCP client
+	mcpURL := fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port)
+	mcpClient := mcp.NewMCPClient(mcpURL)
+
+	// Create packaging service
+	tempDir := "/tmp/nixai-packaging"
+	packagingService := packaging.NewPackagingService(
+		legacyAIProvider, // Use legacy AI provider directly
+		mcpClient,
+		tempDir,
+		logger.NewLogger(),
+	)
+
+	// Create package request
+	request := &packaging.PackageRequest{
+		RepoURL:     repoURL,
+		LocalPath:   localPath,
+		OutputPath:  outputPath,
+		PackageName: packageName,
+		Quiet:       false,
+	}
+
+	// Display header
+	if localPath != "" {
+		fmt.Println(utils.FormatHeader("📦 Analyzing Local Repository: " + localPath))
+	} else {
+		fmt.Println(utils.FormatHeader("📦 Analyzing Repository: " + repoURL))
+	}
+	fmt.Println()
+
+	// Execute packaging
+	ctx := context.Background()
+	result, err := packagingService.PackageRepository(ctx, request)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Failed to package repository: "+err.Error()))
+		return
+	}
+
+	// Display analysis results
+	fmt.Println(utils.FormatHeader("🔍 Repository Analysis"))
+	fmt.Println(utils.FormatKeyValue("Project Name", result.Analysis.ProjectName))
+	fmt.Println(utils.FormatKeyValue("Language", result.Analysis.Language))
+	fmt.Println(utils.FormatKeyValue("Build System", string(result.Analysis.BuildSystem))) // Convert BuildSystem to string
+	fmt.Println(utils.FormatKeyValue("Dependencies", fmt.Sprintf("%d found", len(result.Analysis.Dependencies))))
+	
+	if len(result.Analysis.Dependencies) > 0 {
+		fmt.Println()
+		fmt.Println(utils.FormatHeader("📋 Dependencies"))
+		for _, dep := range result.Analysis.Dependencies {
+			fmt.Printf("  • %s (%s)\n", dep.Name, dep.Type)
+		}
+	}
+
+	// Display validation issues if any
+	if len(result.ValidationIssues) > 0 {
+		fmt.Println()
+		fmt.Println(utils.FormatHeader("⚠️  Validation Issues"))
+		for _, issue := range result.ValidationIssues {
+			fmt.Println(utils.FormatWarning("• " + issue))
+		}
+	}
+
+	// Display derivation if not analyze-only
+	if !analyzeOnly && result.Derivation != "" {
+		fmt.Println()
+		fmt.Println(utils.FormatHeader("📜 Generated Nix Derivation"))
+		fmt.Println(utils.RenderMarkdown("```nix\n" + result.Derivation + "\n```"))
+
+		// Save to file if output path specified
+		if outputPath != "" {
+			err := os.WriteFile(outputPath, []byte(result.Derivation), 0644)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to write derivation to file: "+err.Error()))
+			} else {
+				fmt.Println()
+				fmt.Println(utils.FormatSuccess("✅ Derivation written to: " + outputPath))
+			}
+		}
+	}
+
+	// Display nixpkgs mappings if available
+	if len(result.NixpkgsMappings) > 0 {
+		fmt.Println()
+		fmt.Println(utils.FormatHeader("🗂️  Nixpkgs Mappings"))
+		for dep, nixpkg := range result.NixpkgsMappings {
+			fmt.Println(utils.FormatKeyValue(dep, nixpkg))
+		}
+	}
+
+	fmt.Println()
+	fmt.Println(utils.FormatSuccess("✅ Repository analysis complete!"))
 }
 
 // initializeLogsAgent creates a logs agent with AI provider

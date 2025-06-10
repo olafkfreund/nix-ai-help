@@ -1303,6 +1303,39 @@ func init() {
 	buildProfileCmd.Flags().String("package", "", "Specific package to profile")
 }
 
+// NewBuildCommand creates a new build command with all subcommands and flags
+func NewBuildCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   enhancedBuildCmd.Use,
+		Short: enhancedBuildCmd.Short,
+		Long:  enhancedBuildCmd.Long,
+		Args:  enhancedBuildCmd.Args,
+		Run:   enhancedBuildCmd.Run,
+	}
+
+	// Add all subcommands
+	cmd.AddCommand(buildDebugCmd)
+	cmd.AddCommand(buildRetryCmd)
+	cmd.AddCommand(buildCacheMissCmd)
+	cmd.AddCommand(buildSandboxDebugCmd)
+	cmd.AddCommand(buildProfileCmd)
+
+	// Add enhanced monitoring and management commands
+	cmd.AddCommand(buildWatchCmd)
+	cmd.AddCommand(buildStatusCmd)
+	cmd.AddCommand(buildStopCmd)
+	cmd.AddCommand(buildBackgroundCmd)
+	cmd.AddCommand(buildQueueCmd)
+
+	// Add flags
+	cmd.Flags().Bool("flake", false, "Use flake mode for building")
+	cmd.Flags().Bool("dry-run", false, "Show what would be built without actually building")
+	cmd.Flags().Bool("verbose", false, "Show verbose build output")
+	cmd.Flags().String("out-link", "", "Path where the symlink to the output will be stored")
+
+	return cmd
+}
+
 // extractPackageFromFailure attempts to extract the package name from build failure output
 func extractPackageFromFailure(output string) string {
 	lines := strings.Split(output, "\n")

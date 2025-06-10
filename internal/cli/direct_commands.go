@@ -905,12 +905,21 @@ func showPackageRepoOptions(out io.Writer) {
 
 // runPackageRepoCmd executes the package-repo command directly
 func runPackageRepoCmd(args []string, out io.Writer) {
-	if len(args) == 0 {
-		showPackageRepoOptions(out)
-		return
+	runCobraCommand(NewPackageRepoCommand(), args, out)
+}
+
+// NewPackageRepoCommand returns a fresh package-repo command
+func NewPackageRepoCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     packageRepoCmd.Use,
+		Short:   packageRepoCmd.Short,
+		Long:    packageRepoCmd.Long,
+		Example: packageRepoCmd.Example,
+		Run:     packageRepoCmd.Run,
 	}
-	_, _ = fmt.Fprintln(out, "Analyzing repo or directory:", args[0])
-	_, _ = fmt.Fprintln(out, "Nix derivation generation coming soon.")
+	cmd.PersistentFlags().AddFlagSet(packageRepoCmd.PersistentFlags())
+	cmd.Flags().AddFlagSet(packageRepoCmd.Flags())
+	return cmd
 }
 
 // Machines helper functions
@@ -974,8 +983,7 @@ func runMachinesCmd(args []string, out io.Writer) {
 
 // Build command
 func runBuildCmd(args []string, out io.Writer) {
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("🛠️ Build Troubleshooting & Optimization"))
-	_, _ = fmt.Fprintln(out, "Enhanced build troubleshooting and optimization coming soon.")
+	runCobraCommand(NewBuildCommand(), args, out)
 }
 
 // Completion command
