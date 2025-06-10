@@ -494,7 +494,14 @@ func getAvailableCommands() []commandItem {
 			{name: "laptop", description: "Laptop-specific optimizations"},
 			{name: "function", description: "Use hardware function calling interface"},
 		}},
-		{name: "migrate", description: "AI-powered migration assistant", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
+		{name: "migrate", description: "AI-powered migration assistant", needsInput: true, options: []commandOption{
+			{name: "Verbose", flag: "verbose", description: "Show detailed analysis", required: false, hasValue: false, optionType: "bool"},
+			{name: "Backup Name", flag: "backup-name", description: "Custom backup name", required: false, hasValue: true, optionType: "string"},
+			{name: "Dry Run", flag: "dry-run", description: "Show migration steps without executing", required: false, hasValue: false, optionType: "bool"},
+		}, subcommands: []subcommandItem{
+			{name: "analyze", description: "Analyze current setup and migration complexity"},
+			{name: "to-flakes", description: "Convert from channels to flakes"},
+		}},
 		{name: "neovim-setup", description: "Neovim integration setup", needsInput: false, options: []commandOption{}, subcommands: []subcommandItem{}},
 	}
 
