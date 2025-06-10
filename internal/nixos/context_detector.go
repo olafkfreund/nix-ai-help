@@ -183,29 +183,7 @@ func (cd *ContextDetector) detectChannelsUsage(context *config.NixOSContext) {
 func (cd *ContextDetector) detectHomeManager(context *config.NixOSContext) {
 	cd.logger.Debug("Detecting Home Manager...")
 
-	// Check for standalone Home Manager
-	if cmd := exec.Command("which", "home-manager"); cmd.Run() == nil {
-		context.HasHomeManager = true
-		context.HomeManagerType = "standalone"
-
-		// Find Home Manager config
-		hmConfigPaths := []string{
-			filepath.Join(os.Getenv("HOME"), ".config", "home-manager", "home.nix"),
-			filepath.Join(os.Getenv("HOME"), ".config", "nixpkgs", "home.nix"),
-		}
-
-		for _, hmPath := range hmConfigPaths {
-			if _, err := os.Stat(hmPath); err == nil {
-				context.HomeManagerConfigPath = hmPath
-				break
-			}
-		}
-
-		cd.logger.Debug("Detected standalone Home Manager")
-		return
-	}
-
-	// Check for Home Manager as NixOS module
+	// First check for Home Manager as NixOS module (priority for NixOS systems)
 	if context.SystemType == "nixos" {
 		configPaths := []string{
 			"/etc/nixos/configuration.nix",
@@ -218,14 +196,67 @@ func (cd *ContextDetector) detectHomeManager(context *config.NixOSContext) {
 			}
 
 			if content, err := os.ReadFile(configPath); err == nil {
-				if strings.Contains(string(content), "home-manager") {
+				contentStr := string(content)
+				// Look for Home Manager module imports or configuration
+				if strings.Contains(contentStr, "home-manager.nixosModules") ||
+					strings.Contains(contentStr, "home-manager/nixos") ||
+					strings.Contains(contentStr, "inputs.home-manager.nixosModules") ||
+					strings.Contains(contentStr, "home-manager.users.") ||
+					(strings.Contains(contentStr, "home-manager") &&
+						(strings.Contains(contentStr, "imports") || strings.Contains(contentStr, "modules"))) {
 					context.HasHomeManager = true
 					context.HomeManagerType = "module"
-					cd.logger.Debug("Detected Home Manager as NixOS module")
+					cd.logger.Debug("Detected Home Manager as NixOS module in: " + configPath)
 					return
 				}
 			}
 		}
+
+		// Also check flake.nix for Home Manager inputs
+		flakePaths := []string{
+			"/etc/nixos/flake.nix",
+			filepath.Join(context.NixOSConfigPath, "flake.nix"),
+		}
+
+		for _, flakePath := range flakePaths {
+			if content, err := os.ReadFile(flakePath); err == nil {
+				contentStr := string(content)
+				if strings.Contains(contentStr, "home-manager") &&
+					(strings.Contains(contentStr, "github:nix-community/home-manager") ||
+						strings.Contains(contentStr, "home-manager.nixosModules")) {
+					context.HasHomeManager = true
+					context.HomeManagerType = "module"
+					cd.logger.Debug("Detected Home Manager module in flake: " + flakePath)
+					return
+				}
+			}
+		}
+	}
+
+	// Check for standalone Home Manager (fallback)
+	if exec.Command("which", "home-manager").Run() == nil {
+		// Check if this is truly standalone by looking for standalone config files
+		hmConfigPaths := []string{
+			filepath.Join(os.Getenv("HOME"), ".config", "home-manager", "home.nix"),
+			filepath.Join(os.Getenv("HOME"), ".config", "nixpkgs", "home.nix"),
+		}
+
+		for _, hmPath := range hmConfigPaths {
+			if _, err := os.Stat(hmPath); err == nil {
+				context.HasHomeManager = true
+				context.HomeManagerType = "standalone"
+				context.HomeManagerConfigPath = hmPath
+				cd.logger.Debug("Detected standalone Home Manager with config: " + hmPath)
+				return
+			}
+		}
+
+		// home-manager command exists but no standalone config found
+		// This likely means it's installed via NixOS module but not detected above
+		cd.logger.Debug("home-manager command found but no standalone config - likely NixOS module")
+		context.HasHomeManager = true
+		context.HomeManagerType = "module"
+		return
 	}
 
 	context.HasHomeManager = false
