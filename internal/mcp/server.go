@@ -147,6 +147,22 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 				Name:        "nix_lsp_definition",
 				Description: "Provide go-to-definition functionality for Nix symbols",
 			},
+			{
+				Name:        "get_nixos_context",
+				Description: "Get current NixOS system context information",
+			},
+			{
+				Name:        "detect_nixos_context",
+				Description: "Force re-detection of NixOS system context",
+			},
+			{
+				Name:        "reset_nixos_context",
+				Description: "Clear cached context and force refresh",
+			},
+			{
+				Name:        "context_status",
+				Description: "Show context detection system status and health",
+			},
 		}
 		_ = conn.Reply(ctx, req.ID, map[string]interface{}{"tools": tools})
 
@@ -454,6 +470,74 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 					},
 				},
 				"locations": locations,
+			})
+
+		case "get_nixos_context":
+			format := "text"
+			detailed := false
+			if formatArg, ok := params.Arguments["format"].(string); ok {
+				format = formatArg
+			}
+			if detailedArg, ok := params.Arguments["detailed"].(bool); ok {
+				detailed = detailedArg
+			}
+
+			result := m.handleGetContext(format, detailed)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "detect_nixos_context":
+			verbose := false
+			if verboseArg, ok := params.Arguments["verbose"].(bool); ok {
+				verbose = verboseArg
+			}
+
+			result := m.handleDetectContext(verbose)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "reset_nixos_context":
+			confirm := true // Default to true for MCP calls
+			if confirmArg, ok := params.Arguments["confirm"].(bool); ok {
+				confirm = confirmArg
+			}
+
+			result := m.handleResetContext(confirm)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "context_status":
+			includeMetrics := false
+			if metricsArg, ok := params.Arguments["includeMetrics"].(bool); ok {
+				includeMetrics = metricsArg
+			}
+
+			result := m.handleContextStatus(includeMetrics)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
 			})
 
 		default:
