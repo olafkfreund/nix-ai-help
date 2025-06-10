@@ -1,10 +1,18 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
+	"time"
+
+	"nix-ai-help/internal/config"
+	"nix-ai-help/pkg/utils"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -48,9 +56,15 @@ func initialModelWithCommand(command string, args []string) tuiModel {
 		for i, cmd := range model.commands {
 			if cmd.name == command {
 				model.selectedCommand = i
-				// If the command has args, execute it immediately
+				// Store initial command and args for execution in Init
+				model.selectedCmdName = command
 				if len(args) > 0 {
-					model.commandOutput = fmt.Sprintf("Executing: %s %s", command, strings.Join(args, " "))
+					// Store args in optionValues for later use
+					if model.optionValues == nil {
+						model.optionValues = make(map[string]string)
+					}
+					model.optionValues["__initial_args__"] = strings.Join(args, " ")
+					model.commandOutput = fmt.Sprintf("Preparing to execute: %s %s", command, strings.Join(args, " "))
 				}
 				break
 			}
@@ -94,6 +108,11 @@ type tuiModel struct {
 	commandOptions     []commandOption
 	selectedOption     int
 	optionValues       map[string]string
+
+	// Streaming output support
+	streamingOutput []string
+	isStreaming     bool
+	currentCommand  string
 }
 
 type commandItem struct {
@@ -146,6 +165,18 @@ type executeCommandMsg struct {
 	output  string
 }
 
+// streamingOutputMsg represents streaming command output
+type streamingOutputMsg struct {
+	command string
+	output  string
+	isEnd   bool
+}
+
+// commandExecutionStartMsg represents the start of command execution
+type commandExecutionStartMsg struct {
+	command string
+}
+
 // Define styles
 var (
 	titleStyle = lipgloss.NewStyle().
@@ -189,6 +220,9 @@ func initialModel() tuiModel {
 		commandOutput:   "Welcome to nixai TUI! Select a command from the left panel to get started.",
 		currentState:    stateCommandList,
 		optionValues:    make(map[string]string),
+		streamingOutput: make([]string, 0),
+		isStreaming:     false,
+		currentCommand:  "",
 	}
 }
 
@@ -404,6 +438,22 @@ func getAvailableCommands() []commandItem {
 
 // Init is called when the model is first created
 func (m tuiModel) Init() tea.Cmd {
+	// If we have initial command args, execute the command immediately
+	if args, exists := m.optionValues["__initial_args__"]; exists && m.selectedCmdName != "" {
+		// Remove the initial args marker
+		delete(m.optionValues, "__initial_args__")
+
+		// Parse the args and execute
+		argList := strings.Fields(args)
+		return tea.Batch(
+			func() tea.Msg {
+				return commandExecutionStartMsg{
+					command: fmt.Sprintf("%s %s", m.selectedCmdName, args),
+				}
+			},
+			m.executeCommandWithParams(m.selectedCmdName, argList),
+		)
+	}
 	return nil
 }
 
@@ -419,6 +469,27 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.isExecuting = false
 		m.currentState = stateResults
 		m.focused = focusOutput
+
+	case commandExecutionStartMsg:
+		m.isStreaming = true
+		m.isExecuting = true
+		m.currentCommand = msg.command
+		m.streamingOutput = []string{fmt.Sprintf("$ %s", msg.command)}
+		m.commandOutput = strings.Join(m.streamingOutput, "\n")
+		m.currentState = stateExecuting
+
+	case streamingOutputMsg:
+		if m.isStreaming && msg.command == m.currentCommand {
+			if msg.isEnd {
+				m.isStreaming = false
+				m.isExecuting = false
+				m.currentState = stateResults
+				m.focused = focusOutput
+			} else {
+				m.streamingOutput = append(m.streamingOutput, msg.output)
+				m.commandOutput = strings.Join(m.streamingOutput, "\n")
+			}
+		}
 
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
@@ -1054,7 +1125,9 @@ func (m tuiModel) renderCommandsPanel(width, height int) string {
 func (m tuiModel) renderOutputPanel(width, height int) string {
 	content := m.commandOutput
 
-	if m.isExecuting {
+	if m.isStreaming {
+		content = "⚡ Executing command (real-time output)...\n\n" + content
+	} else if m.isExecuting {
 		content = "⏳ Executing command...\n\n" + content
 	}
 
@@ -1325,6 +1398,18 @@ func (m tuiModel) executeCommand(cmdName string) tea.Cmd {
 
 // executeCommandWithParams executes a command with parameters and returns a tea.Cmd
 func (m tuiModel) executeCommandWithParams(cmdName string, args []string) tea.Cmd {
+	// Check if this is a command that supports streaming
+	if cmdName == "flake" && len(args) > 0 && args[0] == "validate" {
+		return tea.Batch(
+			func() tea.Msg {
+				return commandExecutionStartMsg{
+					command: fmt.Sprintf("%s %s", cmdName, strings.Join(args, " ")),
+				}
+			},
+			m.executeFlakeValidateStreaming(args[1:]),
+		)
+	}
+
 	return func() tea.Msg {
 		// Create a buffer to capture command output
 		var outputBuffer bytes.Buffer
@@ -1382,6 +1467,188 @@ func (m tuiModel) executeCommandWithSubcommand(cmdName, subcommandName string, a
 		return executeCommandMsg{
 			command: fmt.Sprintf("%s %s %s", cmdName, subcommandName, strings.Join(args, " ")),
 			output:  output,
+		}
+	}
+}
+
+// executeCommandWithStreaming executes a command with real-time streaming output
+func (m tuiModel) executeCommandWithStreaming(cmdName string, args []string) tea.Cmd {
+	return tea.Sequence(
+		// Send start message
+		func() tea.Msg {
+			return commandExecutionStartMsg{
+				command: fmt.Sprintf("%s %s", cmdName, strings.Join(args, " ")),
+			}
+		},
+		// Execute command with streaming
+		func() tea.Msg {
+			return m.streamCommand(cmdName, args)()
+		},
+	)
+}
+
+// streamCommand creates a streaming command execution
+func (m tuiModel) streamCommand(cmdName string, args []string) tea.Cmd {
+	return func() tea.Msg {
+		command := fmt.Sprintf("%s %s", cmdName, strings.Join(args, " "))
+
+		// Check if this is a flake validate command that should use real-time execution
+		if cmdName == "flake" && len(args) > 0 && args[0] == "validate" {
+			return m.executeFlakeValidateStreaming(args[1:])()
+		}
+
+		// For other commands, fall back to regular execution
+		var outputBuffer bytes.Buffer
+		handled, err := RunDirectCommand(cmdName, args, &outputBuffer)
+
+		var output string
+		if err != nil {
+			output = fmt.Sprintf("❌ Error executing command '%s': %v", command, err)
+		} else if !handled {
+			output = fmt.Sprintf("Command '%s' not yet implemented.\n\nUse 'help' to see available commands.", command)
+		} else {
+			output = outputBuffer.String()
+			if output == "" {
+				output = fmt.Sprintf("✅ Command '%s' executed successfully", command)
+			}
+		}
+
+		return streamingOutputMsg{
+			command: command,
+			output:  output,
+			isEnd:   true,
+		}
+	}
+}
+
+// executeFlakeValidateStreaming executes flake validate with real-time output
+func (m tuiModel) executeFlakeValidateStreaming(args []string) tea.Cmd {
+	return func() tea.Msg {
+		command := "flake validate"
+
+		// Determine the correct flake path using user config or arguments
+		var flakePath string
+		if len(args) > 0 {
+			// Use argument if provided
+			flakePath = args[0]
+		} else {
+			// Load user configuration to get NixOS path
+			userCfg, err := config.LoadUserConfig()
+			if err == nil && userCfg.NixosFolder != "" {
+				configPath := utils.ExpandHome(userCfg.NixosFolder)
+
+				// Check if the path is a directory containing flake.nix or a direct file path
+				if utils.IsDirectory(configPath) {
+					flakePath = filepath.Join(configPath, "flake.nix")
+				} else if strings.HasSuffix(configPath, "flake.nix") {
+					flakePath = configPath
+				} else {
+					flakePath = filepath.Join(configPath, "flake.nix")
+				}
+			} else {
+				// Fallback to auto-detection
+				commonPaths := []string{
+					os.ExpandEnv("$HOME/.config/nixos/flake.nix"),
+					"/etc/nixos/flake.nix",
+					"./flake.nix",
+				}
+
+				for _, p := range commonPaths {
+					if utils.IsFile(p) {
+						flakePath = p
+						break
+					}
+				}
+
+				if flakePath == "" {
+					flakePath = "./flake.nix"
+				}
+			}
+		}
+
+		// Check if flake.nix exists
+		if !utils.IsFile(flakePath) {
+			return streamingOutputMsg{
+				command: command,
+				output:  fmt.Sprintf("❌ No flake.nix found at: %s", flakePath),
+				isEnd:   true,
+			}
+		}
+
+		flakeDir := filepath.Dir(flakePath)
+
+		// Execute the command with live output collection
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+
+		cmd := exec.CommandContext(ctx, "nix", "flake", "check")
+		cmd.Dir = flakeDir
+
+		// Set up pipes for real-time output capture
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return streamingOutputMsg{
+				command: command,
+				output:  fmt.Sprintf("❌ Failed to create stdout pipe: %v", err),
+				isEnd:   true,
+			}
+		}
+
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			return streamingOutputMsg{
+				command: command,
+				output:  fmt.Sprintf("❌ Failed to create stderr pipe: %v", err),
+				isEnd:   true,
+			}
+		}
+
+		// Start the command
+		if err := cmd.Start(); err != nil {
+			return streamingOutputMsg{
+				command: command,
+				output:  fmt.Sprintf("❌ Failed to start command: %v", err),
+				isEnd:   true,
+			}
+		}
+
+		// Read combined output
+		var outputBuilder strings.Builder
+		outputBuilder.WriteString(fmt.Sprintf("🔍 Validating flake: %s\n\n", flakePath))
+
+		// Read stdout
+		stdoutScanner := bufio.NewScanner(stdout)
+		for stdoutScanner.Scan() {
+			line := stdoutScanner.Text()
+			if strings.TrimSpace(line) != "" {
+				outputBuilder.WriteString(line + "\n")
+			}
+		}
+
+		// Read stderr
+		stderrScanner := bufio.NewScanner(stderr)
+		for stderrScanner.Scan() {
+			line := stderrScanner.Text()
+			if strings.TrimSpace(line) != "" {
+				outputBuilder.WriteString(line + "\n")
+			}
+		}
+
+		// Wait for command completion
+		err = cmd.Wait()
+
+		// Final result
+		var finalOutput string
+		if err != nil {
+			finalOutput = fmt.Sprintf("%s\n❌ Flake validation failed: %v", outputBuilder.String(), err)
+		} else {
+			finalOutput = fmt.Sprintf("%s\n✅ Flake validation completed successfully", outputBuilder.String())
+		}
+
+		return streamingOutputMsg{
+			command: command,
+			output:  finalOutput,
+			isEnd:   true,
 		}
 	}
 }

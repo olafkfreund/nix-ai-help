@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -2319,22 +2320,81 @@ func handleFlakeValidate(cmd *cobra.Command, args []string) {
 	fmt.Println(utils.FormatHeader("✅ Validating Flake Configuration"))
 	fmt.Println()
 
-	// Check for flake.nix in current directory or specified path
-	flakePath := "./flake.nix"
+	// Determine the correct flake path using user config or arguments
+	var flakePath string
 	if len(args) > 0 {
+		// Use argument if provided
 		flakePath = args[0]
+	} else {
+		// Load user configuration to get NixOS path
+		userCfg, err := config.LoadUserConfig()
+		if err == nil && userCfg.NixosFolder != "" {
+			configPath := utils.ExpandHome(userCfg.NixosFolder)
+			fmt.Println(utils.FormatInfo(fmt.Sprintf("Using NixOS configuration path from user config: %s", configPath)))
+
+			// Check if the path is a directory containing flake.nix or a direct file path
+			if utils.IsDirectory(configPath) {
+				flakePath = filepath.Join(configPath, "flake.nix")
+			} else if strings.HasSuffix(configPath, "flake.nix") {
+				flakePath = configPath
+			} else {
+				// Try to find flake.nix in the directory
+				flakePath = filepath.Join(configPath, "flake.nix")
+			}
+		} else {
+			// Fallback to auto-detection
+			commonPaths := []string{
+				os.ExpandEnv("$HOME/.config/nixos/flake.nix"),
+				"/etc/nixos/flake.nix",
+				"./flake.nix", // Current directory as last resort
+			}
+
+			for _, p := range commonPaths {
+				if utils.IsFile(p) {
+					flakePath = p
+					fmt.Println(utils.FormatInfo(fmt.Sprintf("Auto-detected flake.nix at: %s", p)))
+					break
+				}
+			}
+
+			if flakePath == "" {
+				flakePath = "./flake.nix" // Default if nothing found
+			}
+		}
 	}
 
-	if _, err := os.Stat(flakePath); err != nil {
+	// Check if flake.nix exists
+	if !utils.IsFile(flakePath) {
 		fmt.Fprintln(os.Stderr, utils.FormatError("No flake.nix found at: "+flakePath))
+		fmt.Fprintln(os.Stderr, utils.FormatTip("Ensure you're in the correct directory or specify the path with --nixos-path"))
 		return
 	}
 
 	fmt.Println(utils.FormatKeyValue("Flake File", flakePath))
 	fmt.Println(utils.FormatInfo("Running flake validation..."))
 
-	// TODO: Add actual validation logic using nix flake check
-	fmt.Println(utils.FormatSuccess("✅ Flake validation completed"))
+	// Get the directory containing the flake.nix for the command
+	flakeDir := filepath.Dir(flakePath)
+
+	// Run nix flake check command from the flake directory
+	cmd_exec := exec.Command("nix", "flake", "check")
+	cmd_exec.Dir = flakeDir
+	output, err := cmd_exec.CombinedOutput()
+
+	if err != nil {
+		fmt.Fprintln(os.Stderr, utils.FormatError("Flake validation failed: "+err.Error()))
+		if len(output) > 0 {
+			fmt.Fprintln(os.Stderr, utils.FormatSubsection("Error Details", ""))
+			fmt.Fprintln(os.Stderr, string(output))
+		}
+		return
+	}
+
+	fmt.Println(utils.FormatSuccess("✅ Flake validation completed successfully"))
+	if len(output) > 0 {
+		fmt.Println(utils.FormatSubsection("Validation Output", ""))
+		fmt.Println(string(output))
+	}
 }
 
 func handleFlakeMigrate(cmd *cobra.Command, args []string) {

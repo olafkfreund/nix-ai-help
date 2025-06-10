@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/config"
@@ -326,24 +329,234 @@ func showFlakeOptions(out io.Writer) {
 	_, _ = fmt.Fprintln(out, utils.FormatHeader("❄️  Flake Options"))
 	_, _ = fmt.Fprintln(out)
 	_, _ = fmt.Fprintln(out, utils.FormatSubsection("Available Commands", ""))
+	_, _ = fmt.Fprintln(out, "  validate      - Validate flake configuration (nix flake check)")
+	_, _ = fmt.Fprintln(out, "  check         - Check flake integrity (same as validate)")
 	_, _ = fmt.Fprintln(out, "  init          - Initialize a new flake")
 	_, _ = fmt.Fprintln(out, "  update        - Update flake inputs")
-	_, _ = fmt.Fprintln(out, "  check         - Check flake integrity")
 	_, _ = fmt.Fprintln(out, "  show          - Show flake information")
 	_, _ = fmt.Fprintln(out, "  lock          - Update flake.lock")
 	_, _ = fmt.Fprintln(out, "  metadata      - Show flake metadata")
 	_, _ = fmt.Fprintln(out)
-	_, _ = fmt.Fprintln(out, utils.FormatTip("Full flake management coming soon"))
+	_, _ = fmt.Fprintln(out, utils.FormatTip("All commands run nix flake operations with proper error handling"))
 }
 
-// runFlakeCmd executes the flake command directly
+func runFlakeValidate(args []string, out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("✅ Validating Flake Configuration"))
+	_, _ = fmt.Fprintln(out)
+
+	// Determine the correct flake path using user config or arguments
+	var flakePath string
+	if len(args) > 0 {
+		// Use argument if provided
+		flakePath = args[0]
+	} else {
+		// Load user configuration to get NixOS path
+		userCfg, err := config.LoadUserConfig()
+		if err == nil && userCfg.NixosFolder != "" {
+			configPath := utils.ExpandHome(userCfg.NixosFolder)
+			_, _ = fmt.Fprintln(out, utils.FormatInfo(fmt.Sprintf("Using NixOS configuration path from user config: %s", configPath)))
+
+			// Check if the path is a directory containing flake.nix or a direct file path
+			if utils.IsDirectory(configPath) {
+				flakePath = filepath.Join(configPath, "flake.nix")
+			} else if strings.HasSuffix(configPath, "flake.nix") {
+				flakePath = configPath
+			} else {
+				// Try to find flake.nix in the directory
+				flakePath = filepath.Join(configPath, "flake.nix")
+			}
+		} else {
+			// Fallback to auto-detection
+			commonPaths := []string{
+				os.ExpandEnv("$HOME/.config/nixos/flake.nix"),
+				"/etc/nixos/flake.nix",
+				"./flake.nix", // Current directory as last resort
+			}
+
+			for _, p := range commonPaths {
+				if utils.IsFile(p) {
+					flakePath = p
+					_, _ = fmt.Fprintln(out, utils.FormatInfo(fmt.Sprintf("Auto-detected flake.nix at: %s", p)))
+					break
+				}
+			}
+
+			if flakePath == "" {
+				flakePath = "./flake.nix" // Default if nothing found
+			}
+		}
+	}
+
+	// Check if flake.nix exists
+	if !utils.IsFile(flakePath) {
+		_, _ = fmt.Fprintln(out, utils.FormatError("No flake.nix found at: "+flakePath))
+		_, _ = fmt.Fprintln(out, utils.FormatTip("Ensure you're in the correct directory or specify the path with --nixos-path"))
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Flake File", flakePath))
+	_, _ = fmt.Fprintln(out, utils.FormatInfo("Running flake validation..."))
+
+	// Get the directory containing the flake.nix for the command
+	flakeDir := filepath.Dir(flakePath)
+
+	// Run nix flake check command from the flake directory
+	cmd := exec.Command("nix", "flake", "check")
+	cmd.Dir = flakeDir
+	output, err := cmd.CombinedOutput()
+
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Flake validation failed: "+err.Error()))
+		if len(output) > 0 {
+			_, _ = fmt.Fprintln(out, utils.FormatSubsection("Error Details", ""))
+			_, _ = fmt.Fprintln(out, string(output))
+		}
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("✅ Flake validation completed successfully"))
+	if len(output) > 0 {
+		_, _ = fmt.Fprintln(out, utils.FormatSubsection("Validation Output", ""))
+		_, _ = fmt.Fprintln(out, string(output))
+	}
+}
+
+func runFlakeInit(args []string, out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("🔧 Initializing New Flake"))
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, utils.FormatInfo("Creating basic flake.nix template..."))
+
+	// Run nix flake init
+	var cmd *exec.Cmd
+	if len(args) > 0 {
+		cmd = exec.Command("nix", "flake", "init", "--template", args[0])
+	} else {
+		cmd = exec.Command("nix", "flake", "init")
+	}
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Flake initialization failed: "+err.Error()))
+		if len(output) > 0 {
+			_, _ = fmt.Fprintln(out, string(output))
+		}
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("✅ Flake initialized successfully"))
+	if len(output) > 0 {
+		_, _ = fmt.Fprintln(out, string(output))
+	}
+}
+
+func runFlakeUpdate(args []string, out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("🔄 Updating Flake Inputs"))
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, utils.FormatInfo("Updating flake inputs..."))
+
+	// Run nix flake update
+	cmd := exec.Command("nix", "flake", "update")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Flake update failed: "+err.Error()))
+		if len(output) > 0 {
+			_, _ = fmt.Fprintln(out, string(output))
+		}
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("✅ Flake inputs updated successfully"))
+	if len(output) > 0 {
+		_, _ = fmt.Fprintln(out, string(output))
+	}
+}
+
+func runFlakeShow(args []string, out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("📊 Showing Flake Information"))
+	_, _ = fmt.Fprintln(out)
+
+	// Run nix flake show
+	cmd := exec.Command("nix", "flake", "show")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to show flake information: "+err.Error()))
+		if len(output) > 0 {
+			_, _ = fmt.Fprintln(out, string(output))
+		}
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("Flake outputs:"))
+	_, _ = fmt.Fprintln(out, string(output))
+}
+
+func runFlakeLock(args []string, out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("🔒 Updating Flake Lock"))
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, utils.FormatInfo("Updating flake.lock file..."))
+
+	// Run nix flake lock
+	cmd := exec.Command("nix", "flake", "lock")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Flake lock update failed: "+err.Error()))
+		if len(output) > 0 {
+			_, _ = fmt.Fprintln(out, string(output))
+		}
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("✅ Flake lock file updated successfully"))
+	if len(output) > 0 {
+		_, _ = fmt.Fprintln(out, string(output))
+	}
+}
+
+func runFlakeMetadata(args []string, out io.Writer) {
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("📋 Flake Metadata"))
+	_, _ = fmt.Fprintln(out)
+
+	// Run nix flake metadata
+	cmd := exec.Command("nix", "flake", "metadata")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to get flake metadata: "+err.Error()))
+		if len(output) > 0 {
+			_, _ = fmt.Fprintln(out, string(output))
+		}
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("Flake metadata:"))
+	_, _ = fmt.Fprintln(out, string(output))
+}
+
 func runFlakeCmd(args []string, out io.Writer) {
 	if len(args) == 0 {
 		showFlakeOptions(out)
 		return
 	}
-	_, _ = fmt.Fprintln(out, "Running flake operation:", args[0])
-	_, _ = fmt.Fprintln(out, "Operation complete.")
+
+	subcommand := args[0]
+	switch subcommand {
+	case "validate":
+		runFlakeValidate(args[1:], out)
+	case "check":
+		runFlakeValidate(args[1:], out) // check and validate do the same thing
+	case "init":
+		runFlakeInit(args[1:], out)
+	case "update":
+		runFlakeUpdate(args[1:], out)
+	case "show":
+		runFlakeShow(args[1:], out)
+	case "lock":
+		runFlakeLock(args[1:], out)
+	case "metadata":
+		runFlakeMetadata(args[1:], out)
+	default:
+		_, _ = fmt.Fprintln(out, utils.FormatWarning("Unknown or unimplemented flake subcommand: "+subcommand))
+		_, _ = fmt.Fprintln(out, utils.FormatTip("Available commands: validate, check, init, update, show, lock, metadata"))
+	}
 }
 
 // Learning helper functions
@@ -538,9 +751,21 @@ func runMachinesCmd(args []string, out io.Writer) {
 	}
 	switch args[0] {
 	case "list":
-		_, _ = fmt.Fprintln(out, utils.FormatHeader("🖧 Machines List"))
-		_, _ = fmt.Fprintln(out, "- machine1 (example)")
-		_, _ = fmt.Fprintln(out, "- machine2 (example)")
+		// Get real hosts from flake.nix using utils.GetFlakeHosts()
+		hosts, err := utils.GetFlakeHosts("")
+		if err != nil {
+			_, _ = fmt.Fprintln(out, utils.FormatError("Failed to enumerate hosts from flake.nix: "+err.Error()))
+			return
+		}
+		if len(hosts) == 0 {
+			_, _ = fmt.Fprintln(out, utils.FormatInfo("No hosts found in flake.nix nixosConfigurations."))
+			return
+		}
+
+		_, _ = fmt.Fprintln(out, utils.FormatHeader("NixOS Hosts from flake.nix:"))
+		for _, h := range hosts {
+			_, _ = fmt.Fprintf(out, "- %s\n", h)
+		}
 	case "add":
 		if len(args) < 2 {
 			_, _ = fmt.Fprintln(out, utils.FormatWarning("Usage: machines add <name>"))
