@@ -2669,8 +2669,8 @@ func handleLearnCommand(cmd *cobra.Command, args []string) {
 		return
 	}
 
-	// TODO: Implement learn command functionality
-	fmt.Println("Learn command functionality is coming soon!")
+	// Use the proper implementation from direct_commands.go
+	runLearnCmd(args, cmd.OutOrStdout())
 }
 
 // handleLogsCommand is the main handler for the logs command
