@@ -14,9 +14,11 @@ import (
 	"nix-ai-help/internal/config"
 	"nix-ai-help/pkg/utils"
 
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v3"
 )
 
 // LaunchTUIMode launches TUI mode with support for any command and parameters
@@ -113,6 +115,11 @@ type tuiModel struct {
 	streamingOutput []string
 	isStreaming     bool
 	currentCommand  string
+
+	// Changelog popup support
+	changelogVisible  bool
+	changelogContent  string
+	changelogViewport viewport.Model
 }
 
 type commandItem struct {
@@ -213,16 +220,20 @@ func initialModel() tuiModel {
 	// Get available commands from the root command
 	commands := getAvailableCommands()
 
+	// Create viewport for changelog
+	changelogViewport := viewport.New(0, 0)
+
 	return tuiModel{
-		commands:        commands,
-		selectedCommand: 0,
-		focused:         focusCommands,
-		commandOutput:   "Welcome to nixai TUI! Select a command from the left panel to get started.",
-		currentState:    stateCommandList,
-		optionValues:    make(map[string]string),
-		streamingOutput: make([]string, 0),
-		isStreaming:     false,
-		currentCommand:  "",
+		commands:          commands,
+		selectedCommand:   0,
+		focused:           focusCommands,
+		commandOutput:     "Welcome to nixai TUI! Select a command from the left panel to get started.",
+		currentState:      stateCommandList,
+		optionValues:      make(map[string]string),
+		streamingOutput:   make([]string, 0),
+		isStreaming:       false,
+		currentCommand:    "",
+		changelogViewport: changelogViewport,
 	}
 }
 
@@ -581,6 +592,40 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // handleKeyPress handles key presses based on current state
 func (m tuiModel) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle changelog scrolling when changelog is visible
+	if m.changelogVisible {
+		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		case "esc", "?":
+			m.changelogVisible = false
+			return m, nil
+		case "up", "k":
+			m.changelogViewport.LineUp(1)
+			return m, nil
+		case "down", "j":
+			m.changelogViewport.LineDown(1)
+			return m, nil
+		case "pgup", "b":
+			m.changelogViewport.HalfViewUp()
+			return m, nil
+		case "pgdown", "f":
+			m.changelogViewport.HalfViewDown()
+			return m, nil
+		case "home", "g":
+			m.changelogViewport.GotoTop()
+			return m, nil
+		case "end", "G":
+			m.changelogViewport.GotoBottom()
+			return m, nil
+		default:
+			// Pass other keys to viewport
+			var cmd tea.Cmd
+			m.changelogViewport, cmd = m.changelogViewport.Update(msg)
+			return m, cmd
+		}
+	}
+
 	// Handle text input first when in input modes
 	if m.inputMode || m.searchMode {
 		switch msg.String() {
@@ -601,6 +646,10 @@ func (m tuiModel) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+c", "q":
 		return m, tea.Quit
+
+	case "?":
+		// Toggle changelog
+		return m.toggleChangelog()
 
 	case "tab":
 		return m.handleTabNavigation(), nil
@@ -716,6 +765,11 @@ func (m tuiModel) handleEscape() tuiModel {
 		m.inputMode = false
 		m.parameterInput = ""
 		m.focused = focusCommands
+		return m
+	}
+
+	if m.changelogVisible {
+		m.changelogVisible = false
 		return m
 	}
 
@@ -1135,7 +1189,16 @@ func (m tuiModel) View() string {
 	titleFormatted := titleStyle.Render(title)
 
 	// Combine everything vertically
-	return lipgloss.JoinVertical(lipgloss.Left, titleFormatted, mainArea, statusBar)
+	content := lipgloss.JoinVertical(lipgloss.Left, titleFormatted, mainArea, statusBar)
+
+	// If changelog is visible, render it as an overlay
+	if m.changelogVisible {
+		changelogPopup := m.renderChangelogPopup()
+		// Center the popup over the main content
+		content = lipgloss.Place(m.terminalWidth, m.terminalHeight, lipgloss.Center, lipgloss.Center, changelogPopup, lipgloss.WithWhitespaceChars(" "), lipgloss.WithWhitespaceForeground(lipgloss.NoColor{}))
+	}
+
+	return content
 }
 
 // renderCommandsPanel renders the left commands panel
@@ -1419,6 +1482,18 @@ func (m tuiModel) renderStatusBar(width int) string {
 		statusItems = append(statusItems, "Tab: New Command")
 		statusItems = append(statusItems, "Esc: Back")
 		statusItems = append(statusItems, "Ctrl+C: Exit")
+	}
+
+	// Add changelog controls if changelog is visible (override other status items)
+	if m.changelogVisible {
+		statusItems = []string{
+			"📋 Changelog",
+			"↑↓/jk: Scroll",
+			"PgUp/PgDn: Page",
+			"Home/End: Top/Bottom",
+			"?: Close",
+			"Esc: Close",
+		}
 	}
 
 	statusText := strings.Join(statusItems, " | ")
@@ -1732,4 +1807,224 @@ func (m tuiModel) executeFlakeValidateStreaming(args []string) tea.Cmd {
 			isEnd:   true,
 		}
 	}
+}
+
+// Changelog functionality
+func (m tuiModel) toggleChangelog() (tuiModel, tea.Cmd) {
+	if m.changelogVisible {
+		// Hide changelog
+		m.changelogVisible = false
+	} else {
+		// Show changelog - load content if not already loaded
+		if m.changelogContent == "" {
+			content, err := loadChangelogContent()
+			if err != nil {
+				m.commandOutput = fmt.Sprintf("❌ Failed to load changelog: %v", err)
+				return m, nil
+			}
+			m.changelogContent = content
+		}
+
+		// Configure viewport for the changelog popup
+		popupWidth := int(float64(m.terminalWidth) * 0.8)
+		popupHeight := int(float64(m.terminalHeight) * 0.8)
+
+		// Account for border and padding (subtract 6 for border + padding)
+		m.changelogViewport.Width = popupWidth - 6
+		m.changelogViewport.Height = popupHeight - 6
+
+		// Set the content in the viewport
+		m.changelogViewport.SetContent(m.changelogContent)
+		m.changelogViewport.GotoTop()
+
+		m.changelogVisible = true
+	}
+	return m, nil
+}
+
+// loadChangelogContent loads the changelog from the YAML file
+func loadChangelogContent() (string, error) {
+	// Try to load changelog from configs/changelog.yaml
+	changelogPath := "configs/changelog.yaml"
+	if _, err := os.Stat(changelogPath); os.IsNotExist(err) {
+		// Fallback to a default changelog
+		return generateDefaultChangelog(), nil
+	}
+
+	data, err := os.ReadFile(changelogPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read changelog file: %w", err)
+	}
+
+	// Parse YAML to extract version information
+	var changelogData struct {
+		Changelog []struct {
+			Version    string   `yaml:"version"`
+			Date       string   `yaml:"date"`
+			Highlights []string `yaml:"highlights"`
+			Features   []struct {
+				Title       string `yaml:"title"`
+				Description string `yaml:"description"`
+			} `yaml:"features"`
+			Improvements []string `yaml:"improvements"`
+			Fixes        []string `yaml:"fixes"`
+		} `yaml:"changelog"`
+	}
+
+	if err := yaml.Unmarshal(data, &changelogData); err != nil {
+		return "", fmt.Errorf("failed to parse changelog YAML: %w", err)
+	}
+
+	// Format changelog content
+	var content strings.Builder
+	content.WriteString("# 📋 nixai Changelog\n\n")
+
+	for i, version := range changelogData.Changelog {
+		if i >= 3 { // Show only latest 3 versions
+			break
+		}
+
+		content.WriteString(fmt.Sprintf("## 🎯 Version %s (%s)\n\n", version.Version, version.Date))
+
+		if len(version.Highlights) > 0 {
+			content.WriteString("### ✨ Highlights\n")
+			for _, highlight := range version.Highlights {
+				content.WriteString(fmt.Sprintf("• %s\n", highlight))
+			}
+			content.WriteString("\n")
+		}
+
+		if len(version.Features) > 0 {
+			content.WriteString("### 🚀 New Features\n")
+			for _, feature := range version.Features {
+				content.WriteString(fmt.Sprintf("• **%s**: %s\n", feature.Title, feature.Description))
+			}
+			content.WriteString("\n")
+		}
+
+		if len(version.Improvements) > 0 {
+			content.WriteString("### 🔧 Improvements\n")
+			for _, improvement := range version.Improvements {
+				content.WriteString(fmt.Sprintf("• %s\n", improvement))
+			}
+			content.WriteString("\n")
+		}
+
+		if len(version.Fixes) > 0 {
+			content.WriteString("### 🐛 Bug Fixes\n")
+			for _, fix := range version.Fixes {
+				content.WriteString(fmt.Sprintf("• %s\n", fix))
+			}
+			content.WriteString("\n")
+		}
+
+		content.WriteString("---\n\n")
+	}
+
+	content.WriteString("Press '?' or Esc to close this changelog.")
+
+	return content.String(), nil
+}
+
+// generateDefaultChangelog creates a basic changelog when the YAML file is not available
+func generateDefaultChangelog() string {
+	return `# 📋 nixai Changelog
+
+## 🎯 Version 1.0.0
+
+### ✨ Highlights
+• Modern TUI interface with intuitive navigation
+• Comprehensive NixOS command suite
+• AI-powered assistance for all operations
+
+### 🚀 New Features
+• **Interactive TUI**: Beautiful terminal interface with keyboard navigation
+• **Command Discovery**: Easy browsing of all available nixai commands
+• **Real-time Execution**: Live command output and progress tracking
+• **Search Function**: Quick command search with '/' key
+
+### 🔧 Key Bindings
+• Tab: Switch between panels
+• ↑↓: Navigate commands and options
+• Enter: Execute selected command
+• /: Search commands
+• ?: Show this changelog
+• Esc: Go back/cancel
+• Ctrl+C: Exit
+
+---
+
+Press '?' or Esc to close this changelog.`
+}
+
+// renderChangelogPopup renders the changelog as an overlay
+func (m tuiModel) renderChangelogPopup() string {
+	if !m.changelogVisible {
+		return ""
+	}
+
+	// Calculate popup dimensions (80% of screen)
+	popupWidth := int(float64(m.terminalWidth) * 0.8)
+	popupHeight := int(float64(m.terminalHeight) * 0.8)
+
+	// Create header
+	headerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#7ebae4")).
+		Bold(true).
+		Align(lipgloss.Center).
+		Width(popupWidth - 4)
+
+	header := headerStyle.Render("📋 nixai Changelog")
+
+	// Create footer with scrolling instructions and scroll position
+	footerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("#6272a4")).
+		Italic(true).
+		Align(lipgloss.Center).
+		Width(popupWidth - 4)
+
+	// Calculate scroll position for footer
+	scrollPercent := int((float64(m.changelogViewport.YOffset) / float64(max(1, m.changelogViewport.TotalLineCount()-m.changelogViewport.Height))) * 100)
+	if m.changelogViewport.AtTop() {
+		scrollPercent = 0
+	}
+	if m.changelogViewport.AtBottom() {
+		scrollPercent = 100
+	}
+
+	footerText := fmt.Sprintf("[↑↓/jk] Scroll  [PgUp/PgDn] Page  [Home/End] Top/Bottom  [?/Esc] Close  (%d%%)", scrollPercent)
+	footer := footerStyle.Render(footerText)
+
+	// Get viewport content
+	viewportContent := m.changelogViewport.View()
+
+	// Combine header, viewport content, and footer
+	content := lipgloss.JoinVertical(
+		lipgloss.Left,
+		header,
+		"",
+		viewportContent,
+		"",
+		footer,
+	)
+
+	// Create popup style
+	popupStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#7ebae4")).
+		Background(lipgloss.Color("#1a1b26")).
+		Foreground(lipgloss.Color("#a9b1d6")).
+		Width(popupWidth).
+		Height(popupHeight).
+		Padding(1)
+
+	return popupStyle.Render(content)
+}
+
+// Helper function for max
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
