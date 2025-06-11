@@ -147,6 +147,137 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 				Name:        "nix_lsp_definition",
 				Description: "Provide go-to-definition functionality for Nix symbols",
 			},
+			{
+				Name:        "get_nixos_context",
+				Description: "Get current NixOS system context information",
+			},
+			{
+				Name:        "detect_nixos_context",
+				Description: "Force re-detection of NixOS system context",
+			},
+			{
+				Name:        "reset_nixos_context",
+				Description: "Clear cached context and force refresh",
+			},
+			{
+				Name:        "context_status",
+				Description: "Show context detection system status and health",
+			},
+			{
+				Name:        "context_diff",
+				Description: "Compare current context with previous state and show changes",
+			},
+			// Phase 1: Core NixOS Operations (8 new tools)
+			{
+				Name:        "build_system_analyze",
+				Description: "Analyze build issues and suggest fixes with AI",
+			},
+			{
+				Name:        "diagnose_system",
+				Description: "Diagnose NixOS system issues from logs or config files",
+			},
+			{
+				Name:        "generate_configuration",
+				Description: "Generate NixOS configuration based on requirements",
+			},
+			{
+				Name:        "validate_configuration",
+				Description: "Validate NixOS configuration files for syntax and logic errors",
+			},
+			{
+				Name:        "analyze_package_repo",
+				Description: "Analyze Git repositories and generate Nix derivations",
+			},
+			{
+				Name:        "get_service_examples",
+				Description: "Get practical configuration examples for NixOS services",
+			},
+			{
+				Name:        "check_system_health",
+				Description: "Perform comprehensive NixOS system health checks",
+			},
+			{
+				Name:        "analyze_garbage_collection",
+				Description: "Analyze Nix store and suggest safe garbage collection",
+			},
+			{
+				Name:        "get_hardware_info",
+				Description: "Get hardware detection and optimization suggestions",
+			},
+			// Phase 2: Development & Workflow Tools (10 new tools)
+			{
+				Name:        "create_devenv",
+				Description: "Create development environment using devenv templates",
+			},
+			{
+				Name:        "suggest_devenv_template",
+				Description: "Get AI-powered development environment template suggestions",
+			},
+			{
+				Name:        "setup_neovim_integration",
+				Description: "Setup and configure Neovim integration with nixai MCP",
+			},
+			{
+				Name:        "flake_operations",
+				Description: "Perform NixOS flake operations and management",
+			},
+			{
+				Name:        "migrate_to_flakes",
+				Description: "Migrate NixOS configuration from channels to flakes",
+			},
+			{
+				Name:        "analyze_dependencies",
+				Description: "Analyze NixOS configuration dependencies and relationships",
+			},
+			{
+				Name:        "explain_dependency_chain",
+				Description: "Explain why a specific package is included in the system",
+			},
+			{
+				Name:        "store_operations",
+				Description: "Perform Nix store backup, restore, and analysis operations",
+			},
+			{
+				Name:        "performance_analysis",
+				Description: "Analyze NixOS system performance and suggest optimizations",
+			},
+			{
+				Name:        "search_advanced",
+				Description: "Advanced multi-source search for packages, options, and configurations",
+			},
+			// Phase 3: Community & Learning Tools (8 new tools)
+			{
+				Name:        "get_community_resources",
+				Description: "Get NixOS community resources, forums, and support channels",
+			},
+			{
+				Name:        "get_learning_resources",
+				Description: "Get structured learning paths and tutorials for NixOS",
+			},
+			{
+				Name:        "get_configuration_templates",
+				Description: "Get pre-built NixOS configuration templates",
+			},
+			{
+				Name:        "get_configuration_snippets",
+				Description: "Get reusable configuration code snippets",
+			},
+			{
+				Name:        "manage_machines",
+				Description: "Manage multiple NixOS machines and configurations",
+			},
+			{
+				Name:        "compare_configurations",
+				Description: "Compare configurations between machines or versions",
+			},
+			{
+				Name:        "get_deployment_status",
+				Description: "Get deployment status and history for managed machines",
+			},
+			{
+				Name:        "interactive_assistance",
+				Description: "Provide interactive help and guidance for NixOS tasks",
+			},
 		}
 		_ = conn.Reply(ctx, req.ID, map[string]interface{}{"tools": tools})
 
@@ -455,6 +586,657 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 				},
 				"locations": locations,
 			})
+
+		case "get_nixos_context":
+			format := "text"
+			detailed := false
+			if formatArg, ok := params.Arguments["format"].(string); ok {
+				format = formatArg
+			}
+			if detailedArg, ok := params.Arguments["detailed"].(bool); ok {
+				detailed = detailedArg
+			}
+
+			result := m.handleGetContext(format, detailed)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "detect_nixos_context":
+			verbose := false
+			if verboseArg, ok := params.Arguments["verbose"].(bool); ok {
+				verbose = verboseArg
+			}
+
+			result := m.handleDetectContext(verbose)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "reset_nixos_context":
+			confirm := true // Default to true for MCP calls
+			if confirmArg, ok := params.Arguments["confirm"].(bool); ok {
+				confirm = confirmArg
+			}
+
+			result := m.handleResetContext(confirm)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "context_status":
+			includeMetrics := false
+			if metricsArg, ok := params.Arguments["includeMetrics"].(bool); ok {
+				includeMetrics = metricsArg
+			}
+
+			result := m.handleContextStatus(includeMetrics)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "context_diff":
+			result := m.handleContextDiff()
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "build_system_analyze":
+			var buildLog, project, depth string
+			if buildLogArg, ok := params.Arguments["buildLog"].(string); ok {
+				buildLog = buildLogArg
+			}
+			if projectArg, ok := params.Arguments["project"].(string); ok {
+				project = projectArg
+			}
+			if depthArg, ok := params.Arguments["depth"].(string); ok {
+				depth = depthArg
+			}
+
+			result := m.handleBuildSystemAnalyze(buildLog, project, depth)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "diagnose_system":
+			var logContent, logType, contextStr string
+			if logContentArg, ok := params.Arguments["logContent"].(string); ok {
+				logContent = logContentArg
+			}
+			if logTypeArg, ok := params.Arguments["logType"].(string); ok {
+				logType = logTypeArg
+			}
+			if contextArg, ok := params.Arguments["context"].(string); ok {
+				contextStr = contextArg
+			}
+
+			result := m.handleDiagnoseSystem(logContent, logType, contextStr)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "generate_configuration":
+			var configType string
+			var services, features []string
+			if configTypeArg, ok := params.Arguments["configType"].(string); ok {
+				configType = configTypeArg
+			}
+			if servicesArg, ok := params.Arguments["services"].([]interface{}); ok {
+				for _, s := range servicesArg {
+					if serviceStr, ok := s.(string); ok {
+						services = append(services, serviceStr)
+					}
+				}
+			}
+			if featuresArg, ok := params.Arguments["features"].([]interface{}); ok {
+				for _, f := range featuresArg {
+					if featureStr, ok := f.(string); ok {
+						features = append(features, featureStr)
+					}
+				}
+			}
+
+			result := m.handleGenerateConfiguration(configType, services, features)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "validate_configuration":
+			var configContent, configPath, checkLevel string
+			if configContentArg, ok := params.Arguments["configContent"].(string); ok {
+				configContent = configContentArg
+			}
+			if configPathArg, ok := params.Arguments["configPath"].(string); ok {
+				configPath = configPathArg
+			}
+			if checkLevelArg, ok := params.Arguments["checkLevel"].(string); ok {
+				checkLevel = checkLevelArg
+			}
+
+			result := m.handleValidateConfiguration(configContent, configPath, checkLevel)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "analyze_package_repo":
+			var repoUrl, packageName, outputFormat string
+			if repoUrlArg, ok := params.Arguments["repoUrl"].(string); ok {
+				repoUrl = repoUrlArg
+			}
+			if packageNameArg, ok := params.Arguments["packageName"].(string); ok {
+				packageName = packageNameArg
+			}
+			if outputFormatArg, ok := params.Arguments["outputFormat"].(string); ok {
+				outputFormat = outputFormatArg
+			}
+
+			result := m.handleAnalyzePackageRepo(repoUrl, packageName, outputFormat)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "get_service_examples":
+			var serviceName, useCase string
+			detailed := false
+			if serviceNameArg, ok := params.Arguments["serviceName"].(string); ok {
+				serviceName = serviceNameArg
+			}
+			if useCaseArg, ok := params.Arguments["useCase"].(string); ok {
+				useCase = useCaseArg
+			}
+			if detailedArg, ok := params.Arguments["detailed"].(bool); ok {
+				detailed = detailedArg
+			}
+
+			result := m.handleGetServiceExamples(serviceName, useCase, detailed)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "check_system_health":
+			var checkType string
+			includeRecommendations := false
+			if checkTypeArg, ok := params.Arguments["checkType"].(string); ok {
+				checkType = checkTypeArg
+			}
+			if includeRecommendationsArg, ok := params.Arguments["includeRecommendations"].(bool); ok {
+				includeRecommendations = includeRecommendationsArg
+			}
+
+			result := m.handleCheckSystemHealth(checkType, includeRecommendations)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "analyze_garbage_collection":
+			var analysisType string
+			dryRun := false
+			if analysisTypeArg, ok := params.Arguments["analysisType"].(string); ok {
+				analysisType = analysisTypeArg
+			}
+			if dryRunArg, ok := params.Arguments["dryRun"].(bool); ok {
+				dryRun = dryRunArg
+			}
+
+			result := m.handleAnalyzeGarbageCollection(analysisType, dryRun)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "get_hardware_info":
+			var detectionType string
+			includeOptimizations := false
+			if detectionTypeArg, ok := params.Arguments["detectionType"].(string); ok {
+				detectionType = detectionTypeArg
+			}
+			if includeOptimizationsArg, ok := params.Arguments["includeOptimizations"].(bool); ok {
+				includeOptimizations = includeOptimizationsArg
+			}
+
+			result := m.handleGetHardwareInfo(detectionType, includeOptimizations)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		// Phase 2: Development & Workflow Tools (10 new tools)
+		case "create_devenv":
+			var language, framework, projectName string
+			var services []string
+			if languageArg, ok := params.Arguments["language"].(string); ok {
+				language = languageArg
+			}
+			if frameworkArg, ok := params.Arguments["framework"].(string); ok {
+				framework = frameworkArg
+			}
+			if projectNameArg, ok := params.Arguments["projectName"].(string); ok {
+				projectName = projectNameArg
+			}
+			if servicesArg, ok := params.Arguments["services"].([]interface{}); ok {
+				for _, service := range servicesArg {
+					if serviceStr, ok := service.(string); ok {
+						services = append(services, serviceStr)
+					}
+				}
+			}
+
+			result := m.handleCreateDevenv(language, framework, projectName, services)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "suggest_devenv_template":
+			var description string
+			var requirements []string
+			if descriptionArg, ok := params.Arguments["description"].(string); ok {
+				description = descriptionArg
+			}
+			if requirementsArg, ok := params.Arguments["requirements"].([]interface{}); ok {
+				for _, req := range requirementsArg {
+					if reqStr, ok := req.(string); ok {
+						requirements = append(requirements, reqStr)
+					}
+				}
+			}
+
+			result := m.handleSuggestDevenvTemplate(description, requirements)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "setup_neovim_integration":
+			var configType, socketPath string
+			if configTypeArg, ok := params.Arguments["configType"].(string); ok {
+				configType = configTypeArg
+			}
+			if socketPathArg, ok := params.Arguments["socketPath"].(string); ok {
+				socketPath = socketPathArg
+			}
+
+			result := m.handleSetupNeovimIntegration(configType, socketPath)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "flake_operations":
+			var operation, flakePath string
+			var options []string
+			if operationArg, ok := params.Arguments["operation"].(string); ok {
+				operation = operationArg
+			}
+			if flakePathArg, ok := params.Arguments["flakePath"].(string); ok {
+				flakePath = flakePathArg
+			}
+			if optionsArg, ok := params.Arguments["options"].([]interface{}); ok {
+				for _, opt := range optionsArg {
+					if optStr, ok := opt.(string); ok {
+						options = append(options, optStr)
+					}
+				}
+			}
+
+			result := m.handleFlakeOperations(operation, flakePath, options)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "migrate_to_flakes":
+			var backupName string
+			dryRun := true
+			includeHomeManager := true
+			if backupNameArg, ok := params.Arguments["backupName"].(string); ok {
+				backupName = backupNameArg
+			}
+			if dryRunArg, ok := params.Arguments["dryRun"].(bool); ok {
+				dryRun = dryRunArg
+			}
+			if includeHomeManagerArg, ok := params.Arguments["includeHomeManager"].(bool); ok {
+				includeHomeManager = includeHomeManagerArg
+			}
+
+			result := m.handleMigrateToFlakes(backupName, dryRun, includeHomeManager)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "analyze_dependencies":
+			var configPath, scope, format string
+			if configPathArg, ok := params.Arguments["configPath"].(string); ok {
+				configPath = configPathArg
+			}
+			if scopeArg, ok := params.Arguments["scope"].(string); ok {
+				scope = scopeArg
+			}
+			if formatArg, ok := params.Arguments["format"].(string); ok {
+				format = formatArg
+			}
+
+			result := m.handleAnalyzeDependencies(configPath, scope, format)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "explain_dependency_chain":
+			var packageName, depth, includeOptional string
+			if packageNameArg, ok := params.Arguments["packageName"].(string); ok {
+				packageName = packageNameArg
+			}
+			if depthArg, ok := params.Arguments["depth"].(string); ok {
+				depth = depthArg
+			}
+			if includeOptionalArg, ok := params.Arguments["includeOptional"].(string); ok {
+				includeOptional = includeOptionalArg
+			}
+
+			result := m.handleExplainDependencyChain(packageName, depth, includeOptional)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "store_operations":
+			var operation string
+			var paths []string
+			var options []string
+			if operationArg, ok := params.Arguments["operation"].(string); ok {
+				operation = operationArg
+			}
+			if pathsArg, ok := params.Arguments["paths"].([]interface{}); ok {
+				for _, p := range pathsArg {
+					if pathStr, ok := p.(string); ok {
+						paths = append(paths, pathStr)
+					}
+				}
+			}
+			if optionsArg, ok := params.Arguments["options"].([]interface{}); ok {
+				for _, opt := range optionsArg {
+					if optStr, ok := opt.(string); ok {
+						options = append(options, optStr)
+					}
+				}
+			}
+
+			result := m.handleStoreOperations(operation, paths, options)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "performance_analysis":
+			var analysisType string
+			var metrics []string
+			suggestions := true
+			if analysisTypeArg, ok := params.Arguments["analysisType"].(string); ok {
+				analysisType = analysisTypeArg
+			}
+			if metricsArg, ok := params.Arguments["metrics"].([]interface{}); ok {
+				for _, m := range metricsArg {
+					if metricStr, ok := m.(string); ok {
+						metrics = append(metrics, metricStr)
+					}
+				}
+			}
+			if suggestionsArg, ok := params.Arguments["suggestions"].(bool); ok {
+				suggestions = suggestionsArg
+			}
+
+			result := m.handlePerformanceAnalysis(analysisType, metrics, suggestions)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "search_advanced":
+			var query string
+			var sources []string
+			filters := make(map[string]string)
+			if queryArg, ok := params.Arguments["query"].(string); ok {
+				query = queryArg
+			}
+			if sourcesArg, ok := params.Arguments["sources"].([]interface{}); ok {
+				for _, source := range sourcesArg {
+					if sourceStr, ok := source.(string); ok {
+						sources = append(sources, sourceStr)
+					}
+				}
+			}
+			if filtersArg, ok := params.Arguments["filters"].(map[string]interface{}); ok {
+				for key, value := range filtersArg {
+					if valueStr, ok := value.(string); ok {
+						filters[key] = valueStr
+					}
+				}
+			}
+
+			result := m.handleSearchAdvanced(query, sources, filters)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		// End of Phase 2 tools
+
+		// Phase 3: Community & Learning Tools (8 new tools)
+		case "get_community_resources":
+			result, err := m.handleGetCommunityResources(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
+					},
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
+
+		case "get_learning_resources":
+			result, err := m.handleGetLearningResources(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
+					},
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
+
+		case "get_configuration_templates":
+			result, err := m.handleGetConfigurationTemplates(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
+					},
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
+
+		case "get_configuration_snippets":
+			result, err := m.handleGetConfigurationSnippets(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
+					},
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
+
+		case "manage_machines":
+			result, err := m.handleManageMachines(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
+					},
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
+
+		case "compare_configurations":
+			result, err := m.handleCompareConfigurations(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
+					},
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
+
+		case "get_deployment_status":
+			result, err := m.handleGetDeploymentStatus(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
+					},
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
+
+		case "interactive_assistance":
+			result, err := m.handleInteractiveAssistance(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
+					},
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
+
+		// End of Phase 3 tools
 
 		default:
 			_ = conn.ReplyWithError(ctx, req.ID, &jsonrpc2.Error{
@@ -803,6 +1585,7 @@ func NewServerFromConfig(configPath string) (*Server, error) {
 		debugLogging:         strings.ToLower(userCfg.LogLevel) == "debug",
 		mcpServer:            &MCPServer{logger: *log, lspProvider: lspProvider},
 		configPath:           configPath,
+		watcher:              nil,
 	}
 
 	// Set the global server instance for cross-referencing
@@ -1075,6 +1858,7 @@ func (s *Server) handleQuery(w http.ResponseWriter, r *http.Request) {
 			s.logger.Debug(fmt.Sprintf("handleQuery: globalServerInstance has %d documentation sources",
 				len(globalServerInstance.documentationSources)))
 		}
+
 	}
 
 	result := s.mcpServer.handleDocQuery(query, sources...)

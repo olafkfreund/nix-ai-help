@@ -9,7 +9,7 @@ After extensive testing, the nixai MCP server is working correctly:
 - MCP server responds to protocol requests
 - Unix socket is accessible and functional  
 - JSON-RPC2 communication works perfectly
-- All MCP tools (4 tools) are available and responding
+- All MCP tools (41 tools) are available and responding
 - Both Python socket and socat connections work
 - Bridge scripts work correctly
 

@@ -11,7 +11,7 @@
 - **Protocol**: JSON-RPC2 over Unix socket working perfectly
 - **Architecture**: Fixed server start/stop issues - server blocks properly
 - **Socket Management**: Unix socket at `/tmp/nixai-mcp.sock` with proper cleanup
-- **All Tools**: All 4 MCP tools responding correctly
+- **All Tools**: All 41 MCP tools responding correctly
 
 ### 2. VS Code Extensions ✅
 **Installed and Ready:**
@@ -41,7 +41,7 @@ echo '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"explain_ni
 
 **Response Examples:**
 - Initialize: `{"id":1,"result":{"capabilities":{"tools":{"listChanged":false}},"protocolVersion":"2024-11-05","serverInfo":{"name":"nixai-mcp-server","version":"1.0.0"}},"jsonrpc":"2.0"}`
-- Tools: Returns all 4 tools (query_nixos_docs, explain_nixos_option, explain_home_manager_option, search_nixos_packages)
+- Tools: Returns all 41 tools across 6 categories (Documentation, Context, Core Operations, Development, Community, Language Support)
 - Tool Call: Returns proper NixOS option information
 
 ## 🚀 How to Use
@@ -115,7 +115,7 @@ VS Code Extensions (Copilot, Cline, etc.)
 - ✅ VS Code extensions installed
 - ✅ Configuration files created
 - ✅ Socket communication working
-- ✅ All 4 MCP tools functional
+- ✅ All 41 MCP tools functional
 - ✅ Documentation updated
 
 ## 🎉 READY FOR PRODUCTION USE!
