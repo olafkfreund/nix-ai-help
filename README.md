@@ -404,6 +404,18 @@ nixai features a **unified AI provider management system** that eliminates hardc
 | **OpenAI** | gpt-4o, gpt-4-turbo, gpt-3.5-turbo | Industry-leading performance |
 | **Custom** | User-defined | Bring your own endpoint |
 
+### ⚠️ AI Provider Accuracy for NixOS
+
+**Provider Quality Recommendations:**
+
+- **🥇 OpenAI (gpt-4o, gpt-4-turbo)**: **Best accuracy** for NixOS-specific questions, configuration generation, and troubleshooting. Recommended for complex NixOS tasks and production configurations.
+
+- **🥈 Google Gemini (gemini-2.5-pro)**: **Good accuracy** with strong reasoning capabilities. Reliable for most NixOS questions and configurations, though may occasionally miss nuanced NixOS-specific details.
+
+- **🥉 Ollama (llama3, local models)**: **Variable accuracy** depending on the specific model used. Great for privacy-first usage and general questions, but may provide less precise NixOS configuration advice. Best used with verification against official documentation.
+
+- **💡 Recommendation**: For critical NixOS configurations, use OpenAI or Gemini providers, then verify suggestions against official NixOS documentation. Ollama is excellent for learning and experimentation while maintaining privacy.
+
 ### ⚙️ Configuration
 
 All AI provider settings are managed through `configs/default.yaml`:
