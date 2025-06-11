@@ -1,7 +1,7 @@
 # NixAI MCP Server - VS Code Integration
 
 ## Overview
-The nixai MCP (Model Context Protocol) server enables VS Code and other IDEs to access NixOS documentation and configuration help directly within the editor environment.
+The nixai MCP (Model Context Protocol) server enables VS Code and other IDEs to access NixOS documentation and configuration help directly within the editor environment. The server exposes **41 comprehensive tools** across 6 categories for complete NixOS workflow coverage.
 
 ## Installation & Setup
 
@@ -62,47 +62,60 @@ Use our diagnostic tool to verify the integration is working:
 
 ## Available MCP Tools
 
-The nixai MCP server provides the following tools:
+The nixai MCP server provides **41 comprehensive tools** across 6 categories:
 
-### 1. `query_nixos_docs`
-Query NixOS documentation from multiple sources.
-- **Arguments**: `query` (string) - The search query
-- **Usage**: Search for NixOS configuration examples, options, and documentation
+### 📚 **Documentation & Search (4 tools)**
+- **`query_nixos_docs`** - Query NixOS documentation from multiple sources
+- **`explain_nixos_option`** - Get detailed explanations of NixOS configuration options
+- **`explain_home_manager_option`** - Get explanations for Home Manager configuration options
+- **`search_nixos_packages`** - Search for NixOS packages
 
-### 2. `explain_nixos_option`
-Get detailed explanations of NixOS configuration options.
-- **Arguments**: `option` (string) - The NixOS option name (e.g., "services.nginx.enable")
-- **Usage**: Understand what an option does, its type, default value, and examples
+### 🔍 **Context & System Detection (5 tools)**
+- **`get_nixos_context`** - Get current NixOS system context information
+- **`detect_nixos_context`** - Force re-detection of NixOS system context
+- **`reset_nixos_context`** - Clear cached context and force refresh
+- **`context_status`** - Show context detection system status and health
+- **`context_diff`** - Compare current context with previous state and show changes
 
-### 3. `explain_home_manager_option`
-Get explanations for Home Manager configuration options.
-- **Arguments**: `option` (string) - The Home Manager option name
-- **Usage**: Learn about Home Manager-specific configuration options
+### 🔧 **Core NixOS Operations (9 tools)**
+- **`build_system_analyze`** - Analyze build issues and suggest fixes with AI
+- **`diagnose_system`** - Diagnose NixOS system issues from logs or config files
+- **`generate_configuration`** - Generate NixOS configuration based on requirements
+- **`validate_configuration`** - Validate NixOS configuration files for syntax and logic errors
+- **`analyze_package_repo`** - Analyze Git repositories and generate Nix derivations
+- **`get_service_examples`** - Get practical configuration examples for NixOS services
+- **`check_system_health`** - Perform comprehensive NixOS system health checks
+- **`analyze_garbage_collection`** - Analyze Nix store and suggest safe garbage collection
+- **`get_hardware_info`** - Get hardware detection and optimization suggestions
 
-### 4. `search_nixos_packages`
-Search for NixOS packages.
-- **Arguments**: `query` (string) - Package search terms
-- **Usage**: Find available packages in the NixOS package collection
+### 🛠️ **Development & DevEnv (10 tools)**
+- **`create_devenv`** - Create development environment using devenv templates
+- **`suggest_devenv_template`** - Get AI-powered development environment template suggestions
+- **`setup_neovim_integration`** - Setup and configure Neovim integration with nixai MCP
+- **`flake_operations`** - Perform NixOS flake operations and management
+- **`migrate_to_flakes`** - Migrate NixOS configuration from channels to flakes
+- **`analyze_dependencies`** - Analyze NixOS configuration dependencies and relationships
+- **`explain_dependency_chain`** - Explain why a specific package is included in the system
+- **`store_operations`** - Perform Nix store backup, restore, and analysis operations
+- **`performance_analysis`** - Analyze NixOS system performance and suggest optimizations
+- **`search_advanced`** - Advanced multi-source search for packages, options, and configurations
 
-### 5. `get_nixos_context` ✨ NEW
-Get current NixOS system context information.
-- **Arguments**: `format` (string, optional) - Response format ("text" or "json"), `detailed` (boolean, optional) - Include detailed information
-- **Usage**: Get context-aware information about your NixOS system setup (flakes, Home Manager, services, etc.)
+### 🏢 **Community & Learning (8 tools)**
+- **`get_community_resources`** - Get NixOS community resources, forums, and support channels
+- **`get_learning_resources`** - Get structured learning paths and tutorials for NixOS
+- **`get_configuration_templates`** - Get pre-built NixOS configuration templates
+- **`get_configuration_snippets`** - Get reusable configuration code snippets
+- **`manage_machines`** - Manage multiple NixOS machines and configurations
+- **`compare_configurations`** - Compare configurations between machines or versions
+- **`get_deployment_status`** - Get deployment status and history for managed machines
+- **`interactive_assistance`** - Provide interactive help and guidance for NixOS tasks
 
-### 6. `detect_nixos_context` ✨ NEW
-Force re-detection of NixOS system context.
-- **Arguments**: `verbose` (boolean, optional) - Show detection process details
-- **Usage**: Refresh system context detection when configuration changes
-
-### 7. `reset_nixos_context` ✨ NEW
-Clear cached context and force refresh.
-- **Arguments**: `confirm` (boolean, optional) - Confirm reset operation
-- **Usage**: Clear context cache and perform fresh system detection
-
-### 8. `context_status` ✨ NEW
-Show context detection system status and health.
-- **Arguments**: `includeMetrics` (boolean, optional) - Include performance metrics
-- **Usage**: Check if context system is working properly and get health information
+### ⚙️ **LSP & Language Support (5 tools)**
+- **`complete_nixos_option`** - Autocomplete NixOS option names for a given prefix
+- **`nix_lsp_completion`** - Provide LSP-like completion suggestions for Nix files
+- **`nix_lsp_diagnostics`** - Provide real-time diagnostics and error checking for Nix files
+- **`nix_lsp_hover`** - Provide hover information and documentation for Nix symbols
+- **`nix_lsp_definition`** - Provide go-to-definition functionality for Nix symbols
 
 ## Usage Examples
 

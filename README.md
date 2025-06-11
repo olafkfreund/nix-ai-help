@@ -291,7 +291,8 @@ Commands | F1:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1
 ### 🔗 Editor Integrations ✨ NEW
 
 - **VS Code Integration**: Model Context Protocol (MCP) server for seamless AI assistance:
-  - **5 Context MCP Tools**: System context access through GitHub Copilot, Claude Dev, and other AI extensions
+  - **41 Comprehensive MCP Tools**: Complete NixOS workflow coverage through GitHub Copilot, Claude Dev, and other AI extensions
+  - **6 Tool Categories**: Documentation, Context Detection, Core Operations, Development, Community, and Language Support
   - **Context-Aware Suggestions**: AI responses automatically include your system configuration
   - **Real-Time Help**: Get NixOS assistance without leaving VS Code
 - **Neovim Integration**: Enhanced Lua module with context-aware functionality:
