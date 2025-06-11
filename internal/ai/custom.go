@@ -173,6 +173,16 @@ func (c *CustomProvider) Query(prompt string) (string, error) {
 	return "", fmt.Errorf("no recognized response field found in API response")
 }
 
+// SetTimeout updates the HTTP client timeout for custom provider requests.
+func (c *CustomProvider) SetTimeout(timeout time.Duration) {
+	c.client.Timeout = timeout
+}
+
+// GetTimeout returns the current HTTP client timeout.
+func (c *CustomProvider) GetTimeout() time.Duration {
+	return c.client.Timeout
+}
+
 // GenerateResponse is an alias for Query for compatibility.
 func (c *CustomProvider) GenerateResponse(prompt string) (string, error) {
 	return c.Query(prompt)

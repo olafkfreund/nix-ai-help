@@ -24,10 +24,14 @@ func NewLlamaCppProvider(model string) *LlamaCppProvider {
 	if endpoint == "" {
 		endpoint = "http://localhost:8080/completion" // adjust to your llamacpp server endpoint
 	}
+
+	// Default timeout, will be updated if config is available
+	timeout := 60 * time.Second
+
 	return &LlamaCppProvider{
 		Endpoint: endpoint,
 		Model:    model,
-		Client:   &http.Client{Timeout: 60 * time.Second},
+		Client:   &http.Client{Timeout: timeout},
 	}
 }
 
@@ -47,10 +51,13 @@ func NewLlamaCppProviderWithModel(providerConfig *config.AIProviderConfig, model
 		}
 	}
 
+	// Default timeout of 60 seconds, will be configurable
+	timeout := 60 * time.Second
+
 	return &LlamaCppProvider{
 		Endpoint: endpoint,
 		Model:    model.Name,
-		Client:   &http.Client{Timeout: 60 * time.Second},
+		Client:   &http.Client{Timeout: timeout},
 	}, nil
 }
 
@@ -84,6 +91,16 @@ func (l *LlamaCppProvider) GetSelectedModel() string {
 // SetModel updates the selected model.
 func (l *LlamaCppProvider) SetModel(modelName string) {
 	l.Model = modelName
+}
+
+// SetTimeout updates the HTTP client timeout for llamacpp requests.
+func (l *LlamaCppProvider) SetTimeout(timeout time.Duration) {
+	l.Client.Timeout = timeout
+}
+
+// GetTimeout returns the current HTTP client timeout.
+func (l *LlamaCppProvider) GetTimeout() time.Duration {
+	return l.Client.Timeout
 }
 
 // llamacppRequest is the request format for llamacpp's API.

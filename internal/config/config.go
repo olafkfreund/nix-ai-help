@@ -20,7 +20,20 @@ const EmbeddedDefaultConfig = `default:
         base_url: http://localhost:8080/api/generate  # HTTP API endpoint URL
         headers:  # Optional custom headers (e.g., for authentication)
             Authorization: "Bearer your-api-key-here"
-            # Content-Type: "application/json"  # Set automatically if not provided
+   		userCfg := &UserConfig{
+			AIProvider:  embeddedCfg.AIProvider,
+			AIModel:     embeddedCfg.AIModel,
+			NixosFolder: "~/nixos-config", // Default folder
+			LogLevel:    embeddedCfg.LogLevel,
+			AIModels:    embeddedCfg.AIModels,
+			MCPServer:   embeddedCfg.MCPServer,
+			Nixos:       embeddedCfg.Nixos,
+			Diagnostics: embeddedCfg.Diagnostics,
+			Commands:    embeddedCfg.Commands,
+			AITimeouts:  embeddedCfg.AITimeouts,
+			Devenv:      embeddedCfg.Devenv,
+			CustomAI:    embeddedCfg.CustomAI,
+			Discourse:   embeddedCfg.Discourse,ntent-Type: "application/json"  # Set automatically if not provided
     # Basic AI models configuration (subset for embedded config)
     ai_models:
         providers:
@@ -83,6 +96,13 @@ const EmbeddedDefaultConfig = `default:
     commands:
         timeout: 30
         retries: 3
+    ai_timeouts:
+        ollama: 60
+        llamacpp: 120
+        gemini: 30
+        openai: 30
+        custom: 60
+        default: 60
     devenv:
         default_directory: "."
         auto_init_git: true
@@ -189,10 +209,20 @@ type CommandsConfig struct {
 	Retries int `yaml:"retries"`
 }
 
+// AITimeoutsConfig represents timeout settings for AI providers
+type AITimeoutsConfig struct {
+	Ollama   int `yaml:"ollama" json:"ollama"`
+	LlamaCpp int `yaml:"llamacpp" json:"llamacpp"`
+	Gemini   int `yaml:"gemini" json:"gemini"`
+	OpenAI   int `yaml:"openai" json:"openai"`
+	Custom   int `yaml:"custom" json:"custom"`
+	Default  int `yaml:"default" json:"default"`
+}
+
 type DevenvTemplateConfig struct {
 	Enabled               bool   `yaml:"enabled" json:"enabled"`
 	DefaultVersion        string `yaml:"default_version" json:"default_version"`
-	DefaultPackageManager string `yaml:"default_package_manager" json:"default_package_manager"`
+	DefaultPackageManager string `yaml:"default_package_manager"`
 }
 
 type DevenvConfig struct {
@@ -281,6 +311,7 @@ type YAMLConfig struct {
 	Nixos       NixosConfig       `yaml:"nixos" json:"nixos"`
 	Diagnostics DiagnosticsConfig `yaml:"diagnostics" json:"diagnostics"`
 	Commands    CommandsConfig    `yaml:"commands" json:"commands"`
+	AITimeouts  AITimeoutsConfig  `yaml:"ai_timeouts" json:"ai_timeouts"`
 	Devenv      DevenvConfig      `yaml:"devenv" json:"devenv"`
 	CustomAI    CustomAIConfig    `yaml:"custom_ai" json:"custom_ai"`
 	Discourse   DiscourseConfig   `yaml:"discourse" json:"discourse"`
@@ -296,10 +327,71 @@ type UserConfig struct {
 	Nixos        NixosConfig       `yaml:"nixos" json:"nixos"`
 	Diagnostics  DiagnosticsConfig `yaml:"diagnostics" json:"diagnostics"`
 	Commands     CommandsConfig    `yaml:"commands" json:"commands"`
+	AITimeouts   AITimeoutsConfig  `yaml:"ai_timeouts" json:"ai_timeouts"`
 	Devenv       DevenvConfig      `yaml:"devenv" json:"devenv"`
 	CustomAI     CustomAIConfig    `yaml:"custom_ai" json:"custom_ai"`
 	Discourse    DiscourseConfig   `yaml:"discourse" json:"discourse"`
 	NixOSContext NixOSContext      `yaml:"nixos_context" json:"nixos_context"`
+}
+
+// GetAITimeout returns the timeout for a specific AI provider
+func (c *UserConfig) GetAITimeout(provider string) time.Duration {
+	var timeoutSeconds int
+
+	switch provider {
+	case "ollama":
+		timeoutSeconds = c.AITimeouts.Ollama
+	case "llamacpp":
+		timeoutSeconds = c.AITimeouts.LlamaCpp
+	case "gemini":
+		timeoutSeconds = c.AITimeouts.Gemini
+	case "openai":
+		timeoutSeconds = c.AITimeouts.OpenAI
+	case "custom":
+		timeoutSeconds = c.AITimeouts.Custom
+	default:
+		timeoutSeconds = c.AITimeouts.Default
+	}
+
+	// If timeout is 0 or negative, use default
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = c.AITimeouts.Default
+		if timeoutSeconds <= 0 {
+			timeoutSeconds = 60 // hardcoded fallback
+		}
+	}
+
+	return time.Duration(timeoutSeconds) * time.Second
+}
+
+// GetAITimeout returns the timeout for a specific AI provider from YAMLConfig
+func (c *YAMLConfig) GetAITimeout(provider string) time.Duration {
+	var timeoutSeconds int
+
+	switch provider {
+	case "ollama":
+		timeoutSeconds = c.AITimeouts.Ollama
+	case "llamacpp":
+		timeoutSeconds = c.AITimeouts.LlamaCpp
+	case "gemini":
+		timeoutSeconds = c.AITimeouts.Gemini
+	case "openai":
+		timeoutSeconds = c.AITimeouts.OpenAI
+	case "custom":
+		timeoutSeconds = c.AITimeouts.Custom
+	default:
+		timeoutSeconds = c.AITimeouts.Default
+	}
+
+	// If timeout is 0 or negative, use default
+	if timeoutSeconds <= 0 {
+		timeoutSeconds = c.AITimeouts.Default
+		if timeoutSeconds <= 0 {
+			timeoutSeconds = 60 // hardcoded fallback
+		}
+	}
+
+	return time.Duration(timeoutSeconds) * time.Second
 }
 
 func DefaultUserConfig() *UserConfig {
@@ -437,6 +529,14 @@ func DefaultUserConfig() *UserConfig {
 			},
 		},
 		Commands: CommandsConfig{Timeout: 30, Retries: 2},
+		AITimeouts: AITimeoutsConfig{
+			Ollama:   60,
+			LlamaCpp: 120,
+			Gemini:   30,
+			OpenAI:   30,
+			Custom:   60,
+			Default:  60,
+		},
 		Devenv: DevenvConfig{
 			DefaultDirectory: ".",
 			AutoInitGit:      true,

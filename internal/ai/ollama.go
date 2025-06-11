@@ -136,6 +136,16 @@ func (o *OllamaProvider) SetModel(model string) {
 	}
 }
 
+// SetTimeout updates the HTTP client timeout for Ollama requests.
+func (o *OllamaProvider) SetTimeout(timeout time.Duration) {
+	o.Client.Timeout = timeout
+}
+
+// GetTimeout returns the current HTTP client timeout.
+func (o *OllamaProvider) GetTimeout() time.Duration {
+	return o.Client.Timeout
+}
+
 // Legacy Provider Wrapper for backward compatibility
 type OllamaLegacyProvider struct {
 	*OllamaProvider

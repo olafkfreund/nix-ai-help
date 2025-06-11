@@ -250,6 +250,14 @@ default:
     commands:
         timeout: 30
         retries: 3
+    # AI provider-specific timeout configurations (in seconds)
+    ai_timeouts:
+        ollama: 60          # Local Ollama server timeout
+        llamacpp: 120       # LlamaCpp server timeout (often slower due to CPU inference)
+        gemini: 30          # Google Gemini API timeout
+        openai: 30          # OpenAI API timeout
+        custom: 60          # Custom API timeout
+        default: 60         # Default timeout for unspecified providers
     devenv:
         default_directory: "."
         auto_init_git: true

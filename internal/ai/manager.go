@@ -185,7 +185,17 @@ func (pm *ProviderManager) initializeOllamaProvider(config *config.AIProviderCon
 		os.Setenv("OLLAMA_ENDPOINT", config.BaseURL+"/api/generate")
 	}
 
-	return NewOllamaProvider(defaultModel), nil
+	ollamaProvider := NewOllamaProvider(defaultModel)
+
+	// Apply configured timeout
+	timeout := pm.config.GetAITimeout("ollama")
+	ollamaProvider.SetTimeout(timeout)
+
+	pm.logger.Debug(fmt.Sprintf("Ollama provider initialized with %v timeout", timeout))
+
+	// Create legacy wrapper and then wrap that as Provider
+	legacyProvider := &OllamaLegacyProvider{OllamaProvider: ollamaProvider}
+	return NewProviderWrapper(legacyProvider), nil
 }
 
 // initializeGeminiProvider creates a Gemini provider instance.
@@ -242,6 +252,12 @@ func (pm *ProviderManager) initializeLlamaCppProvider(config *config.AIProviderC
 		llamacppProvider = NewLlamaCppProvider(defaultModel)
 	}
 
+	// Apply configured timeout
+	timeout := pm.config.GetAITimeout("llamacpp")
+	llamacppProvider.SetTimeout(timeout)
+
+	pm.logger.Debug(fmt.Sprintf("LlamaCpp provider initialized with %v timeout", timeout))
+
 	return NewProviderWrapper(llamacppProvider), nil
 }
 
@@ -276,6 +292,12 @@ func (pm *ProviderManager) initializeCustomProvider(config *config.AIProviderCon
 		}
 		customProvider = NewCustomProvider(config.BaseURL, headers)
 	}
+
+	// Apply configured timeout
+	timeout := pm.config.GetAITimeout("custom")
+	customProvider.SetTimeout(timeout)
+
+	pm.logger.Debug(fmt.Sprintf("Custom provider initialized with %v timeout", timeout))
 
 	return NewProviderWrapper(customProvider), nil
 }
