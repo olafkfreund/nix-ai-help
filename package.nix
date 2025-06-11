@@ -81,10 +81,7 @@ in
     nativeBuildInputs = [installShellFiles];
 
     ldflags = let
-      versionString =
-        if (rev != null)
-        then rev
-        else version;
+      versionString = version;  # Always use the version parameter
       commitString =
         if (gitCommit != null)
         then gitCommit
