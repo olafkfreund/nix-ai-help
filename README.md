@@ -16,7 +16,7 @@
 - **📖 Enhanced Typography**: Larger, more readable text with improved visual hierarchy
 - **📜 Smart Scrolling**: Text-based scroll indicators with Page Up/Down support
 - **ℹ️ Version Display**: nixai version prominently shown in status bar
-- **📰 Changelog Popup**: Press F1 to view latest features and updates
+- **📰 Changelog Popup**: Press ? to view latest features and updates
 - **⌨️ Better Navigation**: Improved keyboard shortcuts and panel switching
 - **🔧 Interactive Parameter Input**: All complex commands now support TUI parameter configuration
 - **📊 Real-Time Output**: Command execution with live output display within TUI
@@ -66,7 +66,7 @@ The newly modernized Terminal User Interface provides a professional, accessible
 │                                    │                                   │
 │ (Showing 1-10 of 24)               │ [INPUT] = Interactive Parameters  │
 └────────────────────────────────────┴───────────────────────────────────┘
-Commands | F1:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.2.3
+Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.2.3
 ```
 
 ### ✨ Key TUI Features
@@ -74,7 +74,7 @@ Commands | F1:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1
 - **🎯 Accessibility-First**: 100% text-based design without Unicode icon dependencies
 - **📖 Enhanced Readability**: Larger, bolder text with improved spacing and visual hierarchy
 - **🔄 Smooth Navigation**: Arrow keys, Tab switching, Page Up/Down scrolling with indicators
-- **📰 Feature Discovery**: F1 popup shows latest updates and changelog
+- **📰 Feature Discovery**: ? popup shows latest updates and changelog
 - **⌨️ Keyboard Efficient**: Complete keyboard navigation without mouse requirement
 - **🎨 Professional Design**: Clean two-panel layout with status bar and real-time feedback
 
@@ -245,7 +245,7 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 - **🔄 Smart Navigation**: Tab-based panel switching, arrow key navigation, and search functionality
 - **📜 Intelligent Scrolling**: Text-based scroll indicators with smooth Page Up/Down support
 - **ℹ️ Status Information**: Version display and real-time command execution feedback
-- **📰 Feature Discovery**: F1 changelog popup for viewing latest updates and features
+- **📰 Feature Discovery**: ? changelog popup for viewing latest updates and features
 - **⌨️ Keyboard Shortcuts**: Comprehensive keyboard navigation without mouse dependency
 
 **TUI Interface Preview:**
@@ -262,9 +262,9 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 │ hardware detect                    │ • Enhanced typography             │
 │   Comprehensive hardware analysis  │ • Smart scrolling system         │
 │                                    │ • Version display                │
-│ (Showing 1-8 of 24)               │ • F1 changelog popup             │
+│ (Showing 1-8 of 24)               │ • ? changelog popup             │
 └────────────────────────────────────┴───────────────────────────────────┘
-Commands | F1:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.2.3
+Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.2.3
 ```
 
 ### 🤖 AI-Powered Command System
@@ -370,7 +370,7 @@ Commands | F1:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1
 - **Interactive & CLI Modes**: Use interactively via TUI or directly via CLI, with piped input support
 - **Progress Indicators**: Real-time feedback during API calls and long-running operations
 - **Role & Agent Selection**: `--role` and `--agent` flags for specialized behavior and expertise
-- **Intelligent Help System**: Context-aware help and feature discovery with F1 changelog popup
+- **Intelligent Help System**: Context-aware help and feature discovery with ? changelog popup
 - **Accessibility Features**: Screen reader compatible, keyboard-only navigation, high contrast themes
 
 ### 🔒 Privacy & Performance
@@ -753,7 +753,7 @@ nixai mcp-server start                         # Start MCP server for editor int
 # Tab: Switch between panels  
 # Enter: Select/execute commands
 # /: Search commands
-# F1: Show changelog and latest features
+# ?: Show changelog and latest features
 # Ctrl+C: Exit
 ```
 
@@ -940,7 +940,7 @@ Test the newly completed TUI modernization and context system:
 
 ```zsh
 nixai interactive           # Launch modern TUI
-# In TUI: Press F1 to view changelog
+# In TUI: Press ? to view changelog
 # In TUI: Use Tab to switch panels
 # In TUI: Type / to search commands
 # In TUI: Use ↑↓ arrows to navigate

@@ -96,7 +96,7 @@ func (a *App) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "shift+tab":
 			a.switchFocusReverse()
 
-		case "f1", "ctrl+h":
+		case "?", "ctrl+h":
 			// Toggle changelog popup
 			if a.changelogPopup.IsVisible() {
 				a.changelogPopup.Hide()

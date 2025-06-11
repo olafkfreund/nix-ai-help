@@ -134,7 +134,7 @@ func (s *StatusBar) renderRightStatus() string {
 
 	// Help text
 	helpItems := []string{
-		"F1:Help",
+		"?:Changelog",
 		"Tab:Switch",
 		"Ctrl+C:Exit",
 	}
