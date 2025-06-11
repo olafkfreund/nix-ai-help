@@ -130,7 +130,37 @@ in {
       };
     };
 
-    vscodeIntegration = mkEnableOption "Enable VS Code MCP integration";
+    vscodeIntegration = {
+      enable = mkEnableOption "Enable VS Code MCP integration";
+
+      contextAware = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Enable context-aware AI assistance in VS Code";
+      };
+
+      autoRefreshContext = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Automatically refresh NixOS context when files change";
+      };
+
+      contextTimeout = mkOption {
+        type = types.int;
+        default = 5000;
+        description = "Timeout for context operations in milliseconds";
+      };
+
+      enabledExtensions = mkOption {
+        type = types.listOf types.str;
+        default = [
+          "automatalabs.copilot-mcp"
+          "zebradev.mcp-server-runner"
+          "saoudrizwan.claude-dev"
+        ];
+        description = "List of VS Code extensions to configure for MCP integration";
+      };
+    };
 
     neovimIntegration = {
       enable = mkEnableOption "Enable Neovim integration with nixai";
@@ -208,22 +238,57 @@ in {
       };
     })
 
-    (mkIf cfg.vscodeIntegration {
-      programs.vscode.extensions = mkIf config.programs.vscode.enable [
-        {
-          name = "vscode-nixai";
-          publisher = "nixos";
-          # This is a placeholder - extension details would need to be filled in
-          # once the VS Code extension is published
-          version = "latest";
-        }
-      ];
-
+    (mkIf cfg.vscodeIntegration.enable {
+      # VS Code settings for MCP integration with context-aware features
       programs.vscode.userSettings = mkIf config.programs.vscode.enable {
+        "mcp.servers" = {
+          "nixai" = {
+            "command" = "bash";
+            "args" = ["-c" "socat STDIO UNIX-CONNECT:${cfg.mcp.socketPath}"];
+            "env" = {};
+            "capabilities" = {
+              "context" = cfg.vscodeIntegration.contextAware;
+              "system_detection" = true;
+            };
+          };
+        };
+
+        "copilot.mcp.servers" = {
+          "nixai" = {
+            "command" = "bash";
+            "args" = ["-c" "socat STDIO UNIX-CONNECT:${cfg.mcp.socketPath}"];
+            "env" = {};
+            "contextAware" = cfg.vscodeIntegration.contextAware;
+          };
+        };
+
+        "claude-dev.mcpServers" = {
+          "nixai" = {
+            "command" = "bash";
+            "args" = ["-c" "socat STDIO UNIX-CONNECT:${cfg.mcp.socketPath}"];
+            "env" = {};
+            "useContext" = cfg.vscodeIntegration.contextAware;
+          };
+        };
+
+        "mcp.enableDebug" = true;
+        "claude-dev.enableMcp" = true;
         "automata.mcp.enabled" = true;
         "zebradev.mcp.enabled" = true;
-        "nixai.socket-path" = cfg.mcp.socketPath;
+
+        # Context-aware AI settings
+        "nixai.contextIntegration" = {
+          "autoRefresh" = cfg.vscodeIntegration.autoRefreshContext;
+          "contextTimeout" = cfg.vscodeIntegration.contextTimeout;
+          "enableDetailedContext" = false;
+        };
       };
+
+      # Optional: Install recommended VS Code extensions
+      programs.vscode.extensions = mkIf config.programs.vscode.enable (
+        map (ext: pkgs.vscode-extensions.${ext} or null)
+        (filter (ext: ext != null) cfg.vscodeIntegration.enabledExtensions)
+      );
     })
 
     (mkIf cfg.neovimIntegration.enable {

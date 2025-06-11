@@ -316,6 +316,156 @@ function M.ask_query()
   end)
 end
 
+-- Get NixOS system context
+function M.get_context(format, detailed)
+  local args = {}
+  if format then args.format = format end
+  if detailed then args.detailed = detailed end
+  
+  local result, err = M.call_mcp("get_nixos_context", args)
+  if err then
+    vim.notify("NixAI Error: " .. err, vim.log.levels.ERROR)
+    return nil
+  end
+  return result
+end
+
+-- Force context re-detection
+function M.detect_context(verbose)
+  local args = {}
+  if verbose then args.verbose = verbose end
+  
+  local result, err = M.call_mcp("detect_nixos_context", args)
+  if err then
+    vim.notify("NixAI Error: " .. err, vim.log.levels.ERROR)
+    return nil
+  end
+  return result
+end
+
+-- Reset context cache
+function M.reset_context(confirm)
+  local args = {}
+  if confirm ~= nil then args.confirm = confirm end
+  
+  local result, err = M.call_mcp("reset_nixos_context", args)
+  if err then
+    vim.notify("NixAI Error: " .. err, vim.log.levels.ERROR)
+    return nil
+  end
+  return result
+end
+
+-- Get context system status
+function M.context_status(include_metrics)
+  local args = {}
+  if include_metrics then args.includeMetrics = include_metrics end
+  
+  local result, err = M.call_mcp("context_status", args)
+  if err then
+    vim.notify("NixAI Error: " .. err, vim.log.levels.ERROR)
+    return nil
+  end
+  return result
+end
+
+-- Get context differences
+function M.context_diff()
+  local result, err = M.call_mcp("context_diff", {})
+  if err then
+    vim.notify("NixAI Error: " .. err, vim.log.levels.ERROR)
+    return nil
+  end
+  return result
+end
+
+-- Show current context in floating window
+function M.show_context()
+  local context = M.get_context("text", false)
+  if context then
+    M.show_in_float(context, 'NixOS System Context')
+  end
+end
+
+-- Show detailed context in floating window
+function M.show_detailed_context()
+  local context = M.get_context("text", true)
+  if context then
+    M.show_in_float(context, 'NixOS System Context (Detailed)')
+  end
+end
+
+-- Show context status in floating window
+function M.show_context_status()
+  local status = M.context_status(true)
+  if status then
+    M.show_in_float(status, 'NixOS Context System Status')
+  end
+end
+
+-- Show context diff in floating window
+function M.show_context_diff()
+  local diff = M.context_diff()
+  if diff then
+    M.show_in_float(diff, 'NixOS Context Changes')
+  end
+end
+
+-- Context-aware suggestion that uses system context
+function M.get_context_aware_suggestion()
+  local context = get_current_context()
+  local filetype = vim.bo.filetype
+  
+  -- Get system context first
+  local system_context = M.get_context("text", false)
+  local context_info = ""
+  if system_context and system_context.content and system_context.content[1] then
+    -- Extract just the summary line from system context
+    local lines = vim.split(system_context.content[1].text, '\n')
+    for _, line in ipairs(lines) do
+      if line:match("System Summary:") or line:match("📋 System:") then
+        context_info = line .. " "
+        break
+      end
+    end
+  end
+  
+  -- Use appropriate MCP tool based on filetype and context
+  local tool = "query_nixos_docs"
+  local args = {}
+  
+  if filetype == "nix" then
+    -- Look for specific Nix patterns
+    if context:match("services%.") then
+      tool = "explain_nixos_option"
+      args.option = context:match("services%.[%w%-%.]+")
+    elseif context:match("programs%.") and (context:match("home%-manager") or context_info:match("Home Manager")) then
+      tool = "explain_home_manager_option"
+      args.option = context:match("programs%.[%w%-%.]+")
+    else
+      args.query = context_info .. "Context: " .. context .. "\nWhat Nix configuration would help here?"
+    end
+  else
+    args.query = context_info .. "Context: " .. context .. "\nWhat Nix configuration would help here?"
+  end
+  
+  local result, err = M.call_mcp(tool, args)
+  if err then
+    vim.notify("NixAI Error: " .. err, vim.log.levels.ERROR)
+    return nil
+  end
+  
+  return result
+end
+
+-- Show context-aware suggestion in a floating window
+function M.show_context_aware_suggestion()
+  local suggestion = M.get_context_aware_suggestion()
+  if suggestion then
+    M.show_in_float(suggestion, 'NixAI Context-Aware Suggestion')
+  end
+end
+
 -- Setup the nixai module
 function M.setup(opts)
   opts = opts or {}
@@ -330,6 +480,7 @@ function M.setup(opts)
   
   -- Setup keymaps
   if not opts.disable_keymaps then
+    -- Original functionality
     vim.keymap.set('n', '<leader>ns', M.show_suggestion, {desc = 'NixAI Suggestion'})
     vim.keymap.set('n', '<leader>nq', M.ask_query, {desc = 'NixAI Query'})
     vim.keymap.set('n', '<leader>no', function()
@@ -352,6 +503,31 @@ function M.setup(opts)
         end
       end)
     end, {desc = 'NixAI Explain Home Option'})
+    
+    -- Context-aware functionality ✨ NEW
+    vim.keymap.set('n', '<leader>ncs', M.show_context_aware_suggestion, {desc = 'NixAI Context-Aware Suggestion'})
+    vim.keymap.set('n', '<leader>ncc', M.show_context, {desc = 'NixAI Show Context'})
+    vim.keymap.set('n', '<leader>ncd', M.show_detailed_context, {desc = 'NixAI Show Detailed Context'})
+    vim.keymap.set('n', '<leader>ncr', function()
+      vim.ui.select({'Yes', 'No'}, {prompt = 'Reset NixOS context cache?'}, function(choice)
+        if choice == 'Yes' then
+          local result = M.reset_context(true)
+          if result then
+            vim.notify("Context cache reset successfully", vim.log.levels.INFO)
+            M.show_in_float(result, 'Context Reset')
+          end
+        end
+      end)
+    end, {desc = 'NixAI Reset Context'})
+    vim.keymap.set('n', '<leader>nct', M.show_context_status, {desc = 'NixAI Context Status'})
+    vim.keymap.set('n', '<leader>nck', M.show_context_diff, {desc = 'NixAI Context Changes'})
+    vim.keymap.set('n', '<leader>ncf', function()
+      local result = M.detect_context(true)
+      if result then
+        vim.notify("Context detection completed", vim.log.levels.INFO)
+        M.show_in_float(result, 'Context Detection')
+      end
+    end, {desc = 'NixAI Force Context Detection'})
   end
 end
 

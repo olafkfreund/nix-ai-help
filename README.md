@@ -276,6 +276,30 @@ Commands | F1:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1
 - **Smart Context Detection**: Automatic detection of flakes vs channels, Home Manager type, NixOS version, and system services
 - **Multi-Provider AI Support**: Local Ollama (privacy-first), LlamaCpp (CPU-optimized), OpenAI, Gemini with intelligent fallback
 
+### 🎯 Context-Aware Intelligence ✨ NEW
+
+- **Automatic System Detection**: Comprehensive NixOS configuration analysis with caching for performance
+- **Context Commands**: 4 specialized context management commands (`detect`, `show`, `reset`, `status`)
+- **Intelligent Adaptation**: AI responses automatically adapt to your specific NixOS setup:
+  - **Flakes vs Channels**: Suggests appropriate commands and workflows
+  - **Home Manager Integration**: Detects standalone vs module setup
+  - **Service Recognition**: Identifies enabled services for targeted suggestions
+  - **Configuration Paths**: Discovers and uses actual configuration file locations
+- **Real-Time Context**: Context system keeps configuration information current with automatic refresh
+- **Editor Integration**: Context available in VS Code and Neovim through MCP protocol
+
+### 🔗 Editor Integrations ✨ NEW
+
+- **VS Code Integration**: Model Context Protocol (MCP) server for seamless AI assistance:
+  - **5 Context MCP Tools**: System context access through GitHub Copilot, Claude Dev, and other AI extensions
+  - **Context-Aware Suggestions**: AI responses automatically include your system configuration
+  - **Real-Time Help**: Get NixOS assistance without leaving VS Code
+- **Neovim Integration**: Enhanced Lua module with context-aware functionality:
+  - **7 Context Keymaps**: Complete context management from within Neovim
+  - **Floating Windows**: Rich context display with formatted output
+  - **Intelligent Suggestions**: Context-aware help based on cursor position and file content
+  - **Auto-Detection**: Automatic context updates and notifications
+
 ### 🩺 System Management & Diagnostics
 
 - **Comprehensive Health Checks**: `nixai doctor` for full system diagnostics and health monitoring

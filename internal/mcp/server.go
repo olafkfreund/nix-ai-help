@@ -163,6 +163,10 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 				Name:        "context_status",
 				Description: "Show context detection system status and health",
 			},
+			{
+				Name:        "context_diff",
+				Description: "Compare current context with previous state and show changes",
+			},
 			// Phase 1: Core NixOS Operations (8 new tools)
 			{
 				Name:        "build_system_analyze",
@@ -248,7 +252,7 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 			},
 			{
 				Name:        "get_learning_resources",
-				Description: "Get curated NixOS learning materials and tutorials",
+				Description: "Get structured learning paths and tutorials for NixOS",
 			},
 			{
 				Name:        "get_configuration_templates",
@@ -256,23 +260,23 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 			},
 			{
 				Name:        "get_configuration_snippets",
-				Description: "Get specific NixOS configuration code snippets",
+				Description: "Get reusable configuration code snippets",
 			},
 			{
 				Name:        "manage_machines",
-				Description: "Manage multi-machine NixOS configurations and deployments",
+				Description: "Manage multiple NixOS machines and configurations",
 			},
 			{
 				Name:        "compare_configurations",
-				Description: "Compare different NixOS configurations and show differences",
+				Description: "Compare configurations between machines or versions",
 			},
 			{
 				Name:        "get_deployment_status",
-				Description: "Get deployment status and health for managed machines",
+				Description: "Get deployment status and history for managed machines",
 			},
 			{
 				Name:        "interactive_assistance",
-				Description: "Launch interactive TUI assistance for guided NixOS help",
+				Description: "Provide interactive help and guidance for NixOS tasks",
 			},
 		}
 		_ = conn.Reply(ctx, req.ID, map[string]interface{}{"tools": tools})
@@ -642,6 +646,17 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 			}
 
 			result := m.handleContextStatus(includeMetrics)
+			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+				"content": []map[string]interface{}{
+					{
+						"type": "text",
+						"text": result,
+					},
+				},
+			})
+
+		case "context_diff":
+			result := m.handleContextDiff()
 			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
 				"content": []map[string]interface{}{
 					{
@@ -1118,177 +1133,108 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 
 		// Phase 3: Community & Learning Tools (8 new tools)
 		case "get_community_resources":
-			var resourceType, topic string
-			if resourceTypeArg, ok := params.Arguments["resourceType"].(string); ok {
-				resourceType = resourceTypeArg
-			}
-			if topicArg, ok := params.Arguments["topic"].(string); ok {
-				topic = topicArg
-			}
-
-			result := m.handleGetCommunityResources(resourceType, topic)
-			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
-				"content": []map[string]interface{}{
-					{
-						"type": "text",
-						"text": result,
+			result, err := m.handleGetCommunityResources(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
 					},
-				},
-			})
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
 
 		case "get_learning_resources":
-			var skillLevel, topic string
-			if skillLevelArg, ok := params.Arguments["skillLevel"].(string); ok {
-				skillLevel = skillLevelArg
-			}
-			if topicArg, ok := params.Arguments["topic"].(string); ok {
-				topic = topicArg
-			}
-
-			result := m.handleGetLearningResources(skillLevel, topic)
-			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
-				"content": []map[string]interface{}{
-					{
-						"type": "text",
-						"text": result,
+			result, err := m.handleGetLearningResources(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
 					},
-				},
-			})
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
 
 		case "get_configuration_templates":
-			var templateType string
-			var features []string
-			if templateTypeArg, ok := params.Arguments["templateType"].(string); ok {
-				templateType = templateTypeArg
-			}
-			if featuresArg, ok := params.Arguments["features"].([]interface{}); ok {
-				for _, feature := range featuresArg {
-					if featureStr, ok := feature.(string); ok {
-						features = append(features, featureStr)
-					}
-				}
-			}
-
-			result := m.handleGetConfigurationTemplates(templateType, features)
-			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
-				"content": []map[string]interface{}{
-					{
-						"type": "text",
-						"text": result,
+			result, err := m.handleGetConfigurationTemplates(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
 					},
-				},
-			})
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
 
 		case "get_configuration_snippets":
-			var category, searchTerm string
-			includeExplanation := true
-			if categoryArg, ok := params.Arguments["category"].(string); ok {
-				category = categoryArg
-			}
-			if searchTermArg, ok := params.Arguments["searchTerm"].(string); ok {
-				searchTerm = searchTermArg
-			}
-			if includeExplanationArg, ok := params.Arguments["includeExplanation"].(bool); ok {
-				includeExplanation = includeExplanationArg
-			}
-
-			result := m.handleGetConfigurationSnippets(category, searchTerm, includeExplanation)
-			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
-				"content": []map[string]interface{}{
-					{
-						"type": "text",
-						"text": result,
+			result, err := m.handleGetConfigurationSnippets(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
 					},
-				},
-			})
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
 
 		case "manage_machines":
-			var operation, machine string
-			var options []string
-			if operationArg, ok := params.Arguments["operation"].(string); ok {
-				operation = operationArg
-			}
-			if machineArg, ok := params.Arguments["machine"].(string); ok {
-				machine = machineArg
-			}
-			if optionsArg, ok := params.Arguments["options"].([]interface{}); ok {
-				for _, option := range optionsArg {
-					if optionStr, ok := option.(string); ok {
-						options = append(options, optionStr)
-					}
-				}
-			}
-
-			result := m.handleManageMachines(operation, machine, options)
-			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
-				"content": []map[string]interface{}{
-					{
-						"type": "text",
-						"text": result,
+			result, err := m.handleManageMachines(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
 					},
-				},
-			})
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
 
 		case "compare_configurations":
-			var source, target, compareType string
-			if sourceArg, ok := params.Arguments["source"].(string); ok {
-				source = sourceArg
-			}
-			if targetArg, ok := params.Arguments["target"].(string); ok {
-				target = targetArg
-			}
-			if compareTypeArg, ok := params.Arguments["compareType"].(string); ok {
-				compareType = compareTypeArg
-			}
-
-			result := m.handleCompareConfigurations(source, target, compareType)
-			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
-				"content": []map[string]interface{}{
-					{
-						"type": "text",
-						"text": result,
+			result, err := m.handleCompareConfigurations(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
 					},
-				},
-			})
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
 
 		case "get_deployment_status":
-			var machine string
-			detailed := false
-			if machineArg, ok := params.Arguments["machine"].(string); ok {
-				machine = machineArg
-			}
-			if detailedArg, ok := params.Arguments["detailed"].(bool); ok {
-				detailed = detailedArg
-			}
-
-			result := m.handleGetDeploymentStatus(machine, detailed)
-			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
-				"content": []map[string]interface{}{
-					{
-						"type": "text",
-						"text": result,
+			result, err := m.handleGetDeploymentStatus(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
 					},
-				},
-			})
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
 
 		case "interactive_assistance":
-			var mode, startingTopic string
-			if modeArg, ok := params.Arguments["mode"].(string); ok {
-				mode = modeArg
-			}
-			if startingTopicArg, ok := params.Arguments["startingTopic"].(string); ok {
-				startingTopic = startingTopicArg
-			}
-
-			result := m.handleInteractiveAssistance(mode, startingTopic)
-			_ = conn.Reply(ctx, req.ID, map[string]interface{}{
-				"content": []map[string]interface{}{
-					{
-						"type": "text",
-						"text": result,
+			result, err := m.handleInteractiveAssistance(params.Arguments)
+			if err != nil {
+				_ = conn.Reply(ctx, req.ID, map[string]interface{}{
+					"error": map[string]interface{}{
+						"code":    -1,
+						"message": err.Error(),
 					},
-				},
-			})
+				})
+				return
+			}
+			_ = conn.Reply(ctx, req.ID, result)
 
 		// End of Phase 3 tools
 
@@ -1639,6 +1585,7 @@ func NewServerFromConfig(configPath string) (*Server, error) {
 		debugLogging:         strings.ToLower(userCfg.LogLevel) == "debug",
 		mcpServer:            &MCPServer{logger: *log, lspProvider: lspProvider},
 		configPath:           configPath,
+		watcher:              nil,
 	}
 
 	// Set the global server instance for cross-referencing

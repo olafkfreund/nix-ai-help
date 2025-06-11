@@ -84,7 +84,64 @@ Search for NixOS packages.
 - **Arguments**: `query` (string) - Package search terms
 - **Usage**: Find available packages in the NixOS package collection
 
+### 5. `get_nixos_context` ✨ NEW
+Get current NixOS system context information.
+- **Arguments**: `format` (string, optional) - Response format ("text" or "json"), `detailed` (boolean, optional) - Include detailed information
+- **Usage**: Get context-aware information about your NixOS system setup (flakes, Home Manager, services, etc.)
+
+### 6. `detect_nixos_context` ✨ NEW
+Force re-detection of NixOS system context.
+- **Arguments**: `verbose` (boolean, optional) - Show detection process details
+- **Usage**: Refresh system context detection when configuration changes
+
+### 7. `reset_nixos_context` ✨ NEW
+Clear cached context and force refresh.
+- **Arguments**: `confirm` (boolean, optional) - Confirm reset operation
+- **Usage**: Clear context cache and perform fresh system detection
+
+### 8. `context_status` ✨ NEW
+Show context detection system status and health.
+- **Arguments**: `includeMetrics` (boolean, optional) - Include performance metrics
+- **Usage**: Check if context system is working properly and get health information
+
 ## Usage Examples
+
+### Context-Aware NixOS Assistance ✨ NEW
+
+The new context tools enable AI assistants to understand your specific NixOS configuration:
+
+#### In VS Code with Claude Dev (Cline)
+
+1. **Get System Context**:
+   - Ask: "Using the context tools, show me my current NixOS configuration setup"
+   - Claude will use `get_nixos_context` to provide tailored information
+
+2. **Context-Aware Configuration Help**:
+   - Ask: "How should I configure nginx based on my current system setup?"
+   - Claude will first get your context, then provide recommendations specific to your configuration (flakes vs channels, Home Manager type, etc.)
+
+3. **System Health Check**:
+   - Ask: "Check my NixOS context system health"
+   - Claude will use `context_status` to verify everything is working correctly
+
+#### In VS Code with GitHub Copilot Chat
+
+1. **Context-Aware Suggestions**:
+   ```
+   @nixai Using my system context, suggest the best way to configure PostgreSQL
+   ```
+
+2. **System Detection**:
+   ```
+   @nixai Get my current NixOS context and explain my configuration type
+   ```
+
+3. **Troubleshooting**:
+   ```
+   @nixai Check context status and refresh if needed
+   ```
+
+### Traditional Documentation Queries
 
 ### In VS Code with Claude Dev (Cline)
 1. Open Command Palette (`Ctrl+Shift+P`)
@@ -103,10 +160,57 @@ Search for NixOS packages.
 echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "test", "version": "1.0.0"}}}' | socat - UNIX-CONNECT:/tmp/nixai-mcp.sock
 ```
 
+## AI Prompt Templates for Context-Aware Assistance ✨ NEW
+
+Use these prompt templates to get the most out of the context tools:
+
+### Context-Aware Configuration Prompts
+
+1. **Smart Configuration Suggestions**:
+   ```
+   Using get_nixos_context, analyze my system setup and suggest the optimal configuration for [SERVICE/FEATURE]. Consider my current flakes usage, Home Manager setup, and enabled services.
+   ```
+
+2. **Troubleshooting with Context**:
+   ```
+   First check my context status, then help me debug [ISSUE]. Use my system context to provide specific solutions for my configuration type.
+   ```
+
+3. **Migration Assistance**:
+   ```
+   Based on my current NixOS context, guide me through migrating to [TARGET] (e.g., flakes, different Home Manager setup). Show step-by-step instructions tailored to my current setup.
+   ```
+
+4. **Service Configuration**:
+   ```
+   Using my NixOS context, show me how to configure [SERVICE] in the way that best fits my current system architecture (flakes/channels, Home Manager type, etc.).
+   ```
+
+### Advanced Context Workflows
+
+1. **Full System Analysis**:
+   ```
+   1. Get my current context with detailed information
+   2. Check context system health
+   3. Analyze my configuration and suggest improvements
+   4. Provide specific next steps based on my setup
+   ```
+
+2. **Configuration Validation**:
+   ```
+   Using context tools, validate that my current NixOS setup is optimal and suggest any improvements based on best practices for my configuration type.
+   ```
+
+3. **Automated Health Check**:
+   ```
+   Run a complete system health check including context status, and provide a summary of my NixOS system state with recommendations.
+   ```
+
 ## Configuration
 
 ### Server Configuration
 Located in `configs/default.yaml`:
+
 ```yaml
 mcp_server:
   host: localhost
@@ -120,6 +224,59 @@ mcp_server:
     - https://nixos.org/manual/nixpkgs/stable/
     - https://nix.dev/manual/nix/2.28/language/
     - https://nix-community.github.io/home-manager/
+  
+  # Context system configuration ✨ NEW
+  context:
+    cache_ttl: 3600  # Cache context for 1 hour
+    auto_detect: true  # Auto-detect context changes
+    detailed_detection: false  # Set to true for verbose context
+```
+
+### Enhanced VS Code Settings ✨ NEW
+
+For optimal context-aware assistance, update your VS Code settings:
+
+```json
+{
+  "mcp.servers": {
+    "nixai": {
+      "command": "bash",
+      "args": ["-c", "socat STDIO UNIX-CONNECT:/tmp/nixai-mcp.sock"],
+      "env": {},
+      "capabilities": {
+        "context": true,
+        "system_detection": true
+      }
+    }
+  },
+  "copilot.mcp.servers": {
+    "nixai": {
+      "command": "bash", 
+      "args": ["-c", "socat STDIO UNIX-CONNECT:/tmp/nixai-mcp.sock"],
+      "env": {},
+      "contextAware": true
+    }
+  },
+  "claude-dev.mcpServers": {
+    "nixai": {
+      "command": "bash",
+      "args": ["-c", "socat STDIO UNIX-CONNECT:/tmp/nixai-mcp.sock"],
+      "env": {},
+      "useContext": true
+    }
+  },
+  "mcp.enableDebug": true,
+  "claude-dev.enableMcp": true,
+  "automata.mcp.enabled": true,
+  "zebradev.mcp.enabled": true,
+  
+  // Context-aware AI settings ✨ NEW
+  "nixai.contextIntegration": {
+    "autoRefresh": true,
+    "contextTimeout": 5000,
+    "enableDetailedContext": false
+  }
+}
 ```
 
 ### Auto-Start

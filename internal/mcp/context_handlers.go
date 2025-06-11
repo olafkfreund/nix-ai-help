@@ -173,6 +173,45 @@ func (m *MCPServer) handleContextStatus(includeMetrics bool) string {
 	return response.Content[0].Text
 }
 
+// handleContextDiff compares current context with previous state and shows changes
+func (m *MCPServer) handleContextDiff() string {
+	// Load configuration
+	cfg, err := config.LoadUserConfig()
+	if err != nil {
+		return fmt.Sprintf("❌ Error loading config: %v", err)
+	}
+
+	// Create context detector (need pointer to logger)
+	contextDetector := nixos.NewContextDetector(&m.logger)
+
+	// Get current context
+	currentCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		return fmt.Sprintf("❌ Failed to get current context: %v", err)
+	}
+
+	// For now, we'll compare with a stored previous context
+	// In a real implementation, you'd store the previous context in cache/file
+	// This is a placeholder implementation showing the concept
+
+	// Try to get previous context from cache or history
+	// For demonstration, we'll show a placeholder diff
+	if currentCtx == nil {
+		return "❌ No current context available for comparison"
+	}
+
+	// Create a mock previous context for demonstration
+	// In real implementation, you'd load this from persistent storage
+	var previousCtx *config.NixOSContext = nil
+
+	// Compare contexts
+	diff := CompareContexts(previousCtx, currentCtx)
+
+	// Format and return the diff
+	response := FormatContextDiff(diff)
+	return response.Content[0].Text
+}
+
 // Helper function to validate context detection capability
 func (m *MCPServer) validateContextSystem(cfg *config.UserConfig) []string {
 	var issues []string

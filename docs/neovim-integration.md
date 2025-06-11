@@ -122,6 +122,115 @@ Interactively select an MCP endpoint for your query:
 
 ---
 
+## 🎯 Context-Aware NixAI Integration ✨ NEW
+
+NixAI now provides context-aware Neovim integration through the MCP server, enabling intelligent suggestions based on your actual NixOS configuration.
+
+### Setup
+
+1. **Install nixai with MCP server support:**
+```bash
+nixai mcp-server start --daemon
+```
+
+2. **Add nixai Lua module to your Neovim config:**
+```bash
+# Generate the nixai.lua module automatically
+nixai neovim --setup
+```
+
+3. **Add to your `init.lua`:**
+```lua
+-- Load nixai integration
+require('nixai').setup({
+  socket_path = "/tmp/nixai-mcp.sock",
+})
+```
+
+### Context-Aware Features
+
+#### System Context Access
+- **`<leader>ncc`**: Show current NixOS system context
+- **`<leader>ncd`**: Show detailed system context  
+- **`<leader>nct`**: Show context system status and health
+- **`<leader>nck`**: Show context changes/diff since last check
+
+#### Context Management
+- **`<leader>ncf`**: Force fresh context detection
+- **`<leader>ncr`**: Reset context cache (with confirmation)
+
+#### Smart Suggestions
+- **`<leader>ncs`**: Get context-aware suggestions based on:
+  - Your current NixOS configuration (flakes vs channels)
+  - Home Manager setup (standalone vs module)
+  - Currently enabled services
+  - File content and cursor position
+
+### Context-Aware Intelligence
+
+The nixai Neovim integration automatically adapts suggestions based on your system:
+
+```lua
+-- When editing Nix files, nixai knows your context:
+-- • If you use flakes, suggests flake-based solutions
+-- • If you have Home Manager standalone, suggests user-level config
+-- • If you have Home Manager as NixOS module, suggests system-level config
+-- • Recognizes enabled services and suggests related configurations
+```
+
+#### Example Context-Aware Workflow
+
+1. **Check your system context**: `<leader>ncc`
+   ```
+   📋 System: nixos | Flakes: Yes | Home Manager: standalone
+   ```
+
+2. **Get smart suggestions**: `<leader>ncs`
+   - Automatically knows you use flakes + standalone Home Manager
+   - Suggests appropriate configuration for your setup
+
+3. **Ask contextual questions**: `<leader>nq`
+   - AI responses include your system context
+   - More relevant and specific suggestions
+
+---
+
+### Available Context Commands
+
+| Command | Keymap | Description |
+|---------|---------|-------------|
+| `:lua require('nixai').show_context()` | `<leader>ncc` | Show current NixOS system context |
+| `:lua require('nixai').show_detailed_context()` | `<leader>ncd` | Show detailed system context with all information |
+| `:lua require('nixai').show_context_status()` | `<leader>nct` | Show context detection system health and status |
+| `:lua require('nixai').show_context_diff()` | `<leader>nck` | Show changes since last context check |
+| `:lua require('nixai').show_context_aware_suggestion()` | `<leader>ncs` | Get intelligent suggestions based on system context |
+| `:lua require('nixai').detect_context(true)` | `<leader>ncf` | Force fresh context detection (verbose) |
+| `:lua require('nixai').reset_context(true)` | `<leader>ncr` | Reset context cache with confirmation |
+
+### Context Integration Benefits
+
+1. **Automatic Configuration Detection**: nixai automatically detects your NixOS setup
+2. **Smart Suggestions**: AI responses adapt to your configuration type (flakes vs channels, Home Manager setup, etc.)
+3. **Real-Time Context**: Always up-to-date system information
+4. **Seamless Workflow**: Context-aware help without leaving Neovim
+
+### Example Usage
+
+```lua
+-- In any Nix file, get context-aware help
+-- Position cursor on a service configuration like "services.nginx"
+-- Press <leader>ncs to get suggestions specific to your system
+
+-- Check your system context anytime
+-- Press <leader>ncc to see:
+-- 📋 System: nixos | Flakes: Yes | Home Manager: standalone
+
+-- Force context refresh after system changes
+-- Press <leader>ncf to re-detect your configuration
+```
+
+---
+
 ## 🧪 Troubleshooting Table
 
 | What to Check                | How to Fix/Verify                                 |

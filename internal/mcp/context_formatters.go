@@ -57,6 +57,19 @@ type StatusInfo struct {
 	DetectionSpeed string            `json:"detectionSpeed,omitempty"`
 }
 
+// ContextDiff represents changes between two context states
+type ContextDiff struct {
+	HasChanges      bool              `json:"hasChanges"`
+	ChangedFields   []string          `json:"changedFields,omitempty"`
+	AddedServices   []string          `json:"addedServices,omitempty"`
+	RemovedServices []string          `json:"removedServices,omitempty"`
+	AddedPackages   []string          `json:"addedPackages,omitempty"`
+	RemovedPackages []string          `json:"removedPackages,omitempty"`
+	ConfigChanges   map[string]string `json:"configChanges,omitempty"`
+	Summary         string            `json:"summary"`
+	Timestamp       time.Time         `json:"timestamp"`
+}
+
 // FormatContextResponse formats NixOS context for MCP response
 func FormatContextResponse(nixosCtx *config.NixOSContext, format string, detailed bool) *ContextResponse {
 	if nixosCtx == nil {
@@ -272,29 +285,220 @@ func FormatStatusResponse(status *StatusInfo, includeMetrics bool) *ContextRespo
 	}
 }
 
-// Helper functions for formatting
-func formatBoolYesNo(value bool) string {
-	if value {
-		return "Yes"
+// CompareContexts compares two NixOS contexts and returns differences
+func CompareContexts(oldCtx, newCtx *config.NixOSContext) *ContextDiff {
+	if oldCtx == nil && newCtx == nil {
+		return &ContextDiff{
+			HasChanges: false,
+			Summary:    "No context data available for comparison",
+			Timestamp:  time.Now(),
+		}
 	}
-	return "No"
+
+	if oldCtx == nil {
+		return &ContextDiff{
+			HasChanges: true,
+			Summary:    "New context detected (no previous context)",
+			Timestamp:  time.Now(),
+		}
+	}
+
+	if newCtx == nil {
+		return &ContextDiff{
+			HasChanges: true,
+			Summary:    "Context lost (previous context available)",
+			Timestamp:  time.Now(),
+		}
+	}
+
+	diff := &ContextDiff{
+		HasChanges:    false,
+		ChangedFields: []string{},
+		ConfigChanges: make(map[string]string),
+		Timestamp:     time.Now(),
+	}
+
+	// Check system-level changes
+	if oldCtx.SystemType != newCtx.SystemType {
+		diff.HasChanges = true
+		diff.ChangedFields = append(diff.ChangedFields, "systemType")
+		diff.ConfigChanges["systemType"] = fmt.Sprintf("%s → %s", oldCtx.SystemType, newCtx.SystemType)
+	}
+
+	if oldCtx.UsesFlakes != newCtx.UsesFlakes {
+		diff.HasChanges = true
+		diff.ChangedFields = append(diff.ChangedFields, "usesFlakes")
+		diff.ConfigChanges["usesFlakes"] = fmt.Sprintf("%t → %t", oldCtx.UsesFlakes, newCtx.UsesFlakes)
+	}
+
+	if oldCtx.HomeManagerType != newCtx.HomeManagerType {
+		diff.HasChanges = true
+		diff.ChangedFields = append(diff.ChangedFields, "homeManagerType")
+		diff.ConfigChanges["homeManagerType"] = fmt.Sprintf("%s → %s", oldCtx.HomeManagerType, newCtx.HomeManagerType)
+	}
+
+	if oldCtx.NixOSVersion != newCtx.NixOSVersion {
+		diff.HasChanges = true
+		diff.ChangedFields = append(diff.ChangedFields, "nixosVersion")
+		diff.ConfigChanges["nixosVersion"] = fmt.Sprintf("%s → %s", oldCtx.NixOSVersion, newCtx.NixOSVersion)
+	}
+
+	// Compare services
+	diff.AddedServices, diff.RemovedServices = compareStringSlices(oldCtx.EnabledServices, newCtx.EnabledServices)
+	if len(diff.AddedServices) > 0 || len(diff.RemovedServices) > 0 {
+		diff.HasChanges = true
+		diff.ChangedFields = append(diff.ChangedFields, "enabledServices")
+	}
+
+	// Compare packages
+	diff.AddedPackages, diff.RemovedPackages = compareStringSlices(oldCtx.InstalledPackages, newCtx.InstalledPackages)
+	if len(diff.AddedPackages) > 0 || len(diff.RemovedPackages) > 0 {
+		diff.HasChanges = true
+		diff.ChangedFields = append(diff.ChangedFields, "installedPackages")
+	}
+
+	// Generate summary
+	diff.Summary = generateDiffSummary(diff)
+
+	return diff
 }
 
-func formatBoolCheck(value bool) string {
-	if value {
-		return "✅ Yes"
+// compareStringSlices compares two string slices and returns added/removed items
+func compareStringSlices(old, new []string) (added, removed []string) {
+	oldMap := make(map[string]bool)
+	newMap := make(map[string]bool)
+
+	for _, item := range old {
+		oldMap[item] = true
 	}
-	return "❌ No"
+	for _, item := range new {
+		newMap[item] = true
+	}
+
+	// Find added items
+	for item := range newMap {
+		if !oldMap[item] {
+			added = append(added, item)
+		}
+	}
+
+	// Find removed items
+	for item := range oldMap {
+		if !newMap[item] {
+			removed = append(removed, item)
+		}
+	}
+
+	return added, removed
 }
 
-func formatDuration(d time.Duration) string {
-	if d < time.Minute {
-		return fmt.Sprintf("%ds", int(d.Seconds()))
+// generateDiffSummary creates a human-readable summary of changes
+func generateDiffSummary(diff *ContextDiff) string {
+	if !diff.HasChanges {
+		return "No changes detected"
 	}
-	if d < time.Hour {
-		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
+
+	var summary strings.Builder
+	summary.WriteString("Context changes detected: ")
+
+	var changes []string
+
+	if len(diff.ChangedFields) > 0 {
+		changes = append(changes, fmt.Sprintf("%d configuration fields changed", len(diff.ChangedFields)))
 	}
-	return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
+
+	if len(diff.AddedServices) > 0 {
+		changes = append(changes, fmt.Sprintf("%d services added", len(diff.AddedServices)))
+	}
+
+	if len(diff.RemovedServices) > 0 {
+		changes = append(changes, fmt.Sprintf("%d services removed", len(diff.RemovedServices)))
+	}
+
+	if len(diff.AddedPackages) > 0 {
+		changes = append(changes, fmt.Sprintf("%d packages added", len(diff.AddedPackages)))
+	}
+
+	if len(diff.RemovedPackages) > 0 {
+		changes = append(changes, fmt.Sprintf("%d packages removed", len(diff.RemovedPackages)))
+	}
+
+	if len(changes) == 0 {
+		return "Unspecified changes detected"
+	}
+
+	summary.WriteString(strings.Join(changes, ", "))
+	return summary.String()
+}
+
+// FormatContextDiff formats context differences for MCP response
+func FormatContextDiff(diff *ContextDiff) *ContextResponse {
+	var b strings.Builder
+
+	b.WriteString(utils.FormatHeader("🔄 Context Changes"))
+	b.WriteString("\n\n")
+
+	if !diff.HasChanges {
+		b.WriteString("✅ No changes detected since last context check\n")
+	} else {
+		b.WriteString(fmt.Sprintf("📋 Summary: %s\n\n", diff.Summary))
+
+		if len(diff.ConfigChanges) > 0 {
+			b.WriteString("### Configuration Changes\n")
+			for field, change := range diff.ConfigChanges {
+				b.WriteString(utils.FormatKeyValue(field, change))
+			}
+			b.WriteString("\n")
+		}
+
+		if len(diff.AddedServices) > 0 {
+			b.WriteString("### Added Services\n")
+			for _, service := range diff.AddedServices {
+				b.WriteString(fmt.Sprintf("  ➕ %s\n", service))
+			}
+			b.WriteString("\n")
+		}
+
+		if len(diff.RemovedServices) > 0 {
+			b.WriteString("### Removed Services\n")
+			for _, service := range diff.RemovedServices {
+				b.WriteString(fmt.Sprintf("  ➖ %s\n", service))
+			}
+			b.WriteString("\n")
+		}
+
+		if len(diff.AddedPackages) > 0 {
+			b.WriteString("### Added Packages\n")
+			for _, pkg := range diff.AddedPackages {
+				b.WriteString(fmt.Sprintf("  ➕ %s\n", pkg))
+			}
+			b.WriteString("\n")
+		}
+
+		if len(diff.RemovedPackages) > 0 {
+			b.WriteString("### Removed Packages\n")
+			for _, pkg := range diff.RemovedPackages {
+				b.WriteString(fmt.Sprintf("  ➖ %s\n", pkg))
+			}
+			b.WriteString("\n")
+		}
+	}
+
+	b.WriteString(fmt.Sprintf("🕒 Checked at: %s\n", diff.Timestamp.Format("2006-01-02 15:04:05")))
+
+	return &ContextResponse{
+		Content: []ContextContent{{
+			Type: "text",
+			Text: b.String(),
+		}},
+		Context: &ContextData{
+			Metadata: map[string]string{
+				"type":        "diff",
+				"hasChanges":  fmt.Sprintf("%t", diff.HasChanges),
+				"changeCount": fmt.Sprintf("%d", len(diff.ChangedFields)),
+			},
+		},
+	}
 }
 
 // FormatDetectionResponse formats context detection results
@@ -374,4 +578,29 @@ func FormatResetResponse(success bool, nixosCtx *config.NixOSContext) *ContextRe
 			return nil
 		}(),
 	}
+}
+
+// Helper functions for formatting
+func formatBoolYesNo(value bool) string {
+	if value {
+		return "Yes"
+	}
+	return "No"
+}
+
+func formatBoolCheck(value bool) string {
+	if value {
+		return "✅ Yes"
+	}
+	return "❌ No"
+}
+
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
+	}
+	return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
 }
