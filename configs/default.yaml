@@ -70,38 +70,46 @@ default:
                 name: "Google Gemini"
                 description: "Google's advanced AI models via API"
                 type: "cloud"
-                base_url: "https://generativelanguage.googleapis.com"
+                base_url: "https://generativelanguage.googleapis.com/v1beta"
                 available: true
                 supports_streaming: true
                 supports_tools: true
                 requires_api_key: true
                 env_var: "GEMINI_API_KEY"
                 models:
-                    gemini-1.5-pro:
-                        name: "Gemini 1.5 Pro"
-                        description: "Most capable Gemini model for complex tasks"
-                        type: "chat"
-                        context_window: 2097152
-                        max_tokens: 8192
-                        recommended_for: ["complex", "analysis", "reasoning"]
-                        cost_tier: "premium"
-                        default: true
-                    gemini-1.5-flash:
-                        name: "Gemini 1.5 Flash"
-                        description: "Fast and efficient Gemini model"
+                    gemini-2.5-flash-preview-05-20:
+                        name: "Gemini 2.5 Flash Preview 05-20"
+                        description: "Latest Gemini 2.5 Flash with adaptive thinking and cost efficiency"
                         type: "chat"
                         context_window: 1048576
                         max_tokens: 8192
-                        recommended_for: ["fast", "general", "nixos"]
+                        recommended_for: ["fast", "general", "nixos", "adaptive"]
                         cost_tier: "standard"
-                    gemini-1.0-pro:
-                        name: "Gemini 1.0 Pro"
-                        description: "Previous generation Gemini model"
-                        type: "chat"
-                        context_window: 32768
-                        max_tokens: 2048
-                        recommended_for: ["general", "budget"]
-                        cost_tier: "budget"
+                        default: true
+                    gemini-2.5-flash-preview-native-audio-dialog:
+                        name: "Gemini 2.5 Flash Native Audio"
+                        description: "Gemini 2.5 Flash with native audio dialog capabilities"
+                        type: "multimodal"
+                        context_window: 1048576
+                        max_tokens: 8192
+                        recommended_for: ["audio", "multimodal", "conversational"]
+                        cost_tier: "premium"
+                    gemini-2.5-flash-exp-native-audio-thinking-dialog:
+                        name: "Gemini 2.5 Flash Audio Thinking"
+                        description: "Experimental Gemini 2.5 Flash with audio thinking capabilities"
+                        type: "multimodal"
+                        context_window: 1048576
+                        max_tokens: 8192
+                        recommended_for: ["experimental", "audio", "thinking", "conversational"]
+                        cost_tier: "premium"
+                    gemini-2.5-flash-preview-tts:
+                        name: "Gemini 2.5 Flash TTS"
+                        description: "Gemini 2.5 Flash with text-to-speech capabilities"
+                        type: "tts"
+                        context_window: 1048576
+                        max_tokens: 8192
+                        recommended_for: ["tts", "audio_generation"]
+                        cost_tier: "standard"
             openai:
                 name: "OpenAI"
                 description: "OpenAI's GPT models via API"
@@ -184,26 +192,26 @@ default:
             # Default model per provider (overrides model defaults above)
             default_models:
                 ollama: "llama3"
-                gemini: "gemini-1.5-flash"
+                gemini: "gemini-2.5-flash-preview-05-20"
                 openai: "gpt-3.5-turbo"
                 llamacpp: "llama-2-7b-chat"
                 custom: "custom-model"
             # Task-specific model recommendations
             task_models:
                 nixos_config:
-                    primary: ["ollama:llama3", "gemini:gemini-1.5-flash"]
+                    primary: ["ollama:llama3", "gemini:gemini-2.5-flash-preview-05-20"]
                     fallback: ["openai:gpt-3.5-turbo"]
                 code_generation:
                     primary: ["ollama:codellama", "openai:gpt-4"]
-                    fallback: ["gemini:gemini-1.5-pro"]
+                    fallback: ["gemini:gemini-2.5-flash-preview-05-20"]
                 debugging:
-                    primary: ["openai:gpt-4", "gemini:gemini-1.5-pro"]
+                    primary: ["openai:gpt-4", "gemini:gemini-2.5-flash-preview-05-20"]
                     fallback: ["ollama:llama3"]
                 general_help:
-                    primary: ["ollama:llama3", "gemini:gemini-1.5-flash"]
+                    primary: ["ollama:llama3", "gemini:gemini-2.5-flash-preview-05-20"]
                     fallback: ["openai:gpt-3.5-turbo"]
                 complex_analysis:
-                    primary: ["openai:gpt-4", "gemini:gemini-1.5-pro"]
+                    primary: ["openai:gpt-4", "gemini:gemini-2.5-flash-preview-05-20"]
                     fallback: ["ollama:llama3:70b"]
         # Model discovery and availability checking
         discovery:

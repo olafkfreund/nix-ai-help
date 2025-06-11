@@ -7,11 +7,13 @@ import (
 
 	"nix-ai-help/internal/ai"
 	"nix-ai-help/internal/ai/roles"
+	"nix-ai-help/internal/ai/validation"
 )
 
 // FlakeAgent handles Nix flake-related operations and guidance
 type FlakeAgent struct {
 	BaseAgent
+	validator *validation.FlakeValidator
 }
 
 // FlakeContext contains flake-specific context information
@@ -37,6 +39,7 @@ func NewFlakeAgent(provider ai.Provider) *FlakeAgent {
 			provider: provider,
 			role:     roles.RoleFlake,
 		},
+		validator: validation.NewFlakeValidator(),
 	}
 	return agent
 }
@@ -59,7 +62,23 @@ func (a *FlakeAgent) Query(ctx context.Context, question string) (string, error)
 	// Build context-aware prompt
 	fullPrompt := a.buildContextualPrompt(prompt, question)
 
-	return a.provider.Query(ctx, fullPrompt)
+	// Get response from AI provider
+	response, err := a.provider.Query(ctx, fullPrompt)
+	if err != nil {
+		return "", err
+	}
+
+	// Validate the response for flake syntax issues
+	if a.validator != nil && validation.IsFlakeContent(response) {
+		validationResult := a.validator.ValidateFlakeContent(response)
+		if !validationResult.IsValid || len(validationResult.Warnings) > 0 {
+			validationSummary := a.validator.FormatValidationResult(validationResult)
+			// Append validation summary to the response
+			response += "\n\n---\n\n" + validationSummary
+		}
+	}
+
+	return response, nil
 }
 
 // GenerateResponse handles flake-related response generation

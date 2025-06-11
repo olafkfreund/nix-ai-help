@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 )
 
 // GeminiClient is a struct that holds the configuration for the Gemini AI provider.
@@ -73,8 +74,12 @@ func (g *GeminiClient) GetSelectedModel() string {
 // SetModel updates the selected model.
 func (g *GeminiClient) SetModel(modelName string) {
 	g.Model = modelName
-	// Update the base URL to use the new model
-	g.BaseURL = fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", modelName)
+	// Update the base URL to use the new model if we have a base URL
+	if g.BaseURL != "" && strings.Contains(g.BaseURL, "/v1beta") {
+		// Extract base URL without model path
+		basePath := strings.Split(g.BaseURL, "/models/")[0]
+		g.BaseURL = fmt.Sprintf("%s/models/%s:generateContent", basePath, modelName)
+	}
 }
 
 // GeminiRequest represents a request to the Gemini AI model (Google API format)
@@ -99,13 +104,33 @@ type GeminiResponse struct {
 
 // Query sends a request to the official Google Gemini API and returns the response.
 func (c *GeminiClient) Query(prompt string) (string, error) {
-	apiURL := c.BaseURL
-	if apiURL == "" {
-		apiURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent"
-	}
 	apiKey := c.APIKey
 	if apiKey == "" {
 		return "", fmt.Errorf("GEMINI_API_KEY is not set")
+	}
+
+	// Construct proper API URL with model
+	var apiURL string
+	if c.BaseURL == "" {
+		// Default base URL with v1beta
+		baseURL := "https://generativelanguage.googleapis.com/v1beta"
+		model := c.Model
+		if model == "" {
+			model = "gemini-1.5-flash" // fallback model
+		}
+		apiURL = fmt.Sprintf("%s/models/%s:generateContent", baseURL, model)
+	} else {
+		// Use configured base URL, but ensure it includes the model endpoint
+		if c.Model != "" && !strings.Contains(c.BaseURL, c.Model) {
+			// If BaseURL doesn't include model, construct it properly
+			if strings.Contains(c.BaseURL, "/v1beta") {
+				apiURL = fmt.Sprintf("%s/models/%s:generateContent", c.BaseURL, c.Model)
+			} else {
+				apiURL = fmt.Sprintf("%s/v1beta/models/%s:generateContent", c.BaseURL, c.Model)
+			}
+		} else {
+			apiURL = c.BaseURL
+		}
 	}
 
 	// Build request body

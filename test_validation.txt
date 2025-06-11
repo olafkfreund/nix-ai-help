@@ -1,0 +1,28 @@
+Here's a test flake response with problematic syntax:
+
+```nix
+{
+  description = "My NixOS flake";
+  
+  inputs = {
+    nixpkgs.nix = {
+      type = "github";
+      owner = "NixOS";
+      repo = "nixpkgs";
+    };
+  };
+  
+  outputs = { self = {
+    devShell = {
+      package = pkgs.mkShell {
+        buildInputs = with pkgs; [
+          python3
+          nodejs
+        ];
+      };
+    };
+  } };
+}
+```
+
+This shows incorrect syntax patterns.

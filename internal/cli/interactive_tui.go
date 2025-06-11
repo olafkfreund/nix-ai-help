@@ -1930,6 +1930,25 @@ func loadChangelogContent() (string, error) {
 func generateDefaultChangelog() string {
 	return `# 📋 nixai Changelog
 
+## 🎯 Version 1.0.1
+
+### ✨ Enhanced Ask Command with Multi-Source Validation
+• Comprehensive information gathering from multiple sources
+• Enhanced validation system for accurate NixOS configurations
+• Improved Bluetooth configuration guidance (hardware.bluetooth.enable vs services.bluetooth.enable)
+
+### 🔍 Validation Improvements
+• Pre-answer factual validation using MCP and GitHub sources
+• Flake syntax validation with error reporting
+• NixOS configuration option validation and correction suggestions
+• Bluetooth-specific configuration checks
+
+### 📊 Multi-Source Integration
+• Official NixOS documentation via MCP server
+• Real-world GitHub configuration examples
+• Package verification through nix search
+• Enhanced progress indicators and source attribution
+
 ## 🎯 Version 1.0.0
 
 ### ✨ Highlights

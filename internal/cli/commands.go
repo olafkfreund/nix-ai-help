@@ -58,84 +58,16 @@ Usage:
 		}
 
 		if askQuestion != "" {
-			fmt.Println(utils.FormatHeader("🤖 AI Answer to your question:"))
-
-			cfg, err := config.LoadUserConfig()
-			if err != nil {
-				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-				os.Exit(1)
+			// Set environment variables for provider and model flags so enhanced ask command can access them
+			if aiProvider != "" {
+				os.Setenv("NIXAI_PROVIDER", aiProvider)
+			}
+			if aiModel != "" {
+				os.Setenv("NIXAI_MODEL", aiModel)
 			}
 
-			// Create AI provider using the new unified system
-			manager := ai.NewProviderManager(cfg, logger.NewLogger())
-
-			// Get the configured default provider or fall back to ollama
-			defaultProvider := cfg.AIModels.SelectionPreferences.DefaultProvider
-			if agentType != "" {
-				defaultProvider = agentType
-			} else if defaultProvider == "" {
-				defaultProvider = "ollama"
-			}
-
-			aiProvider, err := manager.GetProvider(defaultProvider)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
-				os.Exit(1)
-			}
-
-			// Create agent from flags
-			agentInstance, err := createAgentFromFlags(aiProvider)
-			if err != nil {
-				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to create agent: "+err.Error()))
-				os.Exit(1)
-			}
-
-			// Set role if specified
-			if err := validateAndSetRole(agentInstance); err != nil {
-				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to set role: "+err.Error()))
-				os.Exit(1)
-			}
-
-			// Set context if specified
-			if err := setAgentContext(agentInstance); err != nil {
-				fmt.Fprintln(os.Stderr, utils.FormatError("Failed to set context: "+err.Error()))
-				os.Exit(1)
-			}
-
-			// Query MCP for documentation context (optional, ignore errors)
-			var mcpDocumentation string
-			mcpBase := cfg.MCPServer.Host
-			if mcpBase != "" {
-				mcpClient := mcp.NewMCPClient(mcpBase)
-				doc, mcpErr := mcpClient.QueryDocumentation(askQuestion)
-				if mcpErr == nil && doc != "" {
-					mcpDocumentation = doc
-				}
-			}
-
-			// Use agent to answer the question
-			ctx := context.Background()
-			var answer string
-
-			// If we have MCP documentation and this is an AskAgent, use QueryWithContext
-			if mcpDocumentation != "" {
-				if askAgent, ok := agentInstance.(*agent.AskAgent); ok {
-					askCtx := &agent.AskContext{
-						Question: askQuestion,
-						Context:  mcpDocumentation,
-					}
-					answer, err = askAgent.QueryWithContext(ctx, askQuestion, askCtx)
-				} else {
-					answer, err = agentInstance.Query(ctx, askQuestion)
-				}
-			} else {
-				answer, err = agentInstance.Query(ctx, askQuestion)
-			}
-			if err != nil {
-				fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
-				os.Exit(1)
-			}
-			fmt.Println(utils.RenderMarkdown(answer))
+			// Use the enhanced ask command implementation instead of simple version
+			runAskCmd([]string{askQuestion}, os.Stdout)
 			return nil
 		}
 		// If no --ask, show help
@@ -148,14 +80,18 @@ var nixosPath string
 var daemonMode bool
 var agentRole string
 var agentType string
+var aiProvider string
+var aiModel string
 var contextFile string
 var globalTUI bool
 
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&askQuestion, "ask", "a", "", "Ask a question about NixOS configuration")
 	rootCmd.PersistentFlags().StringVarP(&nixosPath, "nixos-path", "n", "", "Path to your NixOS configuration folder (containing flake.nix or configuration.nix)")
-	rootCmd.PersistentFlags().StringVar(&agentRole, "role", "", "Specify the agent role (diagnoser, explainer, ask, build, etc.)")
-	rootCmd.PersistentFlags().StringVar(&agentType, "agent", "", "Specify the agent type (ollama, openai, gemini, etc.)")
+	rootCmd.PersistentFlags().StringVar(&agentRole, "role", "", "Specify the agent role (diagnoser, explainer, ask, build, flake, etc.)")
+	rootCmd.PersistentFlags().StringVar(&agentType, "agent", "", "Specify the agent type (ask, build, diagnose, flake, etc.)")
+	rootCmd.PersistentFlags().StringVar(&aiProvider, "provider", "", "Specify the AI provider (ollama, openai, gemini, etc.)")
+	rootCmd.PersistentFlags().StringVar(&aiModel, "model", "", "Specify the AI model (llama3, gpt-4, gemini-1.5-pro, etc.)")
 	rootCmd.PersistentFlags().StringVar(&contextFile, "context-file", "", "Path to a file containing context information (JSON or text)")
 	rootCmd.PersistentFlags().BoolVar(&globalTUI, "tui", false, "Launch TUI mode for any command")
 	mcpServerCmd.Flags().BoolVarP(&daemonMode, "daemon", "d", false, "Run MCP server in background/daemon mode")
@@ -198,15 +134,90 @@ func loadContextFromFile(filepath string) (interface{}, error) {
 }
 
 func createAgentFromFlags(provider ai.Provider) (agent.Agent, error) {
-	// If no agent type specified, use default behavior
+	// If no agent type specified, determine from role or use default
 	if agentType == "" {
-		return agent.NewOllamaAgent(provider), nil
+		// Try to infer agent type from role
+		if agentRole != "" {
+			switch strings.ToLower(agentRole) {
+			case "ask":
+				return agent.NewAskAgent(provider), nil
+			case "flake":
+				return agent.NewFlakeAgent(provider), nil
+			case "build":
+				return agent.NewBuildAgent(provider), nil
+			case "explain-option":
+				return agent.NewExplainOptionAgent(provider, nil), nil
+			case "explain-home-option":
+				return agent.NewExplainHomeOptionAgent(provider, nil), nil
+			case "configure":
+				return agent.NewConfigureAgent(provider), nil
+			case "hardware":
+				return agent.NewHardwareAgent(provider), nil
+			case "gc":
+				return agent.NewGCAgent(provider), nil
+			case "interactive":
+				return agent.NewInteractiveAgent(provider), nil
+			case "learn":
+				return agent.NewLearnAgent(provider), nil
+			case "migrate":
+				return agent.NewMigrateAgent(provider), nil
+			case "devenv":
+				return agent.NewDevenvAgent(provider), nil
+			case "package-repo":
+				return agent.NewPackageRepoAgent(provider), nil
+			case "templates":
+				return agent.NewTemplatesAgent(provider), nil
+			case "help":
+				return agent.NewHelpAgent(provider), nil
+			// These agents have interface compatibility issues, default to ask agent
+			case "diagnose", "community", "machines", "store", "logs", "mcp-server", "neovim-setup", "snippets":
+				return agent.NewAskAgent(provider), nil
+			default:
+				return agent.NewAskAgent(provider), nil // Default fallback
+			}
+		}
+		// Default to ask agent if no role specified
+		return agent.NewAskAgent(provider), nil
 	}
 
-	// Create agent based on type
+	// Create agent based on explicit agent type
 	switch strings.ToLower(agentType) {
-	case "ollama":
-		return agent.NewOllamaAgent(provider), nil
+	case "ask":
+		return agent.NewAskAgent(provider), nil
+	case "flake":
+		return agent.NewFlakeAgent(provider), nil
+	case "build":
+		return agent.NewBuildAgent(provider), nil
+	case "explain-option":
+		return agent.NewExplainOptionAgent(provider, nil), nil
+	case "explain-home-option":
+		return agent.NewExplainHomeOptionAgent(provider, nil), nil
+	case "configure":
+		return agent.NewConfigureAgent(provider), nil
+	case "hardware":
+		return agent.NewHardwareAgent(provider), nil
+	case "gc":
+		return agent.NewGCAgent(provider), nil
+	case "interactive":
+		return agent.NewInteractiveAgent(provider), nil
+	case "learn":
+		return agent.NewLearnAgent(provider), nil
+	case "migrate":
+		return agent.NewMigrateAgent(provider), nil
+	case "devenv":
+		return agent.NewDevenvAgent(provider), nil
+	case "package-repo":
+		return agent.NewPackageRepoAgent(provider), nil
+	case "templates":
+		return agent.NewTemplatesAgent(provider), nil
+	case "help":
+		return agent.NewHelpAgent(provider), nil
+	// These agents have interface compatibility issues, default to ask agent
+	case "diagnose", "community", "machines", "store", "logs", "mcp-server", "neovim-setup", "snippets":
+		return agent.NewAskAgent(provider), nil
+	case "ollama", "openai", "gemini", "llamacpp", "custom":
+		// These are provider names, not agent types - default to ask agent
+		return agent.NewAskAgent(provider), nil
 	default:
 		return nil, fmt.Errorf("unsupported agent type: %s", agentType)
 	}
@@ -1099,82 +1110,26 @@ func conditionalMaximumArgsValidator(maxArgs int) cobra.PositionalArgs {
 	}
 }
 
-// Stub commands for missing top-level commands
+// Ask command - Now uses the enhanced implementation
 var askCmd = &cobra.Command{
 	Use:   "ask [question]",
 	Short: "Ask a question about NixOS configuration",
-	Long: `Ask a direct question about NixOS configuration and get an AI-powered answer.
+	Long: `Ask a direct question about NixOS configuration and get an AI-powered answer with comprehensive multi-source validation.
+
+This command queries multiple information sources:
+- Official NixOS documentation via MCP server
+- Verified package search results
+- Real-world GitHub configuration examples
+- Response validation for common syntax errors
 
 Examples:
   nixai ask "How do I configure nginx?"
-  nixai ask "What is the difference between services.openssh.enable and programs.ssh.enable?"`,
+  nixai ask "What is the difference between services.openssh.enable and programs.ssh.enable?"
+  nixai ask "How do I set up a development environment with Python?" --provider gemini`,
 	Args: conditionalArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		question := strings.Join(args, " ")
-		fmt.Println(utils.FormatHeader("🤖 AI Answer to your question:"))
-
-		cfg, err := config.LoadUserConfig()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to load config: "+err.Error()))
-			os.Exit(1)
-		}
-
-		aiProvider, err := GetLegacyAIProvider(cfg, logger.NewLogger())
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
-			os.Exit(1)
-		}
-
-		// Get provider name for context
-		providerName := cfg.AIProvider
-		if providerName == "" {
-			providerName = "ollama"
-		}
-
-		// Query MCP for documentation context (optional, ignore errors)
-		var docExcerpts []string
-		fmt.Print(utils.FormatInfo("Querying documentation... "))
-		mcpBase := cfg.MCPServer.Host
-		if mcpBase != "" {
-			mcpClient := mcp.NewMCPClient(mcpBase)
-			doc, err := mcpClient.QueryDocumentation(question)
-			fmt.Println(utils.FormatSuccess("done"))
-			if err == nil && doc != "" {
-				// Try to parse as MCP option doc JSON
-				opt, fallbackDoc := parseMCPOptionDoc(doc)
-				if opt.Name != "" {
-					// Compose a rich context string from MCP fields
-					context := fmt.Sprintf("Option: %s\nType: %s\nDefault: %s\nExample: %s\nDescription: %s\nSource: %s\nNixOS Version: %s\nRelated: %v\nLinks: %v", opt.Name, opt.Type, opt.Default, opt.Example, opt.Description, opt.Source, opt.Version, opt.Related, opt.Links)
-					docExcerpts = append(docExcerpts, context)
-				} else {
-					docExcerpts = append(docExcerpts, fallbackDoc)
-				}
-			}
-		} else {
-			fmt.Println(utils.FormatWarning("skipped (no MCP host configured)"))
-		}
-
-		promptCtx := ai.PromptContext{
-			Question:     question,
-			DocExcerpts:  docExcerpts,
-			Intent:       "explain",
-			OutputFormat: "markdown",
-			Provider:     providerName,
-		}
-		builder := ai.DefaultPromptBuilder{}
-		prompt, err := builder.BuildPrompt(promptCtx)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("Prompt build error: "+err.Error()))
-			os.Exit(1)
-		}
-		fmt.Print(utils.FormatInfo("Querying AI provider... "))
-		answer, err := aiProvider.Query(prompt)
-		fmt.Println(utils.FormatSuccess("done"))
-		if err != nil {
-			fmt.Fprintln(os.Stderr, utils.FormatError("AI error: "+err.Error()))
-			os.Exit(1)
-		}
-		fmt.Println(utils.RenderMarkdown(answer))
+		// Use the enhanced implementation from direct_commands.go with provider flags
+		runAskCmdWithOptions(args, cmd.OutOrStdout(), aiProvider, aiModel)
 	},
 }
 var communityCmd = &cobra.Command{

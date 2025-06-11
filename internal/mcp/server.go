@@ -104,7 +104,7 @@ func (m *MCPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 			},
 			"serverInfo": map[string]interface{}{
 				"name":    "nixai-mcp-server",
-				"version": "1.0.0",
+				"version": "1.0.1",
 			},
 		}
 		_ = conn.Reply(ctx, req.ID, result)

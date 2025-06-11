@@ -927,7 +927,7 @@ nix build --rebuild
 After installation, verify everything works:
 
 ```zsh
-nixai --version              # Should show "nixai version 0.1.0"
+nixai --version              # Should show "nixai version 1.0.1"
 nixai doctor                 # Run comprehensive health check
 nixai hardware detect       # Test hardware detection
 nixai -a "test question"     # Test AI functionality
