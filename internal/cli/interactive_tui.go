@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"nix-ai-help/internal/config"
+	"nix-ai-help/internal/tui/components"
+	"nix-ai-help/internal/tui/styles"
 	"nix-ai-help/pkg/utils"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -120,6 +122,10 @@ type tuiModel struct {
 	changelogVisible  bool
 	changelogContent  string
 	changelogViewport viewport.Model
+
+	// AI response popup support
+	askResponsePopup *components.AskResponsePopup
+	theme            *styles.Theme
 }
 
 type commandItem struct {
@@ -223,6 +229,12 @@ func initialModel() tuiModel {
 	// Create viewport for changelog
 	changelogViewport := viewport.New(0, 0)
 
+	// Create theme for TUI components
+	theme := styles.NewDefaultTheme()
+
+	// Create AI response popup
+	askResponsePopup := components.NewAskResponsePopup(theme)
+
 	return tuiModel{
 		commands:          commands,
 		selectedCommand:   0,
@@ -234,6 +246,8 @@ func initialModel() tuiModel {
 		isStreaming:       false,
 		currentCommand:    "",
 		changelogViewport: changelogViewport,
+		askResponsePopup:  askResponsePopup,
+		theme:             theme,
 	}
 }
 
@@ -245,8 +259,8 @@ func getAvailableCommands() []commandItem {
 			description: "Ask any NixOS question",
 			needsInput:  true,
 			options: []commandOption{
-				{name: "Question", flag: "question", description: "Your NixOS question", required: true, hasValue: true, optionType: "string"},
-				{name: "Agent", flag: "agent", description: "AI provider (ollama, openai, gemini)", required: false, hasValue: true, defaultValue: "ollama", optionType: "string"},
+				{name: "Provider", flag: "provider", description: "AI provider (ollama, openai, gemini)", required: false, hasValue: true, defaultValue: "ollama", optionType: "string"},
+				{name: "Model", flag: "model", description: "AI model (llama3, gpt-4, gemini-2.5-pro)", required: false, hasValue: true, optionType: "string"},
 				{name: "Role", flag: "role", description: "Agent role (diagnoser, explainer, etc.)", required: false, hasValue: true, optionType: "string"},
 			},
 			subcommands: []subcommandItem{},
@@ -556,8 +570,38 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.terminalWidth = msg.Width
 		m.terminalHeight = msg.Height
 
+		// Update AI response popup size
+		popupWidth := int(float64(msg.Width) * 0.8)
+		popupHeight := int(float64(msg.Height) * 0.8)
+		m.askResponsePopup.SetSize(popupWidth, popupHeight)
+
 	case executeCommandMsg:
-		m.commandOutput = msg.output
+		// Check if this is an ask command - if so, show in popup
+		if strings.HasPrefix(msg.command, "ask ") || strings.HasPrefix(msg.command, "ask --") {
+			// Extract the question from the command
+			var question string
+			if strings.HasPrefix(msg.command, "ask --question ") {
+				// Handle format: ask --question "question text"
+				question = strings.TrimPrefix(msg.command, "ask --question ")
+				// Remove quotes if present
+				if len(question) >= 2 && question[0] == '"' && question[len(question)-1] == '"' {
+					question = question[1 : len(question)-1]
+				}
+			} else if strings.HasPrefix(msg.command, "ask ") {
+				// Handle format: ask question text (simple format)
+				question = strings.TrimPrefix(msg.command, "ask ")
+			} else {
+				// Fallback - just use the command
+				question = msg.command
+			}
+
+			m.askResponsePopup.Show(question, msg.output)
+
+			// Also update command output for regular display (as backup)
+			m.commandOutput = "AI response displayed in popup (press 'Ctrl+A' to reopen)"
+		} else {
+			m.commandOutput = msg.output
+		}
 		m.isExecuting = false
 		m.currentState = stateResults
 		m.focused = focusOutput
@@ -584,10 +628,21 @@ func (m tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.KeyMsg:
+		// Update AI response popup first if it's visible
+		if m.askResponsePopup.IsVisible() {
+			var cmd tea.Cmd
+			m.askResponsePopup, cmd = m.askResponsePopup.Update(msg)
+			return m, cmd
+		}
+
 		return m.handleKeyPress(msg)
 	}
 
-	return m, nil
+	// Update AI response popup
+	var cmd tea.Cmd
+	m.askResponsePopup, cmd = m.askResponsePopup.Update(msg)
+
+	return m, cmd
 }
 
 // handleKeyPress handles key presses based on current state
@@ -650,6 +705,10 @@ func (m tuiModel) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "?":
 		// Toggle changelog
 		return m.toggleChangelog()
+
+	case "ctrl+a":
+		// Toggle AI response popup
+		return m.toggleAskResponse()
 
 	case "tab":
 		return m.handleTabNavigation(), nil
@@ -764,7 +823,16 @@ func (m tuiModel) handleEscape() tuiModel {
 	if m.inputMode {
 		m.inputMode = false
 		m.parameterInput = ""
-		m.focused = focusCommands
+
+		// Special handling for ask command - go back to options state
+		if m.selectedCmdName == "ask" {
+			m.currentState = stateCommandOptions
+			m.focused = focusOptions
+			m.commandOutput = "Configure options for 'ask' command or select 'Execute Command' to continue"
+		} else {
+			m.selectedCmdName = "" // Reset selected command name for other commands
+			m.focused = focusCommands
+		}
 		return m
 	}
 
@@ -813,14 +881,38 @@ func (m tuiModel) handleEscape() tuiModel {
 // handleEnter handles enter key based on current state and focus
 func (m tuiModel) handleEnter() (tuiModel, tea.Cmd) {
 	// Handle input mode first, regardless of state
-	if m.inputMode && len(m.commandOptions) > 0 && m.selectedOption < len(m.commandOptions) {
-		opt := m.commandOptions[m.selectedOption]
-		m.optionValues[opt.flag] = m.parameterInput
-		m.inputMode = false
-		m.parameterInput = ""
-		m.focused = focusOptions
-		m.commandOutput = fmt.Sprintf("Set '%s' to: %s", opt.name, m.optionValues[opt.flag])
-		return m, nil
+	if m.inputMode {
+		// Special handling for ask command - execute with question as positional argument
+		if m.selectedCmdName == "ask" && m.parameterInput != "" {
+			question := strings.TrimSpace(m.parameterInput)
+			if question == "" {
+				m.commandOutput = "Please enter a question."
+				return m, nil
+			}
+
+			// Execute ask command with question as argument
+			m.inputMode = false
+			m.parameterInput = ""
+			m.isExecuting = true
+			m.currentState = stateExecuting
+
+			// Build command arguments including options + question
+			args := m.buildCommandArgs()
+			args = append(args, question)
+
+			return m, m.executeCommandWithParams("ask", args)
+		}
+
+		// Regular option configuration
+		if len(m.commandOptions) > 0 && m.selectedOption < len(m.commandOptions) {
+			opt := m.commandOptions[m.selectedOption]
+			m.optionValues[opt.flag] = m.parameterInput
+			m.inputMode = false
+			m.parameterInput = ""
+			m.focused = focusOptions
+			m.commandOutput = fmt.Sprintf("Set '%s' to: %s", opt.name, m.optionValues[opt.flag])
+			return m, nil
+		}
 	}
 
 	switch m.currentState {
@@ -903,6 +995,18 @@ func (m tuiModel) handleEnter() (tuiModel, tea.Cmd) {
 				filteredCommands := m.filterCommands()
 				if m.selectedCommand >= 0 && m.selectedCommand < len(filteredCommands) {
 					cmd := filteredCommands[m.selectedCommand]
+
+					// Special handling for ask command - need to get question first
+					if cmd.name == "ask" {
+						m.inputMode = true
+						m.parameterInput = ""
+						m.focused = focusInput
+						m.currentState = stateCommandList // Switch to command list state for clean input
+						m.commandOutput = "Enter your question for nixai ask:"
+						m.selectedCmdName = cmd.name
+						return m, nil
+					}
+
 					args := m.buildCommandArgs()
 					m.isExecuting = true
 					m.currentState = stateExecuting
@@ -933,6 +1037,18 @@ func (m tuiModel) handleEnter() (tuiModel, tea.Cmd) {
 			filteredCommands := m.filterCommands()
 			if m.selectedCommand >= 0 && m.selectedCommand < len(filteredCommands) {
 				cmd := filteredCommands[m.selectedCommand]
+
+				// Special handling for ask command - need to get question first
+				if cmd.name == "ask" {
+					m.inputMode = true
+					m.parameterInput = ""
+					m.focused = focusInput
+					m.currentState = stateCommandList // Switch to command list state for clean input
+					m.commandOutput = "Enter your question for nixai ask:"
+					m.selectedCmdName = cmd.name
+					return m, nil
+				}
+
 				args := m.buildCommandArgs()
 				m.isExecuting = true
 				m.currentState = stateExecuting
@@ -1198,6 +1314,13 @@ func (m tuiModel) View() string {
 		content = lipgloss.Place(m.terminalWidth, m.terminalHeight, lipgloss.Center, lipgloss.Center, changelogPopup, lipgloss.WithWhitespaceChars(" "), lipgloss.WithWhitespaceForeground(lipgloss.NoColor{}))
 	}
 
+	// If AI response popup is visible, render it as an overlay (takes priority over changelog)
+	if m.askResponsePopup.IsVisible() {
+		popupView := m.askResponsePopup.View()
+		// Center the popup over the main content
+		content = lipgloss.Place(m.terminalWidth, m.terminalHeight, lipgloss.Center, lipgloss.Center, popupView, lipgloss.WithWhitespaceChars(" "), lipgloss.WithWhitespaceForeground(lipgloss.NoColor{}))
+	}
+
 	return content
 }
 
@@ -1207,17 +1330,33 @@ func (m tuiModel) renderCommandsPanel(width, height int) string {
 
 	// Show input mode if active
 	if m.inputMode {
-		inputHeader := fmt.Sprintf("Enter parameter for '%s':", m.selectedCmdName)
+		var inputHeader string
+		if m.selectedCmdName == "ask" {
+			inputHeader = "Ask nixai a question:"
+		} else {
+			inputHeader = fmt.Sprintf("Enter parameter for '%s':", m.selectedCmdName)
+		}
 		content.WriteString(inputHeader + "\n\n")
 
-		inputLine := fmt.Sprintf("Input: %s_", m.parameterInput)
+		var inputLine string
+		if m.selectedCmdName == "ask" {
+			inputLine = fmt.Sprintf("Question: %s_", m.parameterInput)
+		} else {
+			inputLine = fmt.Sprintf("Input: %s_", m.parameterInput)
+		}
+
 		if m.focused == focusInput {
 			inputLine = selectedStyle.Render(inputLine)
 		} else {
 			inputLine = commandStyle.Render(inputLine)
 		}
 		content.WriteString(inputLine + "\n\n")
-		content.WriteString("Press Enter to execute, Esc to cancel\n")
+
+		if m.selectedCmdName == "ask" {
+			content.WriteString("Press Enter to ask your question, Esc to cancel\n")
+		} else {
+			content.WriteString("Press Enter to execute, Esc to cancel\n")
+		}
 	} else if m.searchMode {
 		// Add search bar if in search mode
 		searchBar := fmt.Sprintf("Search: %s_", m.searchQuery)
@@ -1435,6 +1574,8 @@ func (m tuiModel) renderStatusBar(width int) string {
 		statusItems = append(statusItems, "↑↓/Ctrl+jk: Navigate")
 		statusItems = append(statusItems, "Enter: Select")
 		statusItems = append(statusItems, "/: Search")
+		statusItems = append(statusItems, "?: Changelog")
+		statusItems = append(statusItems, "Ctrl+A: AI Response")
 		statusItems = append(statusItems, "Ctrl+C: Exit")
 
 	case stateSubcommandSelection:
@@ -1492,6 +1633,18 @@ func (m tuiModel) renderStatusBar(width int) string {
 			"PgUp/PgDn: Page",
 			"Home/End: Top/Bottom",
 			"?: Close",
+			"Esc: Close",
+		}
+	}
+
+	// Add AI response controls if AI response popup is visible (override other status items)
+	if m.askResponsePopup.IsVisible() {
+		statusItems = []string{
+			"🤖 AI Response",
+			"↑↓/jk: Scroll",
+			"PgUp/PgDn: Page",
+			"Home/End: Top/Bottom",
+			"Ctrl+A: Toggle",
 			"Esc: Close",
 		}
 	}
@@ -1838,6 +1991,22 @@ func (m tuiModel) toggleChangelog() (tuiModel, tea.Cmd) {
 		m.changelogViewport.GotoTop()
 
 		m.changelogVisible = true
+	}
+	return m, nil
+}
+
+// toggleAskResponse toggles the AI response popup visibility
+func (m tuiModel) toggleAskResponse() (tuiModel, tea.Cmd) {
+	if m.askResponsePopup.IsVisible() {
+		m.askResponsePopup.Hide()
+	} else {
+		// Show the popup if it has content, otherwise provide feedback
+		if m.askResponsePopup.HasContent() {
+			m.askResponsePopup.Show("", "") // This will show the last stored content
+		} else {
+			// Show a message that there's no AI response content
+			m.commandOutput = "💡 No AI response available. Use an 'ask' command to generate a response that will be displayed in this popup."
+		}
 	}
 	return m, nil
 }
