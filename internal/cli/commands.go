@@ -99,6 +99,7 @@ func init() {
 
 	// Add ask command flags
 	askCmd.Flags().BoolP("quiet", "q", false, "Suppress validation output and show only the AI response")
+	askCmd.Flags().BoolP("verbose", "v", false, "Show detailed validation output with multi-section layout")
 
 	// Add package-repo command flags
 	packageRepoCmd.Flags().String("local", "", "Analyze local repository path instead of cloning")
@@ -1125,19 +1126,32 @@ This command queries multiple information sources:
 - Real-world GitHub configuration examples
 - Response validation for common syntax errors
 
-Use --quiet to suppress validation output and show only the AI response.
+Output modes:
+- Default: Concise progress indicators with footer-style summary
+- --quiet: Show only the AI response without any validation output
+- --verbose: Show detailed validation output with multi-section layout
 
 Examples:
   nixai ask "How do I configure nginx?"
   nixai ask "What is the difference between services.openssh.enable and programs.ssh.enable?"
   nixai ask "How do I set up a development environment with Python?" --provider gemini
-  nixai ask "How do I enable SSH?" --quiet`,
+  nixai ask "How do I enable SSH?" --quiet
+  nixai ask "How do I enable nginx?" --verbose`,
 	Args: conditionalArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		// Get the quiet flag value
+		// Get the quiet and verbose flag values
 		quiet, _ := cmd.Flags().GetBool("quiet")
-		// Use the enhanced implementation from direct_commands.go with provider flags and quiet mode
-		runAskCmdWithQuietMode(args, cmd.OutOrStdout(), aiProvider, aiModel, quiet)
+		verbose, _ := cmd.Flags().GetBool("verbose")
+
+		// Route to appropriate version: quiet (minimal) -> concise (default) -> verbose (full)
+		if quiet {
+			runAskCmdWithOptionsQuiet(args, cmd.OutOrStdout(), aiProvider, aiModel)
+		} else if verbose {
+			runAskCmdWithOptions(args, cmd.OutOrStdout(), aiProvider, aiModel)
+		} else {
+			// Default to concise mode for better user experience
+			runAskCmdWithConciseMode(args, cmd.OutOrStdout(), aiProvider, aiModel)
+		}
 	},
 }
 var communityCmd = &cobra.Command{

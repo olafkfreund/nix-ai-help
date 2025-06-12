@@ -66,7 +66,7 @@ The newly modernized Terminal User Interface provides a professional, accessible
 │                                    │                                   │
 │ (Showing 1-10 of 24)               │ [INPUT] = Interactive Parameters  │
 └────────────────────────────────────┴───────────────────────────────────┘
-Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.2.3
+Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.0.3
 ```
 
 ### ✨ Key TUI Features
@@ -264,7 +264,7 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 │                                    │ • Version display                │
 │ (Showing 1-8 of 24)               │ • ? changelog popup             │
 └────────────────────────────────────┴───────────────────────────────────┘
-Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.2.3
+Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.0.3
 ```
 
 ### 🤖 AI-Powered Command System

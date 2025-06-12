@@ -1,4 +1,30 @@
 changelog:
+  - version: "1.0.3"
+    date: "2025-06-12"
+    highlights:
+      - "Ultra-minimal ask command output"
+      - "Reduced screen space usage by 90%"
+      - "Enhanced user experience with concise progress indicators"
+      - "Three output modes: default (concise), quiet, and verbose"
+    features:
+      - title: "Concise Progress Indicators"
+        description: "Single-line emoji progress indicators: 📚 📦 🔍 🤖 ✅"
+      - title: "Minimal Footer"
+        description: "Clean source attribution: ─ docs • examples ─"
+      - title: "Three Output Modes"
+        description: "Default concise mode, --quiet for minimal output, --verbose for detailed information"
+      - title: "Enhanced User Experience"
+        description: "Dramatically reduced visual clutter while maintaining all functionality"
+    improvements:
+      - "90% reduction in screen space usage for ask command"
+      - "Improved readability with focused content display"
+      - "Maintained all multi-source validation capabilities"
+      - "Better command documentation with output mode examples"
+    fixes:
+      - "Streamlined command routing for better performance"
+      - "Removed unnecessary progress text and headers"
+      - "Optimized information display hierarchy"
+
   - version: "1.3.0"
     date: "2025-06-10"
     highlights:

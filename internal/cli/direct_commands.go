@@ -1393,8 +1393,261 @@ func runSearchCmd(args []string, out io.Writer) {
 }
 
 // Ask command - Enhanced version with comprehensive information sources and validation
+// runAskCmdWithConciseMode is a new version with concise footer-style output
+func runAskCmdWithConciseMode(args []string, out io.Writer, providerParam, modelParam string) {
+	if len(args) == 0 {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Usage: ask <question>"))
+		_, _ = fmt.Fprintln(out, utils.FormatTip("Example: ask How do I enable nginx?"))
+		return
+	}
+
+	question := strings.Join(args, " ")
+
+	// Load configuration
+	cfg, err := config.LoadUserConfig()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to load configuration: "+err.Error()))
+		return
+	}
+
+	// Detect NixOS context (silent)
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to detect NixOS context: "+err.Error()))
+		return
+	}
+
+	// Create AI provider manager
+	manager := ai.NewProviderManager(cfg, logger.NewLogger())
+
+	// Determine which provider to use
+	selectedProvider := cfg.AIModels.SelectionPreferences.DefaultProvider
+	if providerParam != "" {
+		selectedProvider = providerParam
+	}
+	if selectedProvider == "" {
+		selectedProvider = "ollama"
+	}
+
+	var provider ai.Provider
+	if modelParam != "" {
+		provider, err = manager.GetProviderWithModel(selectedProvider, modelParam)
+	} else {
+		provider, err = manager.GetProvider(selectedProvider)
+	}
+
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
+		return
+	}
+
+	// Silently gather information from multiple sources
+	var docExcerpts []string
+	var searchContext []string
+	var githubExamples []string
+	var sourceStatus []string
+
+	// 1. MCP server documentation queries (silent)
+	if cfg.MCPServer.Host != "" {
+		_, _ = fmt.Fprintf(out, "📚 ")
+		mcpClient := mcp.NewMCPClient(fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port))
+
+		sources := []string{
+			"https://wiki.nixos.org/wiki/NixOS_Wiki",
+			"https://nix.dev/manual/nix",
+			"https://nixos.org/manual/nixpkgs/stable/",
+			"https://nix.dev/manual/nix/2.28/language/",
+			"https://nix-community.github.io/home-manager/",
+		}
+
+		doc, mcpErr := mcpClient.QueryDocumentation(question, sources...)
+		if mcpErr == nil && doc != "" {
+			opt, fallbackDoc := parseMCPOptionDoc(doc)
+			if opt.Name != "" {
+				context := fmt.Sprintf("NixOS Option Documentation:\nOption: %s\nType: %s\nDefault: %s\nExample: %s\nDescription: %s\nSource: %s\nVersion: %s\nRelated: %v\nLinks: %v",
+					opt.Name, opt.Type, opt.Default, opt.Example, opt.Description, opt.Source, opt.Version, opt.Related, opt.Links)
+				docExcerpts = append(docExcerpts, context)
+				sourceStatus = append(sourceStatus, "docs")
+			} else if len(fallbackDoc) > 10 && len(fallbackDoc) < 3000 {
+				docExcerpts = append(docExcerpts, "NixOS Documentation Context:\n"+fallbackDoc)
+				sourceStatus = append(sourceStatus, "docs")
+			}
+		}
+
+		// Query for service examples if applicable
+		searchTerms := extractSearchTerms(question)
+		for _, term := range searchTerms {
+			if strings.Contains(question, "service") || strings.Contains(question, "enable") {
+				if serviceDoc, err := mcpClient.QueryDocumentation("service examples for " + term); err == nil && serviceDoc != "" {
+					if len(serviceDoc) > 20 && len(serviceDoc) < 2000 {
+						docExcerpts = append(docExcerpts, fmt.Sprintf("Service Configuration Examples for '%s':\n%s", term, serviceDoc))
+					}
+				}
+			}
+		}
+	}
+
+	// 2. Package and options search (silent)
+	_, _ = fmt.Fprintf(out, "📦 ")
+	exec := nixos.NewExecutor(cfg.NixosFolder)
+	searchTerms := extractSearchTerms(question)
+	foundPackages := 0
+	for _, term := range searchTerms {
+		if packageInfo, err := exec.SearchNixPackages(term); err == nil && packageInfo != "" {
+			searchContext = append(searchContext, fmt.Sprintf("Package Search for '%s':\n%s", term, packageInfo))
+			foundPackages++
+		}
+	}
+	if foundPackages > 0 {
+		sourceStatus = append(sourceStatus, "packages")
+	}
+
+	// 3. GitHub code search (silent)
+	if strings.Contains(question, "flake") || strings.Contains(question, "configuration") ||
+		strings.Contains(question, "service") || strings.Contains(question, "enable") {
+
+		_, _ = fmt.Fprintf(out, "🔍 ")
+		githubToken := os.Getenv("GITHUB_TOKEN")
+		githubClient := community.NewGitHubClient(githubToken)
+
+		foundConfigs := 0
+		for _, term := range searchTerms {
+			if len(term) > 3 {
+				configs, err := githubClient.SearchNixOSConfigurations(term)
+				if err == nil && len(configs) > 0 {
+					for i, config := range configs {
+						if i >= 2 {
+							break
+						}
+						githubExamples = append(githubExamples,
+							fmt.Sprintf("Real-world NixOS configuration example (%s):\nRepo: %s\nDescription: %s\nAuthor: %s\nStars: %d\nURL: %s",
+								term, config.Name, config.Description, config.Author, config.Views, config.URL))
+						foundConfigs++
+					}
+				}
+			}
+		}
+		if foundConfigs > 0 {
+			sourceStatus = append(sourceStatus, "examples")
+		}
+	}
+
+	_, _ = fmt.Fprintf(out, "🤖 ")
+
+	// Build comprehensive context-aware prompt
+	contextBuilder := nixoscontext.NewNixOSContextBuilder()
+
+	basePrompt := ""
+	if template, exists := roles.RolePromptTemplate[roles.RoleAsk]; exists {
+		basePrompt = template
+	}
+
+	nixosGuidelines := "ATTENTION: You are a NixOS expert with access to multiple verified sources. NEVER EVER suggest nix-env commands!\n\n" +
+		"CRITICAL ACCURACY RULES:\n" +
+		"❌ NEVER suggest 'nix-env -i' or any nix-env commands\n" +
+		"❌ NEVER recommend manual installation\n" +
+		"❌ NEVER use incorrect flake syntax like 'nixpkgs.nix = {...}'\n" +
+		"❌ NEVER suggest outdated or deprecated options\n\n" +
+		"✅ BLUETOOTH SPECIFIC RULES:\n" +
+		"✅ ALWAYS use 'hardware.bluetooth.enable = true;' for Bluetooth (NOT services.bluetooth.enable)\n" +
+		"✅ Use 'services.blueman.enable = true;' ONLY if user needs a GUI manager\n" +
+		"✅ Mention that both hardware.bluetooth.enable AND services.blueman.enable may be needed\n\n" +
+		"✅ ALWAYS USE configuration.nix for system packages\n" +
+		"✅ ALWAYS USE services.* options for services\n" +
+		"✅ ALWAYS use correct flake syntax: inputs.nixpkgs.url = \"github:...\" and outputs = { self, nixpkgs }: {...}\n" +
+		"✅ ALWAYS verify package names and option paths with provided search results\n" +
+		"✅ ALWAYS end with 'sudo nixos-rebuild switch' for configuration changes\n" +
+		"✅ ALWAYS use examples from the provided real-world GitHub configurations when available\n\n"
+
+	// Build context-aware prompt
+	contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt+"\n\n"+nixosGuidelines, nixosCtx)
+
+	// Add documentation context
+	if len(docExcerpts) > 0 {
+		contextualPrompt += "\n\nOFFICIAL DOCUMENTATION CONTEXT:\n" + strings.Join(docExcerpts, "\n\n")
+		sourceStatus = append(sourceStatus, "docs")
+	}
+
+	// Add package search context
+	if len(searchContext) > 0 {
+		contextualPrompt += "\n\nVERIFIED PACKAGE SEARCH RESULTS:\n" + strings.Join(searchContext, "\n\n")
+		contextualPrompt += "\n\nUse this package information to provide accurate package names and availability."
+		sourceStatus = append(sourceStatus, "packages")
+	}
+
+	// Add GitHub examples context
+	if len(githubExamples) > 0 {
+		contextualPrompt += "\n\nREAL-WORLD NIXOS CONFIGURATION EXAMPLES:\n" + strings.Join(githubExamples, "\n\n")
+		contextualPrompt += "\n\nUse these real-world examples to validate syntax and provide accurate configurations."
+		sourceStatus = append(sourceStatus, "examples")
+	}
+
+	// Add synthesis instruction
+	contextualPrompt += "\n\nSYNTHESIS INSTRUCTION: Combine information from official documentation, verified package searches, and real-world examples to provide the most accurate and up-to-date NixOS configuration advice."
+
+	// Add the user question
+	finalPrompt := contextualPrompt + "\n\nUser Question: " + question
+
+	// Query the AI provider (silent)
+	ctx := context.Background()
+	response, err := provider.Query(ctx, finalPrompt)
+
+	if err != nil {
+		_, _ = fmt.Fprintln(out, "❌")
+		_, _ = fmt.Fprintln(out, utils.FormatError("AI error: "+err.Error()))
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, "✅")
+	_, _ = fmt.Fprintln(out)
+
+	// Display the AI response
+	_, _ = fmt.Fprintln(out, utils.RenderMarkdown(response))
+
+	// Minimal quality assessment
+	qualityScore := len(sourceStatus)
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		qualityScore++
+	}
+	if strings.Contains(response, "configuration.nix") && !strings.Contains(response, "nix-env") {
+		qualityScore++
+	}
+
+	// Ultra-minimal footer
+	if len(sourceStatus) > 0 {
+		_, _ = fmt.Fprintf(out, "\n─ %s ─\n", strings.Join(sourceStatus, " • "))
+	}
+}
+
+// getNixOSContextSummary returns a concise context summary
+func getNixOSContextSummary(nixosCtx *config.NixOSContext) string {
+	if nixosCtx == nil {
+		return "unknown"
+	}
+
+	parts := []string{nixosCtx.SystemType}
+	if nixosCtx.UsesFlakes {
+		parts = append(parts, "Flakes: Yes")
+	} else {
+		parts = append(parts, "Flakes: No")
+	}
+	if nixosCtx.HasHomeManager {
+		parts = append(parts, fmt.Sprintf("Home Manager: %s", nixosCtx.HomeManagerType))
+	}
+
+	return strings.Join(parts, " | ")
+}
+
+// getProviderNameFromProvider extracts the provider name from a Provider instance
+func getProviderNameFromProvider(provider ai.Provider) string {
+	// Simple fallback - just return "ai" for now
+	// Could be enhanced later with proper type checking
+	return "ai"
+}
+
 func runAskCmd(args []string, out io.Writer) {
-	runAskCmdWithOptions(args, out, "", "")
+	runAskCmdWithConciseMode(args, out, "", "")
 }
 
 // runAskCmdWithQuietMode is a wrapper that adds quiet mode support
