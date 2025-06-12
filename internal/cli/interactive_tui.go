@@ -262,6 +262,7 @@ func getAvailableCommands() []commandItem {
 				{name: "Provider", flag: "provider", description: "AI provider (ollama, openai, gemini)", required: false, hasValue: true, defaultValue: "ollama", optionType: "string"},
 				{name: "Model", flag: "model", description: "AI model (llama3, gpt-4, gemini-2.5-pro)", required: false, hasValue: true, optionType: "string"},
 				{name: "Role", flag: "role", description: "Agent role (diagnoser, explainer, etc.)", required: false, hasValue: true, optionType: "string"},
+				{name: "Quiet Mode", flag: "quiet", description: "Suppress validation output, show only AI response", required: false, hasValue: false, optionType: "bool"},
 			},
 			subcommands: []subcommandItem{},
 		},

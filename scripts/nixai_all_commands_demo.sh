@@ -26,6 +26,9 @@ print_section "Direct Question Assistant"
 pause
 ./nixai --ask "how do I update packages in NixOS?"
 pause
+# Demo the new quiet mode
+./nixai ask "How do I configure nginx?" --quiet
+pause
 
 # 3. Diagnosing NixOS Issues
 print_section "Diagnosing NixOS Issues"

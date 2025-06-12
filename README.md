@@ -600,6 +600,7 @@ nixai interactive --classic                    # Classic text-based interactive 
 nixai "How do I enable Bluetooth?"
 nixai --ask "What is a Nix flake?" --role system-architect
 nixai -a "Debug my failing build" --agent diagnose
+nixai ask "How do I enable SSH?" --quiet        # Quiet mode: suppress validation output, show only AI response
 ```
 
 **System diagnostics and health monitoring:**

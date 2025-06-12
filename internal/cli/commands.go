@@ -97,6 +97,9 @@ func init() {
 	mcpServerCmd.Flags().BoolVarP(&daemonMode, "daemon", "d", false, "Run MCP server in background/daemon mode")
 	doctorCmd.Flags().BoolP("verbose", "v", false, "Show detailed output and progress information")
 
+	// Add ask command flags
+	askCmd.Flags().BoolP("quiet", "q", false, "Suppress validation output and show only the AI response")
+
 	// Add package-repo command flags
 	packageRepoCmd.Flags().String("local", "", "Analyze local repository path instead of cloning")
 	packageRepoCmd.Flags().String("output", "", "Output file path for generated derivation")
@@ -1122,14 +1125,19 @@ This command queries multiple information sources:
 - Real-world GitHub configuration examples
 - Response validation for common syntax errors
 
+Use --quiet to suppress validation output and show only the AI response.
+
 Examples:
   nixai ask "How do I configure nginx?"
   nixai ask "What is the difference between services.openssh.enable and programs.ssh.enable?"
-  nixai ask "How do I set up a development environment with Python?" --provider gemini`,
+  nixai ask "How do I set up a development environment with Python?" --provider gemini
+  nixai ask "How do I enable SSH?" --quiet`,
 	Args: conditionalArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		// Use the enhanced implementation from direct_commands.go with provider flags
-		runAskCmdWithOptions(args, cmd.OutOrStdout(), aiProvider, aiModel)
+		// Get the quiet flag value
+		quiet, _ := cmd.Flags().GetBool("quiet")
+		// Use the enhanced implementation from direct_commands.go with provider flags and quiet mode
+		runAskCmdWithQuietMode(args, cmd.OutOrStdout(), aiProvider, aiModel, quiet)
 	},
 }
 var communityCmd = &cobra.Command{

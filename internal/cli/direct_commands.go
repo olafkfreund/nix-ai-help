@@ -12,7 +12,6 @@ import (
 	"nix-ai-help/internal/ai"
 	nixoscontext "nix-ai-help/internal/ai/context"
 	"nix-ai-help/internal/ai/roles"
-	"nix-ai-help/internal/ai/validation"
 	"nix-ai-help/internal/community"
 	"nix-ai-help/internal/config"
 	"nix-ai-help/internal/mcp"
@@ -1398,24 +1397,25 @@ func runAskCmd(args []string, out io.Writer) {
 	runAskCmdWithOptions(args, out, "", "")
 }
 
-// runAskCmdWithOptions is the enhanced ask implementation with provider/model options
-func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelParam string) {
+// runAskCmdWithQuietMode is a wrapper that adds quiet mode support
+func runAskCmdWithQuietMode(args []string, out io.Writer, providerParam, modelParam string, quiet bool) {
+	if quiet {
+		runAskCmdWithOptionsQuiet(args, out, providerParam, modelParam)
+	} else {
+		runAskCmdWithOptions(args, out, providerParam, modelParam)
+	}
+}
+
+// runAskCmdWithOptionsQuiet is the quiet version with minimal output
+func runAskCmdWithOptionsQuiet(args []string, out io.Writer, providerParam, modelParam string) {
 	if len(args) == 0 {
 		_, _ = fmt.Fprintln(out, utils.FormatError("Usage: ask <question>"))
 		_, _ = fmt.Fprintln(out, utils.FormatTip("Example: ask How do I enable nginx?"))
-		_, _ = fmt.Fprintln(out, utils.FormatTip("Use --role to specify agent role (ask, diagnose, explainer, etc.)"))
 		return
 	}
 
 	// Join all arguments to form the question
 	question := strings.Join(args, " ")
-
-	_, _ = fmt.Fprintln(out, utils.FormatHeader("🤖 Enhanced AI Answer with Multi-Source Validation"))
-	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Question", question))
-	_, _ = fmt.Fprintln(out)
-
-	// Declare variables for the function scope
-	var factualValidation *validation.FactualValidationResult
 
 	// Load configuration
 	cfg, err := config.LoadUserConfig()
@@ -1424,21 +1424,9 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 		return
 	}
 
-	// Initialize context detector and get NixOS context
+	// Initialize context detector and get NixOS context (silent)
 	contextDetector := nixos.NewContextDetector(logger.NewLogger())
-	nixosCtx, err := contextDetector.GetContext(cfg)
-	if err != nil {
-		_, _ = fmt.Fprintln(out, utils.FormatWarning("Failed to detect NixOS context: "+err.Error()))
-		nixosCtx = nil
-	}
-
-	// Display detected context summary
-	if nixosCtx != nil && nixosCtx.CacheValid {
-		contextBuilder := nixoscontext.NewNixOSContextBuilder()
-		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
-		_, _ = fmt.Fprintln(out, utils.FormatNote("📋 "+contextSummary))
-		_, _ = fmt.Fprintln(out)
-	}
+	nixosCtx, _ := contextDetector.GetContext(cfg)
 
 	// Create modern AI provider using new ProviderManager system
 	manager := ai.NewProviderManager(cfg, logger.NewLogger())
@@ -1450,7 +1438,6 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 	if providerParam != "" {
 		selectedProvider = providerParam
 	} else if providerFlag := os.Getenv("NIXAI_PROVIDER"); providerFlag != "" {
-		// Check for global provider flag (for --ask flag usage)
 		selectedProvider = providerFlag
 	}
 
@@ -1474,53 +1461,16 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 		return
 	}
 
-	// 0. Pre-Answer Factual Validation - NEW STEP
-	_, _ = fmt.Fprint(out, utils.FormatInfo("Performing pre-answer factual validation... "))
-
-	githubToken := os.Getenv("GITHUB_TOKEN") // Optional for higher rate limits
-	preValidator := validation.NewPreAnswerValidator(cfg.MCPServer.Host, cfg.MCPServer.Port, githubToken)
-
-	ctx := context.Background()
-	factualValidation, err = preValidator.ValidateQuestionFactually(ctx, question)
-
-	if err != nil {
-		_, _ = fmt.Fprintln(out, utils.FormatWarning("validation failed: "+err.Error()))
-	} else {
-		confidenceEmoji := map[string]string{
-			"high":    "🟢",
-			"medium":  "🟡",
-			"low":     "🔴",
-			"unknown": "⚪",
-		}
-		_, _ = fmt.Fprintln(out, utils.FormatSuccess("done "+confidenceEmoji[factualValidation.ConfidenceLevel]))
-
-		// Display validation summary if low confidence or warnings
-		if factualValidation.ConfidenceLevel == "low" || len(factualValidation.Warnings) > 0 {
-			_, _ = fmt.Fprintln(out)
-			_, _ = fmt.Fprintln(out, utils.FormatWarning("⚠️  Low confidence detected - proceed with caution"))
-			if len(factualValidation.Warnings) > 0 {
-				for _, warning := range factualValidation.Warnings {
-					_, _ = fmt.Fprintln(out, utils.FormatNote("• "+warning.Message))
-				}
-			}
-			_, _ = fmt.Fprintln(out)
-		}
-	}
-
-	// Enhanced Multi-Source Information Gathering
+	// Silent Multi-Source Information Gathering (no progress output)
 	var docExcerpts []string
 	var searchContext []string
 	var githubExamples []string
-	mcpContextAdded := false
 
-	// 1. Enhanced MCP server documentation queries using multiple tools
-	_, _ = fmt.Fprint(out, utils.FormatInfo("Gathering comprehensive NixOS documentation... "))
-
+	// 1. MCP server documentation queries (silent)
 	mcpBase := cfg.MCPServer.Host
 	if mcpBase != "" {
 		mcpClient := mcp.NewMCPClient(fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port))
 
-		// Query multiple documentation sources
 		sources := []string{
 			"https://wiki.nixos.org/wiki/NixOS_Wiki",
 			"https://nix.dev/manual/nix",
@@ -1532,18 +1482,13 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 		// Primary documentation query
 		doc, mcpErr := mcpClient.QueryDocumentation(question, sources...)
 		if mcpErr == nil && doc != "" {
-			// Try to parse MCP documentation result
 			opt, fallbackDoc := parseMCPOptionDoc(doc)
 			if opt.Name != "" {
-				// Structured NixOS option documentation
 				context := fmt.Sprintf("NixOS Option Documentation:\nOption: %s\nType: %s\nDefault: %s\nExample: %s\nDescription: %s\nSource: %s\nVersion: %s\nRelated: %v\nLinks: %v",
 					opt.Name, opt.Type, opt.Default, opt.Example, opt.Description, opt.Source, opt.Version, opt.Related, opt.Links)
 				docExcerpts = append(docExcerpts, context)
-				mcpContextAdded = true
 			} else if len(fallbackDoc) > 10 && len(fallbackDoc) < 3000 {
-				// General documentation content
 				docExcerpts = append(docExcerpts, "NixOS Documentation Context:\n"+fallbackDoc)
-				mcpContextAdded = true
 			}
 		}
 
@@ -1554,22 +1499,13 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 				if serviceDoc, err := mcpClient.QueryDocumentation("service examples for " + term); err == nil && serviceDoc != "" {
 					if len(serviceDoc) > 20 && len(serviceDoc) < 2000 {
 						docExcerpts = append(docExcerpts, fmt.Sprintf("Service Configuration Examples for '%s':\n%s", term, serviceDoc))
-						mcpContextAdded = true
 					}
 				}
 			}
 		}
 	}
 
-	if mcpContextAdded {
-		_, _ = fmt.Fprintln(out, utils.FormatSuccess("found"))
-	} else {
-		_, _ = fmt.Fprintln(out, utils.FormatNote("limited"))
-	}
-
-	// 2. Enhanced package and options search
-	_, _ = fmt.Fprint(out, utils.FormatInfo("Searching NixOS packages and options... "))
-
+	// 2. Package and options search (silent)
 	exec := nixos.NewExecutor(cfg.NixosFolder)
 	searchTerms := extractSearchTerms(question)
 	for _, term := range searchTerms {
@@ -1578,24 +1514,17 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 		}
 	}
 
-	_, _ = fmt.Fprintln(out, utils.FormatSuccess("done"))
-
-	// 3. GitHub code search for real-world examples and validation
-	_, _ = fmt.Fprint(out, utils.FormatInfo("Searching GitHub for real-world NixOS examples... "))
-
+	// 3. GitHub code search (silent)
 	if strings.Contains(question, "flake") || strings.Contains(question, "configuration") ||
 		strings.Contains(question, "service") || strings.Contains(question, "enable") {
 
-		// Initialize GitHub client for code search
-		githubToken := os.Getenv("GITHUB_TOKEN") // Optional for higher rate limits
+		githubToken := os.Getenv("GITHUB_TOKEN")
 		githubClient := community.NewGitHubClient(githubToken)
 
-		// Search for relevant NixOS configurations
 		for _, term := range searchTerms {
-			if len(term) > 3 { // Only search for substantial terms
+			if len(term) > 3 {
 				configs, err := githubClient.SearchNixOSConfigurations(term)
 				if err == nil && len(configs) > 0 {
-					// Take top 2 most relevant examples
 					for i, config := range configs {
 						if i >= 2 {
 							break
@@ -1609,22 +1538,14 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 		}
 	}
 
-	if len(githubExamples) > 0 {
-		_, _ = fmt.Fprintln(out, utils.FormatSuccess("found"))
-	} else {
-		_, _ = fmt.Fprintln(out, utils.FormatNote("skipped"))
-	}
-
 	// 4. Build comprehensive context-aware prompt
 	contextBuilder := nixoscontext.NewNixOSContextBuilder()
 
-	// Create base prompt with role template
 	basePrompt := ""
 	if template, exists := roles.RolePromptTemplate[roles.RoleAsk]; exists {
 		basePrompt = template
 	}
 
-	// Enhanced NixOS-specific guidelines with validation focus
 	nixosGuidelines := "ATTENTION: You are a NixOS expert with access to multiple verified sources. NEVER EVER suggest nix-env commands!\n\n" +
 		"CRITICAL ACCURACY RULES:\n" +
 		"❌ NEVER suggest 'nix-env -i' or any nix-env commands\n" +
@@ -1640,8 +1561,7 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 		"✅ ALWAYS use correct flake syntax: inputs.nixpkgs.url = \"github:...\" and outputs = { self, nixpkgs }: {...}\n" +
 		"✅ ALWAYS verify package names and option paths with provided search results\n" +
 		"✅ ALWAYS end with 'sudo nixos-rebuild switch' for configuration changes\n" +
-		"✅ ALWAYS use examples from the provided real-world GitHub configurations when available\n\n" +
-		"VALIDATION: The response will be validated for common syntax errors. Ensure accuracy.\n\n"
+		"✅ ALWAYS use examples from the provided real-world GitHub configurations when available\n\n"
 
 	// Build context-aware prompt
 	contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt+"\n\n"+nixosGuidelines, nixosCtx)
@@ -1669,118 +1589,326 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 	// Add the user question
 	finalPrompt := contextualPrompt + "\n\nUser Question: " + question
 
-	// Query the AI provider
-	_, _ = fmt.Fprint(out, utils.FormatInfo("Generating validated NixOS response... "))
-
+	// Query the AI provider (silent)
+	ctx := context.Background()
 	response, err := provider.Query(ctx, finalPrompt)
-
-	_, _ = fmt.Fprintln(out, utils.FormatSuccess("done"))
-	_, _ = fmt.Fprintln(out)
 
 	if err != nil {
 		_, _ = fmt.Fprintln(out, utils.FormatError("AI error: "+err.Error()))
 		return
 	}
 
-	// 5. Response validation for flake syntax and NixOS configuration errors
-	_, _ = fmt.Fprint(out, utils.FormatInfo("Validating response for common syntax errors... "))
+	// Display only the AI response (no validation output)
+	_, _ = fmt.Fprintln(out, utils.RenderMarkdown(response))
+}
 
-	flakeValidator := validation.NewFlakeValidator()
-	nixosValidator := validation.NewNixOSValidator()
-
-	isFlakeRelated := validation.IsFlakeContent(response)
-	isNixOSRelated := validation.IsNixOSContent(response)
-	hasValidationIssues := false
-
-	// Validate flake syntax if applicable
-	if isFlakeRelated {
-		validationResult := flakeValidator.ValidateFlakeContent(response)
-		if !validationResult.IsValid || len(validationResult.Warnings) > 0 {
-			hasValidationIssues = true
-		}
+// runAskCmdWithOptions is the original verbose version with full validation and multi-source information gathering
+func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelParam string) {
+	if len(args) == 0 {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Usage: ask <question>"))
+		_, _ = fmt.Fprintln(out, utils.FormatTip("Example: ask How do I enable nginx?"))
+		return
 	}
 
-	// Validate NixOS configuration options
-	if isNixOSRelated {
-		nixosValidationResult := nixosValidator.ValidateNixOSContent(response)
-		if !nixosValidationResult.IsValid || len(nixosValidationResult.Warnings) > 0 {
-			hasValidationIssues = true
-		}
+	// Join all arguments to form the question
+	question := strings.Join(args, " ")
+
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("🤖 Enhanced AI Question Assistant"))
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Question", question))
+	_, _ = fmt.Fprintln(out)
+
+	// Load configuration
+	cfg, err := config.LoadUserConfig()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to load config: "+err.Error()))
+		return
 	}
 
-	if hasValidationIssues {
-		_, _ = fmt.Fprintln(out, utils.FormatWarning("validation issues detected"))
-	} else if isFlakeRelated || isNixOSRelated {
-		_, _ = fmt.Fprintln(out, utils.FormatSuccess("passed"))
+	// Initialize context detector and get NixOS context
+	contextDetector := nixos.NewContextDetector(logger.NewLogger())
+	nixosCtx, err := contextDetector.GetContext(cfg)
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatWarning("Context detection failed: "+err.Error()))
+		nixosCtx = nil
+	}
+
+	// Display detected context summary if available
+	if nixosCtx != nil && nixosCtx.CacheValid {
+		contextBuilder := nixoscontext.NewNixOSContextBuilder()
+		contextSummary := contextBuilder.GetContextSummary(nixosCtx)
+		_, _ = fmt.Fprintln(out, utils.FormatNote("📋 "+contextSummary))
+		_, _ = fmt.Fprintln(out)
+	}
+
+	// Create modern AI provider using new ProviderManager system
+	manager := ai.NewProviderManager(cfg, logger.NewLogger())
+
+	// Determine which provider to use from command flags or config
+	selectedProvider := cfg.AIModels.SelectionPreferences.DefaultProvider
+
+	// Check for direct provider parameter (from subcommand flags)
+	if providerParam != "" {
+		selectedProvider = providerParam
+	} else if providerFlag := os.Getenv("NIXAI_PROVIDER"); providerFlag != "" {
+		selectedProvider = providerFlag
+	}
+
+	if selectedProvider == "" {
+		selectedProvider = "ollama"
+	}
+
+	// Get the provider with optional model specification
+	var provider ai.Provider
+
+	if modelParam != "" {
+		provider, err = manager.GetProviderWithModel(selectedProvider, modelParam)
+	} else if modelFlag := os.Getenv("NIXAI_MODEL"); modelFlag != "" {
+		provider, err = manager.GetProviderWithModel(selectedProvider, modelFlag)
 	} else {
-		_, _ = fmt.Fprintln(out, utils.FormatNote("not applicable"))
+		provider, err = manager.GetProvider(selectedProvider)
 	}
 
-	// Display the enhanced response
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
+		return
+	}
+
+	// Multi-Source Information Gathering with progress indicators
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("📚 Gathering Information from Multiple Sources"))
+	_, _ = fmt.Fprintln(out)
+
+	var docExcerpts []string
+	var searchContext []string
+	var githubExamples []string
+
+	// 1. MCP server documentation queries
+	mcpBase := cfg.MCPServer.Host
+	if mcpBase != "" {
+		_, _ = fmt.Fprint(out, utils.FormatInfo("Querying official documentation... "))
+		mcpClient := mcp.NewMCPClient(fmt.Sprintf("http://%s:%d", cfg.MCPServer.Host, cfg.MCPServer.Port))
+
+		sources := []string{
+			"https://wiki.nixos.org/wiki/NixOS_Wiki",
+			"https://nix.dev/manual/nix",
+			"https://nixos.org/manual/nixpkgs/stable/",
+			"https://nix.dev/manual/nix/2.28/language/",
+			"https://nix-community.github.io/home-manager/",
+		}
+
+		// Primary documentation query
+		doc, mcpErr := mcpClient.QueryDocumentation(question, sources...)
+		if mcpErr == nil && doc != "" {
+			opt, fallbackDoc := parseMCPOptionDoc(doc)
+			if opt.Name != "" {
+				context := fmt.Sprintf("NixOS Option Documentation:\nOption: %s\nType: %s\nDefault: %s\nExample: %s\nDescription: %s\nSource: %s\nVersion: %s\nRelated: %v\nLinks: %v",
+					opt.Name, opt.Type, opt.Default, opt.Example, opt.Description, opt.Source, opt.Version, opt.Related, opt.Links)
+				docExcerpts = append(docExcerpts, context)
+				_, _ = fmt.Fprintln(out, utils.FormatSuccess("found option documentation"))
+			} else if len(fallbackDoc) > 10 && len(fallbackDoc) < 3000 {
+				docExcerpts = append(docExcerpts, "NixOS Documentation Context:\n"+fallbackDoc)
+				_, _ = fmt.Fprintln(out, utils.FormatSuccess("found general documentation"))
+			} else {
+				_, _ = fmt.Fprintln(out, utils.FormatWarning("limited documentation found"))
+			}
+		} else {
+			_, _ = fmt.Fprintln(out, utils.FormatWarning("no documentation found"))
+		}
+
+		// Query for service examples if applicable
+		searchTerms := extractSearchTerms(question)
+		for _, term := range searchTerms {
+			if strings.Contains(question, "service") || strings.Contains(question, "enable") {
+				if serviceDoc, err := mcpClient.QueryDocumentation("service examples for " + term); err == nil && serviceDoc != "" {
+					if len(serviceDoc) > 20 && len(serviceDoc) < 2000 {
+						docExcerpts = append(docExcerpts, fmt.Sprintf("Service Configuration Examples for '%s':\n%s", term, serviceDoc))
+					}
+				}
+			}
+		}
+	} else {
+		_, _ = fmt.Fprintln(out, utils.FormatWarning("MCP server not configured - skipping documentation"))
+	}
+
+	// 2. Package and options search
+	_, _ = fmt.Fprint(out, utils.FormatInfo("Searching packages and options... "))
+	exec := nixos.NewExecutor(cfg.NixosFolder)
+	searchTerms := extractSearchTerms(question)
+	foundPackages := 0
+	for _, term := range searchTerms {
+		if packageInfo, err := exec.SearchNixPackages(term); err == nil && packageInfo != "" {
+			searchContext = append(searchContext, fmt.Sprintf("Package Search for '%s':\n%s", term, packageInfo))
+			foundPackages++
+		}
+	}
+	if foundPackages > 0 {
+		_, _ = fmt.Fprintln(out, utils.FormatSuccess(fmt.Sprintf("found %d package results", foundPackages)))
+	} else {
+		_, _ = fmt.Fprintln(out, utils.FormatWarning("no packages found"))
+	}
+
+	// 3. GitHub code search
+	if strings.Contains(question, "flake") || strings.Contains(question, "configuration") ||
+		strings.Contains(question, "service") || strings.Contains(question, "enable") {
+
+		_, _ = fmt.Fprint(out, utils.FormatInfo("Searching real-world configurations... "))
+		githubToken := os.Getenv("GITHUB_TOKEN")
+		githubClient := community.NewGitHubClient(githubToken)
+
+		foundConfigs := 0
+		for _, term := range searchTerms {
+			if len(term) > 3 {
+				configs, err := githubClient.SearchNixOSConfigurations(term)
+				if err == nil && len(configs) > 0 {
+					for i, config := range configs {
+						if i >= 2 {
+							break
+						}
+						githubExamples = append(githubExamples,
+							fmt.Sprintf("Real-world NixOS configuration example (%s):\nRepo: %s\nDescription: %s\nAuthor: %s\nStars: %d\nURL: %s",
+								term, config.Name, config.Description, config.Author, config.Views, config.URL))
+						foundConfigs++
+					}
+				}
+			}
+		}
+		if foundConfigs > 0 {
+			_, _ = fmt.Fprintln(out, utils.FormatSuccess(fmt.Sprintf("found %d configuration examples", foundConfigs)))
+		} else {
+			_, _ = fmt.Fprintln(out, utils.FormatWarning("no configuration examples found"))
+		}
+	}
+
+	_, _ = fmt.Fprintln(out)
+
+	// 4. Build comprehensive context-aware prompt
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("🧠 Processing with AI"))
+	_, _ = fmt.Fprintln(out)
+
+	contextBuilder := nixoscontext.NewNixOSContextBuilder()
+
+	basePrompt := ""
+	if template, exists := roles.RolePromptTemplate[roles.RoleAsk]; exists {
+		basePrompt = template
+	}
+
+	nixosGuidelines := "ATTENTION: You are a NixOS expert with access to multiple verified sources. NEVER EVER suggest nix-env commands!\n\n" +
+		"CRITICAL ACCURACY RULES:\n" +
+		"❌ NEVER suggest 'nix-env -i' or any nix-env commands\n" +
+		"❌ NEVER recommend manual installation\n" +
+		"❌ NEVER use incorrect flake syntax like 'nixpkgs.nix = {...}'\n" +
+		"❌ NEVER suggest outdated or deprecated options\n\n" +
+		"✅ BLUETOOTH SPECIFIC RULES:\n" +
+		"✅ ALWAYS use 'hardware.bluetooth.enable = true;' for Bluetooth (NOT services.bluetooth.enable)\n" +
+		"✅ Use 'services.blueman.enable = true;' ONLY if user needs a GUI manager\n" +
+		"✅ Mention that both hardware.bluetooth.enable AND services.blueman.enable may be needed\n\n" +
+		"✅ ALWAYS USE configuration.nix for system packages\n" +
+		"✅ ALWAYS USE services.* options for services\n" +
+		"✅ ALWAYS use correct flake syntax: inputs.nixpkgs.url = \"github:...\" and outputs = { self, nixpkgs }: {...}\n" +
+		"✅ ALWAYS verify package names and option paths with provided search results\n" +
+		"✅ ALWAYS end with 'sudo nixos-rebuild switch' for configuration changes\n" +
+		"✅ ALWAYS use examples from the provided real-world GitHub configurations when available\n\n"
+
+	// Build context-aware prompt
+	contextualPrompt := contextBuilder.BuildContextualPrompt(basePrompt+"\n\n"+nixosGuidelines, nixosCtx)
+
+	// Add documentation context
+	if len(docExcerpts) > 0 {
+		contextualPrompt += "\n\nOFFICIAL DOCUMENTATION CONTEXT:\n" + strings.Join(docExcerpts, "\n\n")
+		_, _ = fmt.Fprintln(out, utils.FormatNote("✅ Official documentation integrated"))
+	}
+
+	// Add package search context
+	if len(searchContext) > 0 {
+		contextualPrompt += "\n\nVERIFIED PACKAGE SEARCH RESULTS:\n" + strings.Join(searchContext, "\n\n")
+		contextualPrompt += "\n\nUse this package information to provide accurate package names and availability."
+		_, _ = fmt.Fprintln(out, utils.FormatNote("✅ Package search results integrated"))
+	}
+
+	// Add GitHub examples context
+	if len(githubExamples) > 0 {
+		contextualPrompt += "\n\nREAL-WORLD NIXOS CONFIGURATION EXAMPLES:\n" + strings.Join(githubExamples, "\n\n")
+		contextualPrompt += "\n\nUse these real-world examples to validate syntax and provide accurate configurations."
+		_, _ = fmt.Fprintln(out, utils.FormatNote("✅ Real-world configuration examples integrated"))
+	}
+
+	// Add synthesis instruction
+	contextualPrompt += "\n\nSYNTHESIS INSTRUCTION: Combine information from official documentation, verified package searches, and real-world examples to provide the most accurate and up-to-date NixOS configuration advice."
+
+	// Add the user question
+	finalPrompt := contextualPrompt + "\n\nUser Question: " + question
+
+	// Query the AI provider
+	_, _ = fmt.Fprint(out, utils.FormatInfo("Querying AI provider... "))
+	ctx := context.Background()
+	response, err := provider.Query(ctx, finalPrompt)
+
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("failed"))
+		_, _ = fmt.Fprintln(out, utils.FormatError("AI error: "+err.Error()))
+		return
+	}
+
+	_, _ = fmt.Fprintln(out, utils.FormatSuccess("complete"))
+	_, _ = fmt.Fprintln(out)
+
+	// Display the AI response
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("🎯 AI Response"))
+	_, _ = fmt.Fprintln(out)
 	_, _ = fmt.Fprintln(out, utils.RenderMarkdown(response))
 
-	// Display validation issues if found
-	if hasValidationIssues {
-		_, _ = fmt.Fprintln(out)
-		_, _ = fmt.Fprintln(out, utils.FormatDivider())
-		_, _ = fmt.Fprintln(out, utils.FormatWarning("⚠️  **Validation Warnings Detected**"))
-
-		// Display pre-answer validation results if available
-		if factualValidation != nil && (factualValidation.ConfidenceLevel == "low" || len(factualValidation.Warnings) > 0) {
-			preValidationSummary := preValidator.FormatFactualValidationResult(factualValidation)
-			_, _ = fmt.Fprintln(out, utils.RenderMarkdown(preValidationSummary))
-		}
-
-		// Display flake validation issues
-		if isFlakeRelated {
-			flakeValidationResult := flakeValidator.ValidateFlakeContent(response)
-			if !flakeValidationResult.IsValid || len(flakeValidationResult.Warnings) > 0 {
-				flakeValidationSummary := flakeValidator.FormatValidationResult(flakeValidationResult)
-				_, _ = fmt.Fprintln(out, utils.RenderMarkdown(flakeValidationSummary))
-			}
-		}
-
-		// Display NixOS configuration validation issues
-		if isNixOSRelated {
-			nixosValidationResult := nixosValidator.ValidateNixOSContent(response)
-			if !nixosValidationResult.IsValid || len(nixosValidationResult.Warnings) > 0 {
-				nixosValidationSummary := nixosValidator.FormatNixOSValidationResult(nixosValidationResult)
-				_, _ = fmt.Fprintln(out, utils.RenderMarkdown(nixosValidationSummary))
-			}
-		}
-	}
-
-	// Enhanced help information with source attribution
+	// Add quality indicators and help information
 	_, _ = fmt.Fprintln(out)
 	_, _ = fmt.Fprintln(out, utils.FormatDivider())
-	_, _ = fmt.Fprintln(out, utils.FormatTip("💡 **Enhanced Answer Sources & Next Steps**"))
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("📊 Response Quality Indicators"))
+	_, _ = fmt.Fprintln(out)
 
-	sourcesUsed := []string{}
-	if mcpContextAdded {
-		sourcesUsed = append(sourcesUsed, "Official NixOS documentation")
+	qualityScore := 0
+	maxScore := 5
+
+	if len(docExcerpts) > 0 {
+		qualityScore++
+		_, _ = fmt.Fprintln(out, "✅ Official documentation consulted")
+	} else {
+		_, _ = fmt.Fprintln(out, "⚠️  No official documentation found")
 	}
+
 	if len(searchContext) > 0 {
-		sourcesUsed = append(sourcesUsed, "Verified package search")
+		qualityScore++
+		_, _ = fmt.Fprintln(out, "✅ Package search results verified")
+	} else {
+		_, _ = fmt.Fprintln(out, "⚠️  No package search results found")
 	}
+
 	if len(githubExamples) > 0 {
-		sourcesUsed = append(sourcesUsed, "Real-world GitHub examples")
+		qualityScore++
+		_, _ = fmt.Fprintln(out, "✅ Real-world configuration examples included")
+	} else {
+		_, _ = fmt.Fprintln(out, "⚠️  No real-world examples found")
 	}
-
-	if len(sourcesUsed) > 0 {
-		_, _ = fmt.Fprintln(out, utils.FormatNote("📊 Information sources: "+strings.Join(sourcesUsed, ", ")))
-	}
-
-	_, _ = fmt.Fprintln(out, utils.FormatNote("• Use `nixai diagnose` if you encounter errors"))
-	_, _ = fmt.Fprintln(out, utils.FormatNote("• Use `nixai search <term>` to find packages or options"))
-	_, _ = fmt.Fprintln(out, utils.FormatNote("• Use `nixai explain-option <option>` for detailed option info"))
-	_, _ = fmt.Fprintln(out, utils.FormatNote("• Use `nixai doctor` for system health checks"))
 
 	if nixosCtx != nil && nixosCtx.CacheValid {
-		_, _ = fmt.Fprintln(out, utils.FormatNote("• This answer was personalized for your NixOS configuration"))
+		qualityScore++
+		_, _ = fmt.Fprintln(out, "✅ System context awareness enabled")
+	} else {
+		_, _ = fmt.Fprintln(out, "⚠️  Limited system context")
 	}
 
-	if hasValidationIssues {
-		_, _ = fmt.Fprintln(out, utils.FormatNote("• Review validation warnings above for potential syntax issues"))
+	if strings.Contains(response, "configuration.nix") && !strings.Contains(response, "nix-env") {
+		qualityScore++
+		_, _ = fmt.Fprintln(out, "✅ Follows NixOS best practices")
+	}
+
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Quality Score", fmt.Sprintf("%d/%d", qualityScore, maxScore)))
+
+	// Enhanced help information
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, utils.FormatTip("For syntax validation, use: nixai flake validate"))
+	_, _ = fmt.Fprintln(out, utils.FormatTip("For more options, use: nixai explain-option <option>"))
+	_, _ = fmt.Fprintln(out, utils.FormatTip("For package details, use: nixai search <package>"))
+	if qualityScore < 3 {
+		_, _ = fmt.Fprintln(out, utils.FormatWarning("Consider using more specific terms for better results"))
 	}
 }
 

@@ -29,7 +29,7 @@ func GetDefaultCommands() []CommandMetadata {
 			Name:        "ask",
 			Description: "Ask AI questions about NixOS",
 			Usage:       "ask \"your question\"",
-			Examples:    []string{"ask \"how to enable SSH?\"", "ask \"what is a flake?\""},
+			Examples:    []string{"ask \"how to enable SSH?\"", "ask \"what is a flake?\"", "ask \"configure nginx\" --quiet"},
 			Category:    "AI",
 		},
 		{
