@@ -258,7 +258,7 @@ func (f *TemplatesFunction) handleList(ctx context.Context, params map[string]in
 			"category":    "data",
 			"features":    []string{"ml", "jupyter", "testing"},
 			"source":      "github:nix-community/templates#python-data",
-			"version":     "1.0.3",
+			"version":     "1.0.4",
 			"popularity":  76,
 		},
 		{

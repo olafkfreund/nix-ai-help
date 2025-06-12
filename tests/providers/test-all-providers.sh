@@ -53,16 +53,46 @@ else
 fi
 
 echo ""
+
+# Test Claude
+echo "📋 4. Testing Claude provider..."
+echo "set ai claude" | $NIXAI_BIN interactive > /dev/null 2>&1
+echo "  - Switched to Claude provider"
+$NIXAI_BIN explain-option services.openssh.enable > "$TEST_LOGS_DIR/claude_test.log" 2>&1
+if grep -q "Complete!" "$TEST_LOGS_DIR/claude_test.log"; then
+    echo "  ✅ Claude test PASSED"
+else
+    echo "  ❌ Claude test FAILED"
+fi
+
+echo ""
+
+# Test Groq
+echo "📋 5. Testing Groq provider..."
+echo "set ai groq" | $NIXAI_BIN interactive > /dev/null 2>&1
+echo "  - Switched to Groq provider"
+$NIXAI_BIN explain-option services.openssh.enable > "$TEST_LOGS_DIR/groq_test.log" 2>&1
+if grep -q "Complete!" "$TEST_LOGS_DIR/groq_test.log"; then
+    echo "  ✅ Groq test PASSED"
+else
+    echo "  ❌ Groq test FAILED"
+fi
+
+echo ""
 echo "=== TEST SUMMARY ==="
 echo "Ollama: $(grep -q "Complete!" "$TEST_LOGS_DIR/ollama_test.log" && echo "✅ PASSED" || echo "❌ FAILED")"
 echo "Gemini: $(grep -q "Complete!" "$TEST_LOGS_DIR/gemini_test.log" && echo "✅ PASSED" || echo "❌ FAILED")"
 echo "OpenAI: $(grep -q "Complete!" "$TEST_LOGS_DIR/openai_test.log" && echo "✅ PASSED" || echo "❌ FAILED")"
+echo "Claude: $(grep -q "Complete!" "$TEST_LOGS_DIR/claude_test.log" && echo "✅ PASSED" || echo "❌ FAILED")"
+echo "Groq: $(grep -q "Complete!" "$TEST_LOGS_DIR/groq_test.log" && echo "✅ PASSED" || echo "❌ FAILED")"
 
 # Calculate overall status
 OLLAMA_STATUS=$(grep -q "Complete!" "$TEST_LOGS_DIR/ollama_test.log" && echo "0" || echo "1")
 GEMINI_STATUS=$(grep -q "Complete!" "$TEST_LOGS_DIR/gemini_test.log" && echo "0" || echo "1")
 OPENAI_STATUS=$(grep -q "Complete!" "$TEST_LOGS_DIR/openai_test.log" && echo "0" || echo "1")
-OVERALL_STATUS=$((OLLAMA_STATUS + GEMINI_STATUS + OPENAI_STATUS))
+CLAUDE_STATUS=$(grep -q "Complete!" "$TEST_LOGS_DIR/claude_test.log" && echo "0" || echo "1")
+GROQ_STATUS=$(grep -q "Complete!" "$TEST_LOGS_DIR/groq_test.log" && echo "0" || echo "1")
+OVERALL_STATUS=$((OLLAMA_STATUS + GEMINI_STATUS + OPENAI_STATUS + CLAUDE_STATUS + GROQ_STATUS))
 
 echo ""
 echo "Test logs saved in: $TEST_LOGS_DIR/"

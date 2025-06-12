@@ -1,4 +1,28 @@
 changelog:
+  - version: "1.0.4"
+    date: "2025-01-27"
+    highlights:
+      - "Added Claude (Anthropic) AI provider support"
+      - "Added Groq AI provider support"
+      - "Enhanced provider ecosystem with cloud and local LLM options"
+      - "Improved AI model selection and configuration"
+    features:
+      - title: "Claude Provider Integration"
+        description: "Full support for Claude models including claude-sonnet-4-20250514, claude-3-7-sonnet-20250219, and claude-3-5-haiku-20241022"
+      - title: "Groq Provider Integration"
+        description: "Support for Groq's fast inference models including llama-3.3-70b-versatile, llama3-8b-8192, and mixtral-8x7b-32768"
+      - title: "Enhanced Provider Manager"
+        description: "Improved provider initialization and fallback handling for multiple AI services"
+      - title: "Extended Configuration Options"
+        description: "Updated configuration files with new provider settings and task-specific model recommendations"
+    improvements:
+      - "Streamlined AI provider architecture"
+      - "Better error handling for provider initialization"
+      - "Comprehensive model timeout configurations"
+      - "Enhanced provider health checking"
+    bugfixes:
+      - "Fixed YAML syntax errors in user configuration files"
+      - "Improved provider fallback mechanisms"
   - version: "1.0.3"
     date: "2025-06-12"
     highlights:

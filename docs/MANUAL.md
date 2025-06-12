@@ -4,6 +4,7 @@ Welcome to the nixai Command Manual. Each command has its own dedicated document
 
 ## 📚 System Documentation
 
+- [**AI Providers Guide**](ai-providers.md) - Comprehensive guide to all 7 supported AI providers
 - [**Function System**](functions.md) - Complete guide to nixai's 29 specialized functions
 - [**Agent Architecture**](agents.md) - AI agent system with 26+ specialized agents
 - [**Role System**](roles.md) - Role-based AI behavior and prompt templates

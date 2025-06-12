@@ -35,7 +35,9 @@ Global Flags:
 Examples:
   nixai ask "How do I configure nginx?"
   nixai ask "What is the difference between services.openssh.enable and programs.ssh.enable?"
-  nixai ask "How do I set up a development environment with Python?" --provider gemini
+  nixai ask "How do I set up a development environment with Python?"
+  nixai ask "Generate a secure NixOS configuration" # Uses Claude for complex reasoning
+  nixai ask "Quick help with flakes setup" # Uses Groq for fast response
   nixai ask "How do I enable SSH?" --quiet
 ```
 

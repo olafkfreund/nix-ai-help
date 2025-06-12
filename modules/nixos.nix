@@ -66,7 +66,7 @@ in {
       aiProvider = mkOption {
         type = types.str;
         default = "ollama";
-        description = "Default AI provider to use (ollama, gemini, openai)";
+        description = "Default AI provider to use (ollama, claude, groq, gemini, openai, llamacpp, custom)";
         example = "ollama";
       };
 

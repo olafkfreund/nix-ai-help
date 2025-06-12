@@ -352,6 +352,32 @@ Set environment variable:
 export GEMINI_API_KEY="your-api-key-here"
 ```
 
+#### Claude (Anthropic)
+```nix
+services.nixai.mcp = {
+  aiProvider = "claude";
+  aiModel = "claude-sonnet-4-20250514";  # or "claude-3-7-sonnet-20250219"
+};
+```
+
+Set environment variable:
+```bash
+export CLAUDE_API_KEY="your-claude-api-key"
+```
+
+#### Groq (Ultra-fast Inference)
+```nix
+services.nixai.mcp = {
+  aiProvider = "groq";
+  aiModel = "llama-3.3-70b-versatile";  # or "llama3-8b-8192"
+};
+```
+
+Set environment variable:
+```bash
+export GROQ_API_KEY="your-groq-api-key"
+```
+
 #### llamacpp (Local, Open Source)
 ```nix
 services.nixai.mcp = {
@@ -607,11 +633,17 @@ systemctl status ollama
 curl http://localhost:11434/api/tags
 ```
 
-**API Key issues** (OpenAI/Gemini):
+**API Key issues** (Cloud providers):
 ```bash
-# Check environment variables
+# Check environment variables for all cloud providers
 echo $OPENAI_API_KEY
 echo $GEMINI_API_KEY
+echo $CLAUDE_API_KEY
+echo $GROQ_API_KEY
+
+# Test API connectivity
+curl -H "Authorization: Bearer $CLAUDE_API_KEY" https://api.anthropic.com/v1/messages
+curl -H "Authorization: Bearer $GROQ_API_KEY" https://api.groq.com/openai/v1/models
 ```
 
 #### 5. Permission Issues

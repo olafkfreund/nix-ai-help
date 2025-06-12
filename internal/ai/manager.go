@@ -163,6 +163,10 @@ func (pm *ProviderManager) initializeProvider(providerName string) (Provider, er
 		return pm.initializeGeminiProvider(providerConfig)
 	case "openai":
 		return pm.initializeOpenAIProvider(providerConfig)
+	case "claude":
+		return pm.initializeClaudeProvider(providerConfig)
+	case "groq":
+		return pm.initializeGroqProvider(providerConfig)
 	case "llamacpp":
 		return pm.initializeLlamaCppProvider(providerConfig)
 	case "custom":
@@ -300,6 +304,68 @@ func (pm *ProviderManager) initializeCustomProvider(config *config.AIProviderCon
 	pm.logger.Debug(fmt.Sprintf("Custom provider initialized with %v timeout", timeout))
 
 	return NewProviderWrapper(customProvider), nil
+}
+
+// initializeClaudeProvider creates a Claude provider instance.
+func (pm *ProviderManager) initializeClaudeProvider(config *config.AIProviderConfig) (Provider, error) {
+	apiKey := os.Getenv(config.EnvVar)
+	if apiKey == "" && config.RequiresAPIKey {
+		return nil, fmt.Errorf("Claude API key not found in environment variable %s", config.EnvVar)
+	}
+
+	// Get default model for Claude
+	defaultModel := pm.config.AIModels.SelectionPreferences.DefaultModels["claude"]
+	if defaultModel == "" {
+		defaultModel = "claude-3-sonnet-20240229" // fallback
+	}
+
+	// Use the new model-aware constructor
+	claudeClient, err := NewClaudeProviderWithModel(config, defaultModel)
+	if err != nil {
+		// Fall back to simple constructor if model-aware fails
+		claudeClient = NewClaudeClientWithModel(apiKey, defaultModel)
+	}
+
+	// Apply configured timeout
+	timeout := pm.config.GetAITimeout("claude")
+	claudeClient.SetTimeout(timeout)
+
+	pm.logger.Debug(fmt.Sprintf("Claude provider initialized with %v timeout", timeout))
+
+	// Create legacy wrapper and then wrap that as Provider
+	legacyProvider := &ClaudeLegacyProvider{ClaudeClient: claudeClient}
+	return NewProviderWrapper(legacyProvider), nil
+}
+
+// initializeGroqProvider creates a Groq provider instance.
+func (pm *ProviderManager) initializeGroqProvider(config *config.AIProviderConfig) (Provider, error) {
+	apiKey := os.Getenv(config.EnvVar)
+	if apiKey == "" && config.RequiresAPIKey {
+		return nil, fmt.Errorf("Groq API key not found in environment variable %s", config.EnvVar)
+	}
+
+	// Get default model for Groq
+	defaultModel := pm.config.AIModels.SelectionPreferences.DefaultModels["groq"]
+	if defaultModel == "" {
+		defaultModel = "llama3-8b-8192" // fallback
+	}
+
+	// Use the new model-aware constructor
+	groqClient, err := NewGroqProviderWithModel(config, defaultModel)
+	if err != nil {
+		// Fall back to simple constructor if model-aware fails
+		groqClient = NewGroqClientWithModel(apiKey, defaultModel)
+	}
+
+	// Apply configured timeout
+	timeout := pm.config.GetAITimeout("groq")
+	groqClient.SetTimeout(timeout)
+
+	pm.logger.Debug(fmt.Sprintf("Groq provider initialized with %v timeout", timeout))
+
+	// Create legacy wrapper and then wrap that as Provider
+	legacyProvider := &GroqLegacyProvider{GroqClient: groqClient}
+	return NewProviderWrapper(legacyProvider), nil
 }
 
 // parseModelReference parses a model reference in the format "provider:model".

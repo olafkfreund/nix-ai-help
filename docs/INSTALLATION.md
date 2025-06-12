@@ -194,13 +194,41 @@ nixai --interactive
 ### Custom AI Provider
 
 ```bash
+# Use Claude (Anthropic) for advanced reasoning
+export CLAUDE_API_KEY="your-claude-api-key"
+nixai -a "Generate comprehensive NixOS security configuration"
+
+# Use Groq for ultra-fast inference
+export GROQ_API_KEY="your-groq-api-key"
+nixai -a "Quick NixOS troubleshooting help"
+
 # Use OpenAI instead of Ollama
-export OPENAI_API_KEY="your-key-here"
-nixai -a "Configure networking" --provider openai
+export OPENAI_API_KEY="your-openai-api-key"
+nixai -a "Configure networking"
 
 # Use Gemini
-export GEMINI_API_KEY="your-key-here" 
-nixai -a "Setup firewall" --provider gemini
+export GEMINI_API_KEY="your-gemini-api-key" 
+nixai -a "Setup firewall"
+```
+
+### Provider Configuration in config.yaml
+
+```yaml
+# Set default provider
+ai_provider: claude  # or groq, gemini, openai, ollama
+ai_model: claude-sonnet-4-20250514
+
+# Provider-specific configuration
+ai_models:
+  providers:
+    claude:
+      models:
+        claude-sonnet-4-20250514:
+          recommended_for: ["complex", "analysis", "reasoning"]
+    groq:
+      models:
+        llama-3.3-70b-versatile:
+          recommended_for: ["fast", "general", "iteration"]
 ```
 
 ### Custom Configuration

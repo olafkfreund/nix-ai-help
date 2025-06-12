@@ -1,5 +1,5 @@
 default:
-    ai_provider: ollama  # Options: openai, ollama, gemini, llamacpp, custom
+    ai_provider: ollama  # Options: openai, ollama, gemini, claude, groq, llamacpp, custom
     ai_model: llama3  # Model name for ollama or gemini, e.g., "llama3", "gemini-1.5-flash"
     # For llamacpp, set endpoint via LLAMACPP_ENDPOINT env var (default: http://localhost:8080/completion)
     # Example: export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
@@ -146,6 +146,94 @@ default:
                         max_tokens: 4096
                         recommended_for: ["general", "fast", "budget"]
                         cost_tier: "standard"
+            claude:
+                name: "Anthropic Claude"
+                description: "Anthropic's Claude models via API"
+                type: "cloud"
+                base_url: "https://api.anthropic.com/v1/messages"
+                available: true
+                supports_streaming: true
+                supports_tools: true
+                requires_api_key: true
+                env_var: "CLAUDE_API_KEY"
+                models:
+                    claude-sonnet-4-20250514:
+                        name: "Claude Sonnet 4"
+                        description: "Latest and most capable Claude 4 model for complex reasoning"
+                        type: "chat"
+                        context_window: 200000
+                        max_tokens: 8192
+                        recommended_for: ["complex", "analysis", "reasoning", "coding", "advanced"]
+                        cost_tier: "premium"
+                        default: true
+                    claude-3-7-sonnet-20250219:
+                        name: "Claude 3.7 Sonnet"
+                        description: "Advanced Claude 3.7 model with enhanced capabilities"
+                        type: "chat"
+                        context_window: 200000
+                        max_tokens: 8192
+                        recommended_for: ["complex", "analysis", "coding", "enhanced"]
+                        cost_tier: "premium"
+                    claude-3-5-haiku-20241022:
+                        name: "Claude 3.5 Haiku"
+                        description: "Fastest and most efficient Claude model"
+                        type: "chat"
+                        context_window: 200000
+                        max_tokens: 4096
+                        recommended_for: ["fast", "simple", "budget", "efficient"]
+                        cost_tier: "standard"
+            groq:
+                name: "Groq"
+                description: "Groq's high-speed inference platform"
+                type: "cloud"
+                base_url: "https://api.groq.com/openai/v1/chat/completions"
+                available: true
+                supports_streaming: true
+                supports_tools: true
+                requires_api_key: true
+                env_var: "GROQ_API_KEY"
+                models:
+                    llama-3.3-70b-versatile:
+                        name: "Llama 3.3 70B Versatile"
+                        description: "Latest Llama 3.3 70B model optimized for versatile tasks"
+                        type: "chat"
+                        context_window: 32768
+                        max_tokens: 32768
+                        recommended_for: ["versatile", "complex", "analysis", "coding", "general"]
+                        cost_tier: "standard"
+                        default: true
+                    llama3-8b-8192:
+                        name: "Llama 3 8B"
+                        description: "Fast Llama 3 model optimized for speed"
+                        type: "chat"
+                        context_window: 8192
+                        max_tokens: 8192
+                        recommended_for: ["fast", "general", "nixos"]
+                        cost_tier: "budget"
+                    llama3-70b-8192:
+                        name: "Llama 3 70B"
+                        description: "Large Llama 3 model for complex tasks"
+                        type: "chat"
+                        context_window: 8192
+                        max_tokens: 8192
+                        recommended_for: ["complex", "analysis", "detailed"]
+                        cost_tier: "standard"
+                    mixtral-8x7b-32768:
+                        name: "Mixtral 8x7B"
+                        description: "Mixture of experts model for diverse tasks"
+                        type: "chat"
+                        context_window: 32768
+                        max_tokens: 32768
+                        recommended_for: ["coding", "analysis", "versatile"]
+                        cost_tier: "standard"
+                    gemma-7b-it:
+                        name: "Gemma 7B Instruct"
+                        description: "Google's Gemma model for instruction following"
+                        type: "chat"
+                        context_window: 8192
+                        max_tokens: 8192
+                        recommended_for: ["instructions", "general", "budget"]
+                        cost_tier: "budget"
             llamacpp:
                 name: "Llama.cpp"
                 description: "Local CPU-optimized inference server"
@@ -194,25 +282,27 @@ default:
                 ollama: "llama3"
                 gemini: "gemini-2.5-flash-preview-05-20"
                 openai: "gpt-3.5-turbo"
+                claude: "claude-sonnet-4-20250514"
+                groq: "llama-3.3-70b-versatile"
                 llamacpp: "llama-2-7b-chat"
                 custom: "custom-model"
             # Task-specific model recommendations
             task_models:
                 nixos_config:
-                    primary: ["ollama:llama3", "gemini:gemini-2.5-flash-preview-05-20"]
-                    fallback: ["openai:gpt-3.5-turbo"]
+                    primary: ["ollama:llama3", "gemini:gemini-2.5-flash-preview-05-20", "groq:llama-3.3-70b-versatile"]
+                    fallback: ["claude:claude-3-7-sonnet-20250219", "openai:gpt-3.5-turbo"]
                 code_generation:
-                    primary: ["ollama:codellama", "openai:gpt-4"]
-                    fallback: ["gemini:gemini-2.5-flash-preview-05-20"]
+                    primary: ["claude:claude-sonnet-4-20250514", "ollama:codellama", "openai:gpt-4"]
+                    fallback: ["groq:llama-3.3-70b-versatile", "gemini:gemini-2.5-flash-preview-05-20"]
                 debugging:
-                    primary: ["openai:gpt-4", "gemini:gemini-2.5-flash-preview-05-20"]
-                    fallback: ["ollama:llama3"]
+                    primary: ["claude:claude-sonnet-4-20250514", "openai:gpt-4", "gemini:gemini-2.5-flash-preview-05-20"]
+                    fallback: ["groq:llama-3.3-70b-versatile", "ollama:llama3"]
                 general_help:
-                    primary: ["ollama:llama3", "gemini:gemini-2.5-flash-preview-05-20"]
-                    fallback: ["openai:gpt-3.5-turbo"]
+                    primary: ["groq:llama3-8b-8192", "ollama:llama3", "gemini:gemini-2.5-flash-preview-05-20"]
+                    fallback: ["claude:claude-3-5-haiku-20241022", "openai:gpt-3.5-turbo"]
                 complex_analysis:
-                    primary: ["openai:gpt-4", "gemini:gemini-2.5-flash-preview-05-20"]
-                    fallback: ["ollama:llama3:70b"]
+                    primary: ["claude:claude-sonnet-4-20250514", "openai:gpt-4", "gemini:gemini-2.5-flash-preview-05-20"]
+                    fallback: ["groq:llama-3.3-70b-versatile", "ollama:llama3:70b"]
         # Model discovery and availability checking
         discovery:
             # Whether to auto-discover available models on startup
@@ -264,6 +354,8 @@ default:
         llamacpp: 120       # LlamaCpp server timeout (often slower due to CPU inference)
         gemini: 30          # Google Gemini API timeout
         openai: 30          # OpenAI API timeout
+        claude: 30          # Anthropic Claude API timeout
+        groq: 30            # Groq API timeout (high-speed inference)
         custom: 60          # Custom API timeout
         default: 60         # Default timeout for unspecified providers
     devenv:

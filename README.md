@@ -35,6 +35,7 @@
 
 ### 🚀 **Recent Feature Additions**
 
+- **🤖 Enhanced AI Provider Ecosystem**: Added Claude (Anthropic) and Groq providers for expanded AI capabilities and ultra-fast inference
 - **Modern TUI Architecture**: Complete `/internal/tui/` system with Bubble Tea framework
 - **Context-Aware System**: Intelligent NixOS context detection with 4 management commands
 - **Enhanced Hardware Management**: 6 specialized subcommands for comprehensive system analysis
@@ -66,7 +67,7 @@ The newly modernized Terminal User Interface provides a professional, accessible
 │                                    │                                   │
 │ (Showing 1-10 of 24)               │ [INPUT] = Interactive Parameters  │
 └────────────────────────────────────┴───────────────────────────────────┘
-Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.0.3
+Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.0.4
 ```
 
 ### ✨ Key TUI Features
@@ -264,7 +265,7 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 │                                    │ • Version display                │
 │ (Showing 1-8 of 24)               │ • ? changelog popup             │
 └────────────────────────────────────┴───────────────────────────────────┘
-Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.0.3
+Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.0.4
 ```
 
 ### 🤖 AI-Powered Command System
@@ -402,6 +403,8 @@ nixai features a **unified AI provider management system** that eliminates hardc
 | **LlamaCpp** | llama-2-7b-chat, custom models | CPU-optimized local inference |
 | **Google Gemini** | gemini-2.5-pro, gemini-2.0, gemini-flash | Advanced reasoning, multimodal |
 | **OpenAI** | gpt-4o, gpt-4-turbo, gpt-3.5-turbo | Industry-leading performance |
+| **Claude (Anthropic)** | claude-sonnet-4, claude-3.7-sonnet, claude-3.5-haiku | Constitutional AI, advanced reasoning |
+| **Groq** | llama-3.3-70b-versatile, llama3-8b-8192, mixtral-8x7b | Ultra-fast inference, cost-efficient |
 | **Custom** | User-defined | Bring your own endpoint |
 
 ### ⚠️ AI Provider Accuracy for NixOS
@@ -410,11 +413,15 @@ nixai features a **unified AI provider management system** that eliminates hardc
 
 - **🥇 OpenAI (gpt-4o, gpt-4-turbo)**: **Best accuracy** for NixOS-specific questions, configuration generation, and troubleshooting. Recommended for complex NixOS tasks and production configurations.
 
+- **🥇 Claude (claude-sonnet-4, claude-3.7-sonnet)**: **Excellent accuracy** with constitutional AI approach and strong reasoning. Particularly effective for complex NixOS configurations and detailed explanations.
+
 - **🥈 Google Gemini (gemini-2.5-pro)**: **Good accuracy** with strong reasoning capabilities. Reliable for most NixOS questions and configurations, though may occasionally miss nuanced NixOS-specific details.
+
+- **🥈 Groq (llama-3.3-70b-versatile)**: **Good accuracy** with ultra-fast inference speeds. Excellent for quick NixOS questions and iterative configuration development.
 
 - **🥉 Ollama (llama3, local models)**: **Variable accuracy** depending on the specific model used. Great for privacy-first usage and general questions, but may provide less precise NixOS configuration advice. Best used with verification against official documentation.
 
-- **💡 Recommendation**: For critical NixOS configurations, use OpenAI or Gemini providers, then verify suggestions against official NixOS documentation. Ollama is excellent for learning and experimentation while maintaining privacy.
+- **💡 Recommendation**: For critical NixOS configurations, use OpenAI, Claude, or Gemini providers, then verify suggestions against official NixOS documentation. Ollama and Groq are excellent for learning, experimentation, and rapid iteration while maintaining cost efficiency or privacy.
 
 ### ⚙️ Configuration
 
@@ -427,6 +434,36 @@ ai:
   fallback_provider: "ollama"          # Fallback if primary fails
   
   providers:
+    claude:
+      base_url: "https://api.anthropic.com"
+      api_key_env: "CLAUDE_API_KEY"
+      models:
+        claude-sonnet-4-20250514:
+          name: "Claude Sonnet 4"
+          display_name: "Claude Sonnet 4 (Latest)"
+          capabilities: ["text", "code", "reasoning", "analysis"]
+          context_limit: 200000
+        claude-3-7-sonnet-20250219:
+          name: "Claude 3.7 Sonnet"
+          display_name: "Claude 3.7 Sonnet"
+          capabilities: ["text", "code", "reasoning"]
+          context_limit: 200000
+    
+    groq:
+      base_url: "https://api.groq.com"
+      api_key_env: "GROQ_API_KEY"
+      models:
+        llama-3.3-70b-versatile:
+          name: "Llama 3.3 70B Versatile"
+          display_name: "Llama 3.3 70B (Ultra-fast)"
+          capabilities: ["text", "code", "versatile"]
+          context_limit: 32768
+        llama3-8b-8192:
+          name: "Llama 3 8B"
+          display_name: "Llama 3 8B (Speed)"
+          capabilities: ["text", "code", "fast"]
+          context_limit: 8192
+    
     gemini:
       base_url: "https://generativelanguage.googleapis.com/v1beta"
       api_key_env: "GEMINI_API_KEY"
@@ -464,6 +501,33 @@ ai:
 nixai -a "How do I configure Nginx in NixOS?"
 ```
 
+**Using Claude provider:**
+
+```zsh
+# Set environment variable
+export CLAUDE_API_KEY="your-claude-api-key"
+
+# Configure as default provider in config
+ai_provider: claude
+ai_model: claude-sonnet-4-20250514
+
+nixai -a "Generate a comprehensive NixOS configuration with security hardening"
+```
+
+**Using Groq provider for fast iteration:**
+
+```zsh
+# Set environment variable
+export GROQ_API_KEY="your-groq-api-key"
+
+# Configure as default provider in config
+ai_provider: groq
+ai_model: llama-3.3-70b-versatile
+
+nixai -a "Quick help with NixOS flake setup"
+nixai diagnose --context-file /etc/nixos/configuration.nix
+```
+
 **Using LlamaCpp provider:**
 
 ```zsh
@@ -484,7 +548,8 @@ nixai diagnose --context-file /etc/nixos/configuration.nix
 
 ```zsh
 # These commands are planned for future implementation
-nixai --provider openai -a "Complex reasoning task"
+nixai --provider claude -a "Complex reasoning task"
+nixai --provider groq -a "Fast iterative development"
 nixai --provider ollama -a "Private local assistance"
 nixai config set-provider gemini
 ```
@@ -497,7 +562,7 @@ The system includes three core components:
 2. **ModelRegistry**: Configuration-driven model lookup and validation  
 3. **Legacy Adapter**: Backward compatibility with existing CLI commands
 
-This architecture eliminated 25+ hardcoded switch statements and enables adding new providers through configuration alone.
+This architecture eliminated 25+ hardcoded switch statements and enables adding new providers through configuration alone. With the addition of Claude and Groq providers, nixai now supports **7 AI providers** for maximum flexibility and choice.
 
 ### 🖥️ LlamaCpp Setup Guide
 
