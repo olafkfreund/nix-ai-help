@@ -245,7 +245,7 @@ func (pm *ProviderManager) initializeClaudeProvider(config *config.AIProviderCon
 	if apiKey == "" {
 		apiKey = os.Getenv("ANTHROPIC_API_KEY")
 	}
-
+	
 	if apiKey == "" && config.RequiresAPIKey {
 		return nil, fmt.Errorf("claude API key not found in environment variables CLAUDE_API_KEY or ANTHROPIC_API_KEY")
 	}
@@ -261,19 +261,13 @@ func (pm *ProviderManager) initializeClaudeProvider(config *config.AIProviderCon
 	if defaultModel == "" {
 		defaultModel = "claude-3-5-sonnet-20241022" // Default to Claude 3.5 Sonnet
 	}
-
+	
 	// Create Claude provider
 	claudeProvider := NewClaudeProvider(defaultModel)
-
+	
 	// Apply configured timeout
 	timeout := pm.config.GetAITimeout("claude")
 	claudeProvider.SetTimeout(timeout)
-
-	pm.logger.Debug(fmt.Sprintf("Claude provider initialized with model %s and %v timeout",
-		defaultModel, timeout))
-
-	// Create legacy wrapper for backward compatibility
-	legacyProvider := &ClaudeLegacyProvider{ClaudeProvider: claudeProvider}
 	return NewProviderWrapper(legacyProvider), nil
 }
 

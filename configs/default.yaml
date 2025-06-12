@@ -186,49 +186,35 @@ default:
                         recommended_for: ["custom", "experimental"]
                         default: true
             claude:
-                name: "Anthropic Claude"
-                description: "Anthropic's Claude models for advanced reasoning and analysis"
+                name: "Claude"
+                description: "Anthropic's Claude models for advanced reasoning and code understanding"
                 type: "cloud"
                 base_url: "https://api.anthropic.com/v1/messages"
                 available: true
-                supports_streaming: true
-                supports_tools: true
+                supports_streaming: false
+                supports_tools: false
                 requires_api_key: true
-                env_var: "CLAUDE_API_KEY"
                 models:
                     claude-3-5-sonnet-20241022:
                         name: "Claude 3.5 Sonnet"
-                        description: "Latest Claude 3.5 Sonnet with advanced reasoning and coding"
-                        type: "chat"
-                        context_window: 200000
-                        max_tokens: 4096
-                        recommended_for: ["complex", "reasoning", "coding", "analysis", "nixos"]
-                        cost_tier: "premium"
-                        default: true
+                        description: "Most recent Claude model with excellent performance and accuracy"
+                        context_size: 200000
+                        capabilities: ["general", "code", "diagnosis", "reasoning", "explanation"]
                     claude-3-opus-20240229:
                         name: "Claude 3 Opus"
-                        description: "Most powerful Claude model for complex reasoning tasks"
-                        type: "chat"
-                        context_window: 200000
-                        max_tokens: 4096
-                        recommended_for: ["complex", "research", "detailed_analysis"]
-                        cost_tier: "premium"
+                        description: "Most powerful Claude model with enhanced reasoning"
+                        context_size: 200000  
+                        capabilities: ["general", "code", "diagnosis", "reasoning", "explanation"]
                     claude-3-sonnet-20240229:
                         name: "Claude 3 Sonnet"
                         description: "Balanced Claude model for most tasks"
-                        type: "chat"
-                        context_window: 200000
-                        max_tokens: 4096
-                        recommended_for: ["general", "coding", "analysis"]
-                        cost_tier: "standard"
+                        context_size: 180000
+                        capabilities: ["general", "code", "diagnosis", "reasoning"]
                     claude-3-haiku-20240307:
                         name: "Claude 3 Haiku"
-                        description: "Fast and efficient Claude model"
-                        type: "chat"
-                        context_window: 200000
-                        max_tokens: 4096
-                        recommended_for: ["fast", "general", "budget"]
-                        cost_tier: "standard"
+                        description: "Fastest Claude model for routine tasks"
+                        context_size: 150000
+                        capabilities: ["general", "code", "diagnosis"]
         # Model selection preferences
         selection_preferences:
             # Default provider when none specified
