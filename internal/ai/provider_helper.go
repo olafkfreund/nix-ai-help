@@ -1,9 +1,9 @@
 package ai
 
 import (
-"fmt"
-"nix-ai-help/internal/config"
-"nix-ai-help/pkg/logger"
+	"fmt"
+	"nix-ai-help/internal/config"
+	"nix-ai-help/pkg/logger"
 )
 
 // GetProvider is a convenience function to get an AI provider with the specified
@@ -32,7 +32,7 @@ func GetProvider(providerName, modelName string) (Provider, error) {
 	if modelName != "" {
 		return pm.GetProviderWithModel(providerName, modelName)
 	}
-	
+
 	// Get provider with default model
 	return pm.GetProvider(providerName)
 }
