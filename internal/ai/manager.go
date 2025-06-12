@@ -167,6 +167,8 @@ func (pm *ProviderManager) initializeProvider(providerName string) (Provider, er
 		return pm.initializeLlamaCppProvider(providerConfig)
 	case "custom":
 		return pm.initializeCustomProvider(providerConfig)
+	case "claude":
+		return pm.initializeClaudeProvider(providerConfig)
 	default:
 		return nil, fmt.Errorf("unknown provider type: %s", providerName)
 	}
@@ -235,6 +237,37 @@ func (pm *ProviderManager) initializeOpenAIProvider(config *config.AIProviderCon
 
 	openaiClient := NewOpenAIClientWithModel(apiKey, defaultModel)
 	return NewProviderWrapper(openaiClient), nil
+}
+
+// initializeClaudeProvider creates a Claude provider instance.
+func (pm *ProviderManager) initializeClaudeProvider(config *config.AIProviderConfig) (Provider, error) {
+	apiKey := os.Getenv(config.EnvVar)
+	if apiKey == "" && config.RequiresAPIKey {
+		return nil, fmt.Errorf("claude API key not found in environment variable %s", config.EnvVar)
+	}
+
+	// Get default model for Claude
+	defaultModel := pm.config.AIModels.SelectionPreferences.DefaultModels["claude"]
+	if defaultModel == "" {
+		defaultModel = "claude-3-5-sonnet-20241022" // fallback to latest Claude 3.5 Sonnet
+	}
+
+	claudeProvider := NewClaudeProvider(defaultModel)
+
+	// Set custom base URL if configured
+	if config.BaseURL != "" {
+		claudeProvider.BaseURL = config.BaseURL
+	}
+
+	// Apply configured timeout
+	timeout := pm.config.GetAITimeout("claude")
+	claudeProvider.SetTimeout(timeout)
+
+	pm.logger.Debug(fmt.Sprintf("Claude provider initialized with model %s and %v timeout", defaultModel, timeout))
+
+	// Create legacy wrapper for compatibility
+	legacyProvider := &ClaudeLegacyProvider{ClaudeProvider: claudeProvider}
+	return NewProviderWrapper(legacyProvider), nil
 }
 
 // initializeLlamaCppProvider creates a LlamaCpp provider instance.
@@ -425,14 +458,14 @@ func (pm *ProviderManager) getFallbackProviders(providerName string) []string {
 	// Add default fallbacks if none configured
 	if len(fallbacks) == 0 {
 		switch providerName {
-		case "gemini", "openai":
+		case "gemini", "openai", "claude":
 			fallbacks = []string{"ollama"}
 		case "ollama":
-			fallbacks = []string{"gemini", "openai"}
+			fallbacks = []string{"claude", "gemini", "openai"}
 		case "llamacpp":
-			fallbacks = []string{"ollama"}
+			fallbacks = []string{"ollama", "claude"}
 		case "custom":
-			fallbacks = []string{"ollama"}
+			fallbacks = []string{"ollama", "claude"}
 		}
 	}
 

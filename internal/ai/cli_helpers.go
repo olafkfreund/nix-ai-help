@@ -150,6 +150,8 @@ func getProviderName(provider Provider) string {
 				return "llamacpp"
 			case *CustomProvider:
 				return "custom"
+			case *ClaudeLegacyProvider:
+				return "claude"
 			}
 		}
 	}

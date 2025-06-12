@@ -402,11 +402,14 @@ nixai features a **unified AI provider management system** that eliminates hardc
 | **LlamaCpp** | llama-2-7b-chat, custom models | CPU-optimized local inference |
 | **Google Gemini** | gemini-2.5-pro, gemini-2.0, gemini-flash | Advanced reasoning, multimodal |
 | **OpenAI** | gpt-4o, gpt-4-turbo, gpt-3.5-turbo | Industry-leading performance |
+| **Anthropic Claude** | claude-3.5-sonnet, claude-3-opus, claude-3-sonnet | Advanced reasoning, code analysis |
 | **Custom** | User-defined | Bring your own endpoint |
 
 ### ⚠️ AI Provider Accuracy for NixOS
 
 **Provider Quality Recommendations:**
+
+- **🥇 Anthropic Claude (claude-3.5-sonnet, claude-3-opus)**: **Excellent accuracy** for NixOS-specific questions, advanced reasoning, and complex configuration analysis. Exceptional at understanding and generating detailed NixOS configurations with explanations.
 
 - **🥇 OpenAI (gpt-4o, gpt-4-turbo)**: **Best accuracy** for NixOS-specific questions, configuration generation, and troubleshooting. Recommended for complex NixOS tasks and production configurations.
 
@@ -414,7 +417,7 @@ nixai features a **unified AI provider management system** that eliminates hardc
 
 - **🥉 Ollama (llama3, local models)**: **Variable accuracy** depending on the specific model used. Great for privacy-first usage and general questions, but may provide less precise NixOS configuration advice. Best used with verification against official documentation.
 
-- **💡 Recommendation**: For critical NixOS configurations, use OpenAI or Gemini providers, then verify suggestions against official NixOS documentation. Ollama is excellent for learning and experimentation while maintaining privacy.
+- **💡 Recommendation**: For critical NixOS configurations, use Claude or OpenAI providers for their superior reasoning capabilities. Claude excels at detailed explanations and code analysis. Gemini is excellent for general use. Ollama is perfect for learning and experimentation while maintaining privacy.
 
 ### ⚙️ Configuration
 

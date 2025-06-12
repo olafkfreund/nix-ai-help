@@ -1,5 +1,5 @@
 default:
-    ai_provider: ollama  # Options: openai, ollama, gemini, llamacpp, custom
+    ai_provider: ollama  # Options: openai, ollama, gemini, llamacpp, custom, claude
     ai_model: llama3  # Model name for ollama or gemini, e.g., "llama3", "gemini-1.5-flash"
     # For llamacpp, set endpoint via LLAMACPP_ENDPOINT env var (default: http://localhost:8080/completion)
     # Example: export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
@@ -185,6 +185,50 @@ default:
                         max_tokens: 2048
                         recommended_for: ["custom", "experimental"]
                         default: true
+            claude:
+                name: "Anthropic Claude"
+                description: "Anthropic's Claude models for advanced reasoning and analysis"
+                type: "cloud"
+                base_url: "https://api.anthropic.com/v1/messages"
+                available: true
+                supports_streaming: true
+                supports_tools: true
+                requires_api_key: true
+                env_var: "CLAUDE_API_KEY"
+                models:
+                    claude-3-5-sonnet-20241022:
+                        name: "Claude 3.5 Sonnet"
+                        description: "Latest Claude 3.5 Sonnet with advanced reasoning and coding"
+                        type: "chat"
+                        context_window: 200000
+                        max_tokens: 4096
+                        recommended_for: ["complex", "reasoning", "coding", "analysis", "nixos"]
+                        cost_tier: "premium"
+                        default: true
+                    claude-3-opus-20240229:
+                        name: "Claude 3 Opus"
+                        description: "Most powerful Claude model for complex reasoning tasks"
+                        type: "chat"
+                        context_window: 200000
+                        max_tokens: 4096
+                        recommended_for: ["complex", "research", "detailed_analysis"]
+                        cost_tier: "premium"
+                    claude-3-sonnet-20240229:
+                        name: "Claude 3 Sonnet"
+                        description: "Balanced Claude model for most tasks"
+                        type: "chat"
+                        context_window: 200000
+                        max_tokens: 4096
+                        recommended_for: ["general", "coding", "analysis"]
+                        cost_tier: "standard"
+                    claude-3-haiku-20240307:
+                        name: "Claude 3 Haiku"
+                        description: "Fast and efficient Claude model"
+                        type: "chat"
+                        context_window: 200000
+                        max_tokens: 4096
+                        recommended_for: ["fast", "general", "budget"]
+                        cost_tier: "standard"
         # Model selection preferences
         selection_preferences:
             # Default provider when none specified
@@ -196,22 +240,23 @@ default:
                 openai: "gpt-3.5-turbo"
                 llamacpp: "llama-2-7b-chat"
                 custom: "custom-model"
+                claude: "claude-3-5-sonnet-20241022"
             # Task-specific model recommendations
             task_models:
                 nixos_config:
-                    primary: ["ollama:llama3", "gemini:gemini-2.5-flash-preview-05-20"]
+                    primary: ["claude:claude-3-5-sonnet-20241022", "ollama:llama3", "gemini:gemini-2.5-flash-preview-05-20"]
                     fallback: ["openai:gpt-3.5-turbo"]
                 code_generation:
-                    primary: ["ollama:codellama", "openai:gpt-4"]
+                    primary: ["claude:claude-3-5-sonnet-20241022", "ollama:codellama", "openai:gpt-4"]
                     fallback: ["gemini:gemini-2.5-flash-preview-05-20"]
                 debugging:
-                    primary: ["openai:gpt-4", "gemini:gemini-2.5-flash-preview-05-20"]
+                    primary: ["claude:claude-3-opus-20240229", "openai:gpt-4", "gemini:gemini-2.5-flash-preview-05-20"]
                     fallback: ["ollama:llama3"]
                 general_help:
-                    primary: ["ollama:llama3", "gemini:gemini-2.5-flash-preview-05-20"]
+                    primary: ["claude:claude-3-sonnet-20240229", "ollama:llama3", "gemini:gemini-2.5-flash-preview-05-20"]
                     fallback: ["openai:gpt-3.5-turbo"]
                 complex_analysis:
-                    primary: ["openai:gpt-4", "gemini:gemini-2.5-flash-preview-05-20"]
+                    primary: ["claude:claude-3-opus-20240229", "openai:gpt-4", "gemini:gemini-2.5-flash-preview-05-20"]
                     fallback: ["ollama:llama3:70b"]
         # Model discovery and availability checking
         discovery:
@@ -264,6 +309,7 @@ default:
         llamacpp: 120       # LlamaCpp server timeout (often slower due to CPU inference)
         gemini: 30          # Google Gemini API timeout
         openai: 30          # OpenAI API timeout
+        claude: 60          # Anthropic Claude API timeout
         custom: 60          # Custom API timeout
         default: 60         # Default timeout for unspecified providers
     devenv:
