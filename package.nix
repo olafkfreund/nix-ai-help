@@ -4,7 +4,7 @@
   installShellFiles,
   fetchFromGitHub,
   # Optional parameters for version/commit overrides
-  version ? "1.0.51",
+  version ? "1.0.6",
   src ? null,
   srcOverride ? null,
   rev ? null,
@@ -117,4 +117,3 @@ in
       mainProgram = "nixai";
     };
   }
-}
