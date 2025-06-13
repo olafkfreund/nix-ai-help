@@ -10,6 +10,16 @@
 
 ## 🆕 Latest Updates (June 2025)
 
+### 🚀 **v1.0.5: Streaming, Unified AI Provider Interface, and CLI/Agent Refactor**
+
+- **Real-time streaming and interface compatibility for all AI providers**
+- **Unified Query/QueryWithContext interface for all providers**
+- **Refactored agent and CLI layers for context-aware and legacy support**
+- **Improved CLI completion and test reliability**
+- **Removed obsolete streaming_temp.go and duplicate helpers**
+- **All usages updated for compatibility and fallback logic**
+- **Improved error handling and progress indicators**
+
 ### ✨ **Modern TUI Interface** - **NEWLY COMPLETED!**
 
 - **🎨 Icon-Free Design**: 100% accessible text-based interface without Unicode dependencies
@@ -36,6 +46,10 @@
 ### 🚀 **Recent Feature Additions**
 
 - **🤖 Enhanced AI Provider Ecosystem**: Added Claude (Anthropic) and Groq providers for expanded AI capabilities and ultra-fast inference
+- **Real-time streaming and interface compatibility for all AI providers**
+- **Unified Query/QueryWithContext interface for all providers**
+- **Refactored agent and CLI layers for context-aware and legacy support**
+- **Improved CLI completion and test reliability**
 - **Modern TUI Architecture**: Complete `/internal/tui/` system with Bubble Tea framework
 - **Context-Aware System**: Intelligent NixOS context detection with 4 management commands
 - **Enhanced Hardware Management**: 6 specialized subcommands for comprehensive system analysis
@@ -67,7 +81,7 @@ The newly modernized Terminal User Interface provides a professional, accessible
 │                                    │                                   │
 │ (Showing 1-10 of 24)               │ [INPUT] = Interactive Parameters  │
 └────────────────────────────────────┴───────────────────────────────────┘
-Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.0.4
+Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.0.5
 ```
 
 ### ✨ Key TUI Features
@@ -265,7 +279,7 @@ nixai -a "Debug my failing build" --agent diagnose --role troubleshooter
 │                                    │ • Version display                │
 │ (Showing 1-8 of 24)               │ • ? changelog popup             │
 └────────────────────────────────────┴───────────────────────────────────┘
-Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.0.4
+Commands | ?:Changelog | Tab:Switch | ↑↓:Navigate | Enter:Select | nixai v1.0.5
 ```
 
 ### 🤖 AI-Powered Command System
@@ -1005,7 +1019,7 @@ nix build --rebuild
 After installation, verify everything works:
 
 ```zsh
-nixai --version              # Should show "nixai version 1.0.2"
+nixai --version              # Should show "nixai version 1.0.5"
 nixai doctor                 # Run comprehensive health check
 nixai hardware detect       # Test hardware detection
 nixai -a "test question"     # Test AI functionality

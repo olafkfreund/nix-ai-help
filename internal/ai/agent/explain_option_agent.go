@@ -59,12 +59,23 @@ func (a *ExplainOptionAgent) Query(ctx context.Context, question string) (string
 	prompt := a.buildOptionPrompt(question, optionCtx)
 
 	// Query the AI provider
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("failed to query provider: %w", err)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to query provider: %w", err)
+		}
+		return response, nil
 	}
-
-	return response, nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to query provider: %w", err)
+		}
+		return response, nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateResponse generates a response using the provider's GenerateResponse method.
@@ -86,7 +97,15 @@ func (a *ExplainOptionAgent) QueryWithContext(ctx context.Context, question stri
 	}
 
 	prompt := a.buildOptionPrompt(question, optionCtx)
-	return a.provider.Query(ctx, prompt)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, prompt)
+	}
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(prompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // buildOptionContext builds comprehensive context for a NixOS option.

@@ -52,13 +52,23 @@ func (a *AskAgent) Query(ctx context.Context, question string) (string, error) {
 	prompt := a.buildAskPrompt(question, askCtx)
 
 	// Query the AI provider
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("failed to query provider: %w", err)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to query provider: %w", err)
+		}
+		return a.enhanceResponseWithAskGuidance(response), nil
 	}
-
-	// Enhance response with helpful guidance
-	return a.enhanceResponseWithAskGuidance(response), nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to query provider: %w", err)
+		}
+		return a.enhanceResponseWithAskGuidance(response), nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateResponse generates a response using the provider's GenerateResponse method.
@@ -89,12 +99,23 @@ func (a *AskAgent) QueryWithContext(ctx context.Context, question string, askCtx
 	}
 
 	prompt := a.buildAskPrompt(question, askCtx)
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", err
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", err
+		}
+		return a.enhanceResponseWithAskGuidance(response), nil
 	}
-
-	return a.enhanceResponseWithAskGuidance(response), nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", err
+		}
+		return a.enhanceResponseWithAskGuidance(response), nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // buildAskContext builds context information for the question.

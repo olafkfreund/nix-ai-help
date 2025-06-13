@@ -80,12 +80,23 @@ func NewSnippetsAgent(provider ai.Provider) *SnippetsAgent {
 func (a *SnippetsAgent) CreateSnippet(ctx context.Context, language, pattern, description string) (string, error) {
 	prompt := a.buildCreateSnippetPrompt(language, pattern, description)
 
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("failed to create snippet: %w", err)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to create snippet: %w", err)
+		}
+		return response, nil
 	}
-
-	return response, nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to create snippet: %w", err)
+		}
+		return response, nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // OrganizeLibrary helps organize and structure snippet libraries.
@@ -94,12 +105,23 @@ func (a *SnippetsAgent) OrganizeLibrary(ctx context.Context, currentStructure st
 
 	prompt := a.buildOrganizeLibraryPrompt(currentStructure, organizationGoals)
 
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("failed to organize library: %w", err)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to organize library: %w", err)
+		}
+		return response, nil
 	}
-
-	return response, nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to organize library: %w", err)
+		}
+		return response, nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // SetupSnippetEngine configures snippet engines for different editors.
@@ -109,12 +131,23 @@ func (a *SnippetsAgent) SetupSnippetEngine(ctx context.Context, editorType, engi
 
 	prompt := a.buildSetupEnginePrompt(editorType, engineType)
 
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("failed to setup snippet engine: %w", err)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to setup snippet engine: %w", err)
+		}
+		return response, nil
 	}
-
-	return response, nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to setup snippet engine: %w", err)
+		}
+		return response, nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // OptimizePerformance improves snippet library performance and loading times.
@@ -123,12 +156,23 @@ func (a *SnippetsAgent) OptimizePerformance(ctx context.Context, performanceIssu
 
 	prompt := a.buildOptimizePrompt(performanceIssues)
 
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("failed to optimize performance: %w", err)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to optimize performance: %w", err)
+		}
+		return response, nil
 	}
-
-	return response, nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to optimize performance: %w", err)
+		}
+		return response, nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateCollection creates a comprehensive snippet collection for specific use cases.
@@ -137,12 +181,23 @@ func (a *SnippetsAgent) GenerateCollection(ctx context.Context, useCase string, 
 
 	prompt := a.buildGenerateCollectionPrompt([]string{useCase}, languages, requirements)
 
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate collection: %w", err)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate collection: %w", err)
+		}
+		return response, nil
 	}
-
-	return response, nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate collection: %w", err)
+		}
+		return response, nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // MaintainSnippets provides maintenance and update recommendations for snippet libraries.
@@ -152,129 +207,23 @@ func (a *SnippetsAgent) MaintainSnippets(ctx context.Context, lastUpdated string
 
 	prompt := a.buildMaintenancePrompt(lastUpdated, conflictIssues)
 
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("failed to maintain snippets: %w", err)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to maintain snippets: %w", err)
+		}
+		return response, nil
 	}
-
-	return response, nil
-}
-
-// Helper methods for building prompts
-
-func (a *SnippetsAgent) buildCreateSnippetPrompt(language, pattern, description string) string {
-	return fmt.Sprintf(`Create a code snippet with the following specifications:
-
-Language: %s
-Pattern/Template: %s
-Description: %s
-Current Context: %s
-
-Please provide:
-1. Complete snippet code with proper syntax
-2. Placeholder definitions and transformations
-3. Trigger word and expansion logic
-4. Variable substitutions and dynamic content
-5. Documentation and usage examples
-6. Integration instructions for the target editor
-
-Focus on creating a useful, well-structured snippet that follows best practices and conventions.`,
-		language, pattern, description, a.formatContext())
-}
-
-func (a *SnippetsAgent) buildOrganizeLibraryPrompt(currentStructure string, goals []string) string {
-	return fmt.Sprintf(`Help organize a snippet library with the following requirements:
-
-Current Structure: %s
-Organization Goals: %v
-Current Context: %s
-
-Please provide:
-1. Recommended directory and file structure
-2. Naming conventions for snippets and categories
-3. Categorization and tagging strategies
-4. Documentation and metadata standards
-5. Search and discovery improvements
-6. Maintenance and update procedures
-
-Focus on creating a maintainable, discoverable library structure.`,
-		currentStructure, goals, a.formatContext())
-}
-
-func (a *SnippetsAgent) buildSetupEnginePrompt(editorType, engineType string) string {
-	return fmt.Sprintf(`Setup snippet engine configuration for:
-
-Editor: %s
-Snippet Engine: %s
-Current Context: %s
-
-Please provide:
-1. Installation and configuration instructions
-2. Engine-specific configuration files and settings
-3. Integration with editor features and workflows
-4. Trigger and expansion configuration
-5. Custom variable and function setup
-6. Troubleshooting and debugging guidance
-
-Ensure optimal integration and performance with the target editor.`,
-		editorType, engineType, a.formatContext())
-}
-
-func (a *SnippetsAgent) buildOptimizePrompt(performanceIssues []string) string {
-	return fmt.Sprintf(`Optimize snippet library performance addressing these issues:
-
-Performance Issues: %v
-Current Context: %s
-
-Please provide:
-1. Performance analysis and bottleneck identification
-2. Loading time optimization strategies
-3. Memory usage reduction techniques
-4. Snippet organization for faster access
-5. Caching and preloading optimizations
-6. Measurement and monitoring recommendations
-
-Focus on improving responsiveness and reducing resource usage.`,
-		performanceIssues, a.formatContext())
-}
-
-func (a *SnippetsAgent) buildGenerateCollectionPrompt(useCase, languages []string, requirements []string) string {
-	return fmt.Sprintf(`Generate a comprehensive snippet collection for:
-
-Use Case: %s
-Languages: %v
-Requirements: %v
-Current Context: %s
-
-Please provide:
-1. Complete snippet collection covering common patterns
-2. Language-specific snippets and idioms
-3. Framework and library specific templates
-4. Workflow-optimized snippet sequences
-5. Documentation and usage guides
-6. Installation and setup instructions
-
-Create a production-ready collection that enhances productivity.`,
-		useCase, languages, requirements, a.formatContext())
-}
-
-func (a *SnippetsAgent) buildMaintenancePrompt(lastUpdated string, conflictIssues []string) string {
-	return fmt.Sprintf(`Provide maintenance recommendations for snippet library:
-
-Last Updated: %s
-Conflict Issues: %v
-Current Context: %s
-
-Please provide:
-1. Update and maintenance schedule recommendations
-2. Conflict resolution and prevention strategies
-3. Quality assessment and improvement suggestions
-4. Deprecated snippet identification and removal
-5. Performance monitoring and optimization
-6. Backup and versioning strategies
-
-Focus on maintaining library quality and reliability over time.`,
-		lastUpdated, conflictIssues, a.formatContext())
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to maintain snippets: %w", err)
+		}
+		return response, nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GetContext returns the current agent context.
@@ -311,4 +260,42 @@ Documentation: %t`,
 		a.context.SnippetCount,
 		a.context.Organization,
 		a.context.Documentation)
+}
+
+// --- Prompt builder methods for SnippetsAgent ---
+
+// buildCreateSnippetPrompt builds a prompt for creating a new snippet.
+func (a *SnippetsAgent) buildCreateSnippetPrompt(language, pattern, description string) string {
+	return fmt.Sprintf(`Create a code snippet in %s that matches the following pattern: "%s". Description: %s. Use the %s snippet format.`,
+		language, pattern, description, a.context.SnippetFormat)
+}
+
+// buildOrganizeLibraryPrompt builds a prompt for organizing the snippet library.
+func (a *SnippetsAgent) buildOrganizeLibraryPrompt(currentStructure string, organizationGoals []string) string {
+	return fmt.Sprintf(`Current snippet library structure: %s\nOrganization goals: %v. Suggest a new organization plan for the snippet library.`,
+		currentStructure, organizationGoals)
+}
+
+// buildSetupEnginePrompt builds a prompt for setting up a snippet engine for an editor.
+func (a *SnippetsAgent) buildSetupEnginePrompt(editorType, engineType string) string {
+	return fmt.Sprintf(`Setup instructions for integrating the %s snippet engine with %s. Provide configuration steps and best practices.`,
+		editorType, engineType)
+}
+
+// buildOptimizePrompt builds a prompt for optimizing snippet performance.
+func (a *SnippetsAgent) buildOptimizePrompt(performanceIssues []string) string {
+	return fmt.Sprintf(`Performance issues: %v. Suggest optimizations to improve snippet loading and usage performance.`,
+		performanceIssues)
+}
+
+// buildGenerateCollectionPrompt builds a prompt for generating a snippet collection.
+func (a *SnippetsAgent) buildGenerateCollectionPrompt(useCases []string, languages []string, requirements []string) string {
+	return fmt.Sprintf(`Generate a collection of code snippets for use cases: %v, languages: %v, with these requirements: %v. Use the %s format.`,
+		useCases, languages, requirements, a.context.SnippetFormat)
+}
+
+// buildMaintenancePrompt builds a prompt for snippet maintenance recommendations.
+func (a *SnippetsAgent) buildMaintenancePrompt(lastUpdated string, conflictIssues []string) string {
+	return fmt.Sprintf(`The snippet library was last updated on %s. Known conflict issues: %v. Recommend maintenance and update actions.`,
+		lastUpdated, conflictIssues)
 }

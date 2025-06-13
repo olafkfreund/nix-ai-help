@@ -63,22 +63,39 @@ func (a *FlakeAgent) Query(ctx context.Context, question string) (string, error)
 	fullPrompt := a.buildContextualPrompt(prompt, question)
 
 	// Get response from AI provider
-	response, err := a.provider.Query(ctx, fullPrompt)
-	if err != nil {
-		return "", err
-	}
-
-	// Validate the response for flake syntax issues
-	if a.validator != nil && validation.IsFlakeContent(response) {
-		validationResult := a.validator.ValidateFlakeContent(response)
-		if !validationResult.IsValid || len(validationResult.Warnings) > 0 {
-			validationSummary := a.validator.FormatValidationResult(validationResult)
-			// Append validation summary to the response
-			response += "\n\n---\n\n" + validationSummary
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, fullPrompt)
+		if err != nil {
+			return "", err
 		}
+		// Validate the response for flake syntax issues
+		if a.validator != nil && validation.IsFlakeContent(response) {
+			validationResult := a.validator.ValidateFlakeContent(response)
+			if !validationResult.IsValid || len(validationResult.Warnings) > 0 {
+				validationSummary := a.validator.FormatValidationResult(validationResult)
+				// Append validation summary to the response
+				response += "\n\n---\n\n" + validationSummary
+			}
+		}
+		return response, nil
 	}
-
-	return response, nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(fullPrompt)
+		if err != nil {
+			return "", err
+		}
+		if a.validator != nil && validation.IsFlakeContent(response) {
+			validationResult := a.validator.ValidateFlakeContent(response)
+			if !validationResult.IsValid || len(validationResult.Warnings) > 0 {
+				validationSummary := a.validator.FormatValidationResult(validationResult)
+				response += "\n\n---\n\n" + validationSummary
+			}
+		}
+		return response, nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateResponse handles flake-related response generation

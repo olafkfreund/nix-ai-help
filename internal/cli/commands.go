@@ -100,6 +100,7 @@ func init() {
 	// Add ask command flags
 	askCmd.Flags().BoolP("quiet", "q", false, "Suppress validation output and show only the AI response")
 	askCmd.Flags().BoolP("verbose", "v", false, "Show detailed validation output with multi-section layout")
+	askCmd.Flags().BoolP("stream", "s", false, "Stream the response in real-time")
 
 	// Add package-repo command flags
 	packageRepoCmd.Flags().String("local", "", "Analyze local repository path instead of cloning")
@@ -1130,21 +1131,26 @@ Output modes:
 - Default: Concise progress indicators with footer-style summary
 - --quiet: Show only the AI response without any validation output
 - --verbose: Show detailed validation output with multi-section layout
+- --stream: Stream the response in real-time (great for LlamaCpp with Vulkan support)
 
 Examples:
   nixai ask "How do I configure nginx?"
   nixai ask "What is the difference between services.openssh.enable and programs.ssh.enable?"
   nixai ask "How do I set up a development environment with Python?" --provider gemini
   nixai ask "How do I enable SSH?" --quiet
-  nixai ask "How do I enable nginx?" --verbose`,
+  nixai ask "How do I enable nginx?" --verbose
+  nixai ask "Help me troubleshoot my build" --stream`,
 	Args: conditionalArgsValidator(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		// Get the quiet and verbose flag values
+		// Get the quiet, verbose, and stream flag values
 		quiet, _ := cmd.Flags().GetBool("quiet")
 		verbose, _ := cmd.Flags().GetBool("verbose")
+		stream, _ := cmd.Flags().GetBool("stream")
 
-		// Route to appropriate version: quiet (minimal) -> concise (default) -> verbose (full)
-		if quiet {
+		// Route to appropriate version based on flags
+		if stream {
+			runAskCmdWithStreaming(args, cmd.OutOrStdout(), aiProvider, aiModel)
+		} else if quiet {
 			runAskCmdWithOptionsQuiet(args, cmd.OutOrStdout(), aiProvider, aiModel)
 		} else if verbose {
 			runAskCmdWithOptions(args, cmd.OutOrStdout(), aiProvider, aiModel)

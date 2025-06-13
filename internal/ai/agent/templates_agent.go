@@ -51,7 +51,17 @@ func (a *TemplatesAgent) Query(ctx context.Context, question string) (string, er
 	prompt := a.buildTemplatePrompt(question, a.getTemplateContextFromData())
 
 	// Query the AI provider
-	response, err := a.provider.Query(ctx, prompt)
+	var response string
+	var err error
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, prompt)
+	} else if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(prompt)
+	} else {
+		return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to query provider: %w", err)
 	}
@@ -84,7 +94,17 @@ func (a *TemplatesAgent) GenerateTemplate(ctx context.Context, templateCtx *Temp
 	}
 
 	prompt := a.buildGenerateTemplatePrompt(templateCtx)
-	response, err := a.provider.Query(ctx, prompt)
+	var response string
+	var err error
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, prompt)
+	} else if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(prompt)
+	} else {
+		return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to generate template: %w", err)
 	}
@@ -99,7 +119,17 @@ func (a *TemplatesAgent) CustomizeTemplate(ctx context.Context, baseTemplate str
 	}
 
 	prompt := a.buildCustomizeTemplatePrompt(baseTemplate, templateCtx)
-	response, err := a.provider.Query(ctx, prompt)
+	var response string
+	var err error
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, prompt)
+	} else if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(prompt)
+	} else {
+		return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to customize template: %w", err)
 	}
@@ -114,7 +144,17 @@ func (a *TemplatesAgent) ExplainTemplate(ctx context.Context, template string, t
 	}
 
 	prompt := a.buildExplainTemplatePrompt(template, templateCtx)
-	response, err := a.provider.Query(ctx, prompt)
+	var response string
+	var err error
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, prompt)
+	} else if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(prompt)
+	} else {
+		return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to explain template: %w", err)
 	}
@@ -129,7 +169,17 @@ func (a *TemplatesAgent) ValidateTemplate(ctx context.Context, template string, 
 	}
 
 	prompt := a.buildValidateTemplatePrompt(template, templateCtx)
-	response, err := a.provider.Query(ctx, prompt)
+	var response string
+	var err error
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, prompt)
+	} else if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(prompt)
+	} else {
+		return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to validate template: %w", err)
 	}
@@ -144,7 +194,17 @@ func (a *TemplatesAgent) SuggestImprovements(ctx context.Context, template strin
 	}
 
 	prompt := a.buildImprovementPrompt(template, templateCtx)
-	response, err := a.provider.Query(ctx, prompt)
+	var response string
+	var err error
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, prompt)
+	} else if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(prompt)
+	} else {
+		return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to suggest improvements: %w", err)
 	}

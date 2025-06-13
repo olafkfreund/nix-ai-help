@@ -93,16 +93,30 @@ func (cpm *CLIProviderManager) QueryWithProgress(ctx context.Context, prompt str
 		progressCallback("Querying AI...")
 	}
 
-	response, err := provider.Query(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("AI query failed: %w", err)
+	// Use QueryWithContext if available, otherwise fallback to legacy Query
+	if p, ok := provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", fmt.Errorf("AI query failed: %w", err)
+		}
+		if progressCallback != nil {
+			progressCallback("Done")
+		}
+		return response, nil
+	} else if p, ok := provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", fmt.Errorf("AI query failed: %w", err)
+		}
+		if progressCallback != nil {
+			progressCallback("Done")
+		}
+		return response, nil
 	}
 
-	if progressCallback != nil {
-		progressCallback("Done")
-	}
-
-	return response, nil
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // LegacyQueryWithProgress performs a legacy query with progress indication
@@ -134,25 +148,26 @@ func (cpm *CLIProviderManager) LegacyQueryWithProgress(prompt string, progressCa
 
 // getProviderName attempts to determine the provider name from a Provider instance
 func getProviderName(provider Provider) string {
-	// Try to determine provider type by checking the underlying type
-	switch provider.(type) {
-	case *OllamaProvider:
-		return "ollama"
-	case *ProviderWrapper:
-		// Try to check the wrapped provider
-		if wrapper, ok := provider.(*ProviderWrapper); ok {
-			switch wrapper.legacy.(type) {
-			case *GeminiClient:
-				return "gemini"
-			case *OpenAIClient:
-				return "openai"
-			case *LlamaCppProvider:
-				return "llamacpp"
-			case *CustomProvider:
-				return "custom"
-			}
+	// Try to determine provider type by checking the underlying type using type assertions
+	if wrapper, ok := provider.(*ProviderWrapper); ok {
+		switch wrapper.legacy.(type) {
+		case *GeminiClient:
+			return "gemini"
+		case *OpenAIClient:
+			return "openai"
+		case *LlamaCppProvider:
+			return "llamacpp"
+		case *CustomProvider:
+			return "custom"
+		case *OllamaLegacyProvider:
+			return "ollama"
+		case *ClaudeLegacyProvider:
+			return "claude"
+		case *GroqLegacyProvider:
+			return "groq"
 		}
 	}
+	// For all other cases, return unknown
 	return "unknown"
 }
 

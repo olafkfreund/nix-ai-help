@@ -1,5 +1,19 @@
 # nixai Command Manual
 
+---
+
+## 🚀 v1.0.5 Release Highlights (June 2025)
+
+- **Real-time streaming and interface compatibility for all AI providers**
+- **Unified Query/QueryWithContext interface for all providers**
+- **Refactored agent and CLI layers for context-aware and legacy support**
+- **Improved CLI completion and test reliability**
+- **Removed obsolete streaming_temp.go and duplicate helpers**
+- **All usages updated for compatibility and fallback logic**
+- **Improved error handling and progress indicators**
+
+---
+
 Welcome to the nixai Command Manual. Each command has its own dedicated documentation page with usage, options, and real-life examples.
 
 ## 📚 System Documentation

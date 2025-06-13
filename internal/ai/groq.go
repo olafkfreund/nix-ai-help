@@ -1,12 +1,14 @@
 package ai
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"nix-ai-help/internal/config"
@@ -96,8 +98,28 @@ type GroqError struct {
 	Code    string `json:"code"`
 }
 
-// Query implements the Provider interface for GroqClient.
-func (client *GroqClient) Query(ctx context.Context, prompt string) (string, error) {
+// GroqStreamResponse represents a streaming response from Groq API.
+type GroqStreamResponse struct {
+	Choices []GroqStreamChoice `json:"choices"`
+}
+
+// GroqStreamChoice represents a choice in the streaming response.
+type GroqStreamChoice struct {
+	Delta GroqStreamDelta `json:"delta"`
+}
+
+// GroqStreamDelta represents the delta content in streaming.
+type GroqStreamDelta struct {
+	Content string `json:"content"`
+}
+
+// Query implements the AIProvider interface (legacy signature for compatibility).
+func (client *GroqClient) Query(prompt string) (string, error) {
+	return client.QueryWithContext(context.Background(), prompt)
+}
+
+// QueryWithContext implements the Provider interface with context support for GroqClient.
+func (client *GroqClient) QueryWithContext(ctx context.Context, prompt string) (string, error) {
 	request := GroqRequest{
 		Model: client.Model,
 		Messages: []GroqMessage{
@@ -145,22 +167,117 @@ func (client *GroqClient) Query(ctx context.Context, prompt string) (string, err
 	return response.Choices[0].Message.Content, nil
 }
 
-// GenerateResponse implements the Provider interface for GroqClient.
+// GenerateResponse implements the Provider interface with context support for GroqClient.
 func (client *GroqClient) GenerateResponse(ctx context.Context, prompt string) (string, error) {
-	return client.Query(ctx, prompt)
+	return client.QueryWithContext(ctx, prompt)
+}
+
+// StreamResponse implements streaming for Groq API
+func (client *GroqClient) StreamResponse(ctx context.Context, prompt string) (<-chan StreamResponse, error) {
+	responseChan := make(chan StreamResponse, 100)
+
+	go func() {
+		defer close(responseChan)
+
+		request := GroqRequest{
+			Model: client.Model,
+			Messages: []GroqMessage{
+				{Role: "user", Content: prompt},
+			},
+			Stream: true,
+		}
+
+		body, err := json.Marshal(request)
+		if err != nil {
+			responseChan <- StreamResponse{Error: fmt.Errorf("failed to marshal request: %w", err), Done: true}
+			return
+		}
+
+		req, err := http.NewRequestWithContext(ctx, "POST", client.APIURL, bytes.NewBuffer(body))
+		if err != nil {
+			responseChan <- StreamResponse{Error: fmt.Errorf("failed to create request: %w", err), Done: true}
+			return
+		}
+
+		req.Header.Set("Authorization", "Bearer "+client.APIKey)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "text/event-stream")
+
+		resp, err := client.HTTPClient.Do(req)
+		if err != nil {
+			responseChan <- StreamResponse{Error: fmt.Errorf("groq request failed: %w", err), Done: true}
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			responseChan <- StreamResponse{Error: fmt.Errorf("groq returned status %d", resp.StatusCode), Done: true}
+			return
+		}
+
+		// Read Server-Sent Events
+		scanner := bufio.NewScanner(resp.Body)
+		var fullResponse strings.Builder
+
+		for scanner.Scan() {
+			line := scanner.Text()
+
+			// Skip empty lines and non-data lines
+			if line == "" || !strings.HasPrefix(line, "data: ") {
+				continue
+			}
+
+			// Extract JSON data from "data: " prefix
+			data := strings.TrimPrefix(line, "data: ")
+
+			// Check for end of stream
+			if data == "[DONE]" {
+				responseChan <- StreamResponse{Content: "", Done: true}
+				return
+			}
+
+			var streamResp GroqStreamResponse
+			if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
+				continue // Skip malformed responses
+			}
+
+			if len(streamResp.Choices) > 0 {
+				content := streamResp.Choices[0].Delta.Content
+				if content != "" {
+					fullResponse.WriteString(content)
+					responseChan <- StreamResponse{
+						Content: content,
+						Done:    false,
+					}
+				}
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			responseChan <- StreamResponse{
+				Content:      fullResponse.String(),
+				Error:        err,
+				Done:         true,
+				PartialSaved: fullResponse.Len() > 0,
+			}
+		}
+	}()
+
+	return responseChan, nil
+}
+
+// GetPartialResponse returns empty for Groq as partial responses are handled in streaming
+func (client *GroqClient) GetPartialResponse() string {
+	return ""
 }
 
 // CheckHealth checks if the Groq API is accessible and responding.
 func (client *GroqClient) CheckHealth() error {
 	// Simple health check by making a minimal request
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	_, err := client.Query(ctx, "Hello")
+	_, err := client.Query("Hello")
 	if err != nil {
 		return fmt.Errorf("Groq API health check failed: %w", err)
 	}
-
 	return nil
 }
 
@@ -200,7 +317,7 @@ func NewGroqLegacyProvider(apiKey, model string) *GroqLegacyProvider {
 
 // Query implements the legacy AIProvider interface.
 func (g *GroqLegacyProvider) Query(prompt string) (string, error) {
-	return g.GroqClient.Query(context.Background(), prompt)
+	return g.GroqClient.Query(prompt)
 }
 
 // GenerateResponse implements the legacy AIProvider interface.

@@ -42,20 +42,24 @@ func NewMigrateAgent(provider ai.Provider) *MigrateAgent {
 }
 
 // Query provides migration guidance using the provider's Query method.
-func (a *MigrateAgent) Query(ctx context.Context, question string) (string, error) {
+func (a *MigrateAgent) Query(ctx context.Context, prompt string) (string, error) {
+	if a.provider == nil {
+		return "", fmt.Errorf("AI provider not configured")
+	}
+
 	if err := a.validateRole(); err != nil {
 		return "", err
 	}
 
-	// Build migration-specific prompt with context
-	prompt := a.buildMigrationPrompt(question, a.getMigrationContextFromData())
-
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", err
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, prompt)
 	}
-
-	return a.formatMigrationResponse(response), nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(prompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateResponse provides detailed migration plans using the provider's GenerateResponse method.

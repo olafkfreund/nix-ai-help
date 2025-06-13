@@ -50,21 +50,24 @@ func NewGCAgent(provider ai.Provider) *GCAgent {
 }
 
 // Query handles GC-related queries using the provider.
-func (a *GCAgent) Query(ctx context.Context, question string) (string, error) {
-	if a.role == "" {
-		return "", fmt.Errorf("role not set for GCAgent")
+func (a *GCAgent) Query(ctx context.Context, prompt string) (string, error) {
+	if a.provider == nil {
+		return "", fmt.Errorf("AI provider not configured")
 	}
 
-	// Build enhanced prompt with GC context
-	prompt := a.buildContextualPrompt(question)
-
-	// Use provider to generate response
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("GC agent query failed: %w", err)
+	if err := a.validateRole(); err != nil {
+		return "", err
 	}
 
-	return a.enhanceResponseWithGCGuidance(response), nil
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, prompt)
+	}
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(prompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateResponse handles GC-specific response generation.

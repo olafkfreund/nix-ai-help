@@ -1,4 +1,27 @@
 changelog:
+  - version: "1.0.5"
+    date: "2025-06-13"
+    highlights:
+      - "Unified Query/QueryWithContext interface for all AI providers"
+      - "Real-time streaming and interface compatibility for all providers"
+      - "Refactored agent and CLI layers for context-aware and legacy support"
+      - "Improved test coverage and CLI test reliability"
+    features:
+      - title: "Streaming & Interface Unification"
+        description: "All AI providers now support both Query(prompt) and QueryWithContext(ctx, prompt) for real-time streaming and context-aware operation."
+      - title: "CLI & Agent Refactor"
+        description: "All CLI and agent layers refactored to use QueryWithContext if available, with fallback to legacy Query."
+      - title: "Test Suite Improvements"
+        description: "Test suite updated for new interfaces; CLI tests fixed for completion and agent compatibility."
+    improvements:
+      - "ProviderWrapper and LegacyProviderAdapter now handle both interfaces"
+      - "All usages updated for compatibility and fallback logic"
+      - "Removed obsolete streaming_temp.go and duplicate helpers"
+      - "Improved error handling and progress indicators"
+    bugfixes:
+      - "Fixed CLI completion test failures after command set changes"
+      - "Resolved all build and test errors for new provider interfaces"
+
   - version: "1.0.4"
     date: "2025-01-27"
     highlights:
@@ -23,6 +46,7 @@ changelog:
     bugfixes:
       - "Fixed YAML syntax errors in user configuration files"
       - "Improved provider fallback mechanisms"
+
   - version: "1.0.3"
     date: "2025-06-12"
     highlights:

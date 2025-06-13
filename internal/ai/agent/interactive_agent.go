@@ -54,14 +54,25 @@ func (a *InteractiveAgent) Query(ctx context.Context, input string) (string, err
 	prompt := a.buildInteractivePrompt(input, interactiveCtx)
 
 	// Query the AI provider
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("failed to query provider: %w", err)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to query provider: %w", err)
+		}
+		a.addToHistory(input, response)
+		return a.enhanceResponseWithInteractiveGuidance(response), nil
 	}
-
-	// Add to session history and enhance response
-	a.addToHistory(input, response)
-	return a.enhanceResponseWithInteractiveGuidance(response), nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", fmt.Errorf("failed to query provider: %w", err)
+		}
+		a.addToHistory(input, response)
+		return a.enhanceResponseWithInteractiveGuidance(response), nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateResponse generates a response using the provider's GenerateResponse method.
@@ -88,13 +99,25 @@ func (a *InteractiveAgent) QueryWithContext(ctx context.Context, input string, i
 	}
 
 	prompt := a.buildInteractivePrompt(input, interactiveCtx)
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", err
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", err
+		}
+		a.addToHistory(input, response)
+		return a.enhanceResponseWithInteractiveGuidance(response), nil
 	}
-
-	a.addToHistory(input, response)
-	return a.enhanceResponseWithInteractiveGuidance(response), nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", err
+		}
+		a.addToHistory(input, response)
+		return a.enhanceResponseWithInteractiveGuidance(response), nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // StartSession initializes a new interactive session.

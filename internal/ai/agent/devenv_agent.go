@@ -57,12 +57,23 @@ func (a *DevenvAgent) Query(ctx context.Context, question string) (string, error
 	// Build devenv-specific prompt with context
 	prompt := a.buildDevenvPrompt(question, a.getDevenvContextFromData())
 
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", err
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", err
+		}
+		return a.formatDevenvResponse(response), nil
 	}
-
-	return a.formatDevenvResponse(response), nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", err
+		}
+		return a.formatDevenvResponse(response), nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateResponse provides detailed development environment setup using the provider's GenerateResponse method.

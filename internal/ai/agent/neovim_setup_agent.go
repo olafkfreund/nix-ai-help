@@ -80,7 +80,17 @@ func (a *NeovimSetupAgent) SetupNeovimConfig(ctx context.Context, configType, ta
 
 	prompt := a.buildSetupPrompt(configType, targetLanguages)
 
-	response, err := a.provider.Query(ctx, prompt)
+	var response string
+	var err error
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, prompt)
+	} else if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(prompt)
+	} else {
+		return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to generate Neovim setup: %w", err)
 	}
@@ -94,7 +104,17 @@ func (a *NeovimSetupAgent) ConfigureLSP(ctx context.Context, languages []string)
 
 	prompt := a.buildLSPPrompt(languages)
 
-	response, err := a.provider.Query(ctx, prompt)
+	var response string
+	var err error
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, prompt)
+	} else if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(prompt)
+	} else {
+		return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to configure LSP: %w", err)
 	}
@@ -109,7 +129,17 @@ func (a *NeovimSetupAgent) OptimizePerformance(ctx context.Context, currentStart
 
 	prompt := a.buildPerformancePrompt(currentStartupTime, goals)
 
-	response, err := a.provider.Query(ctx, prompt)
+	var response string
+	var err error
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, prompt)
+	} else if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(prompt)
+	} else {
+		return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to optimize performance: %w", err)
 	}
@@ -121,7 +151,17 @@ func (a *NeovimSetupAgent) OptimizePerformance(ctx context.Context, currentStart
 func (a *NeovimSetupAgent) MigrateConfiguration(ctx context.Context, sourceEditor, configPath string) (string, error) {
 	prompt := a.buildMigrationPrompt(sourceEditor, configPath)
 
-	response, err := a.provider.Query(ctx, prompt)
+	var response string
+	var err error
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, prompt)
+	} else if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(prompt)
+	} else {
+		return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to generate migration guide: %w", err)
 	}
@@ -135,7 +175,17 @@ func (a *NeovimSetupAgent) CustomizeWorkflow(ctx context.Context, workflowType s
 
 	prompt := a.buildWorkflowPrompt(workflowType, requirements)
 
-	response, err := a.provider.Query(ctx, prompt)
+	var response string
+	var err error
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, prompt)
+	} else if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(prompt)
+	} else {
+		return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to customize workflow: %w", err)
 	}
@@ -147,7 +197,17 @@ func (a *NeovimSetupAgent) CustomizeWorkflow(ctx context.Context, workflowType s
 func (a *NeovimSetupAgent) TroubleshootConfig(ctx context.Context, issue, errorMessage string) (string, error) {
 	prompt := a.buildTroubleshootingPrompt(issue, errorMessage)
 
-	response, err := a.provider.Query(ctx, prompt)
+	var response string
+	var err error
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, prompt)
+	} else if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(prompt)
+	} else {
+		return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 	if err != nil {
 		return "", fmt.Errorf("failed to troubleshoot configuration: %w", err)
 	}

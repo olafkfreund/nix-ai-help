@@ -25,8 +25,10 @@ Aliases:
   ask, a
 
 Flags:
-  -h, --help    help for ask
-  -q, --quiet   Suppress validation output and show only the AI response
+  -h, --help      help for ask
+  -q, --quiet     Suppress validation output and show only the AI response
+  -s, --stream    Stream the response in real-time
+  -v, --verbose   Show detailed validation output with multi-section layout
 
 Global Flags:
   -a, --ask string          Ask a question about NixOS configuration
@@ -39,6 +41,7 @@ Examples:
   nixai ask "Generate a secure NixOS configuration" # Uses Claude for complex reasoning
   nixai ask "Quick help with flakes setup" # Uses Groq for fast response
   nixai ask "How do I enable SSH?" --quiet
+  nixai ask "Help me troubleshoot my build" --stream  # Stream response in real-time
 ```
 
 ---

@@ -65,6 +65,43 @@ func findFirstMatch(text, pattern string) string {
 	return match
 }
 
+// buildContextualPrompt builds a context-aware prompt.
+func (a *BaseAgent) buildContextualPrompt(rolePrompt, question string) string {
+	if a.contextData == nil {
+		return fmt.Sprintf("%s\n\n%s", rolePrompt, question)
+	}
+	return fmt.Sprintf("%s\n\nContext: %v\n\n%s", rolePrompt, a.contextData, question)
+}
+
+// Query queries the AI provider with the given question.
+func (a *BaseAgent) Query(ctx context.Context, question string) (string, error) {
+	if a.provider == nil {
+		return "", fmt.Errorf("AI provider not configured")
+	}
+
+	if err := a.validateRole(); err != nil {
+		return "", err
+	}
+
+	prompt, ok := roles.RolePromptTemplate[a.role]
+	if !ok {
+		return "", fmt.Errorf("no prompt template for role: %s", a.role)
+	}
+
+	// Build context-aware prompt
+	fullPrompt := a.buildContextualPrompt(prompt, question)
+
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, fullPrompt)
+	}
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(fullPrompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+}
+
 // OllamaAgent is a basic implementation of the Agent interface using the Ollama provider.
 type OllamaAgent struct {
 	BaseAgent
@@ -91,7 +128,15 @@ func (a *OllamaAgent) Query(ctx context.Context, question string) (string, error
 	// Combine role prompt with question
 	fullPrompt := fmt.Sprintf("%s\n\n%s", prompt, question)
 
-	return a.provider.Query(ctx, fullPrompt)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, fullPrompt)
+	}
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(fullPrompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 func (a *OllamaAgent) GenerateResponse(ctx context.Context, prompt string) (string, error) {

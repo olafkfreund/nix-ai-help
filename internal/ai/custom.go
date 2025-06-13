@@ -2,6 +2,7 @@ package ai
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -106,8 +107,18 @@ func (c *CustomProvider) SetModel(modelName string) {
 	c.Model = modelName
 }
 
-// Query sends a prompt to the custom HTTP API provider and returns its response.
+// Query implements the AIProvider interface (legacy signature for compatibility).
 func (c *CustomProvider) Query(prompt string) (string, error) {
+	return c.QueryContext(context.Background(), prompt)
+}
+
+// QueryWithContext implements the Provider interface with context support for CustomProvider.
+func (c *CustomProvider) QueryWithContext(ctx context.Context, prompt string) (string, error) {
+	return c.QueryContext(ctx, prompt)
+}
+
+// Query sends a prompt to the custom HTTP API provider and returns its response.
+func (c *CustomProvider) QueryContext(ctx context.Context, prompt string) (string, error) {
 	// Create request payload - adapt this structure based on your API's expected format
 	payload := map[string]interface{}{
 		"prompt":     prompt,
@@ -123,7 +134,7 @@ func (c *CustomProvider) Query(prompt string) (string, error) {
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", c.BaseURL, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", c.BaseURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
@@ -173,6 +184,11 @@ func (c *CustomProvider) Query(prompt string) (string, error) {
 	return "", fmt.Errorf("no recognized response field found in API response")
 }
 
+// GenerateResponse implements the Provider interface with context support for CustomProvider.
+func (c *CustomProvider) GenerateResponse(ctx context.Context, prompt string) (string, error) {
+	return c.QueryWithContext(ctx, prompt)
+}
+
 // SetTimeout updates the HTTP client timeout for custom provider requests.
 func (c *CustomProvider) SetTimeout(timeout time.Duration) {
 	c.client.Timeout = timeout
@@ -183,7 +199,65 @@ func (c *CustomProvider) GetTimeout() time.Duration {
 	return c.client.Timeout
 }
 
-// GenerateResponse is an alias for Query for compatibility.
-func (c *CustomProvider) GenerateResponse(prompt string) (string, error) {
-	return c.Query(prompt)
+// StreamResponse implements simulated streaming for Custom API provider
+func (c *CustomProvider) StreamResponse(ctx context.Context, prompt string) (<-chan StreamResponse, error) {
+	responseChan := make(chan StreamResponse, 100)
+
+	go func() {
+		defer close(responseChan)
+
+		// Custom providers typically don't support native streaming, so we simulate it
+		// by making the request and sending the response in chunks
+		result, err := c.QueryContext(ctx, prompt)
+
+		if err != nil {
+			responseChan <- StreamResponse{
+				Content:      result,
+				Error:        err,
+				Done:         true,
+				PartialSaved: result != "",
+			}
+			return
+		}
+
+		// Simulate streaming by sending chunks of the response
+		chunkSize := 50 // Send 50 characters at a time for smooth streaming effect
+		for i := 0; i < len(result); i += chunkSize {
+			end := i + chunkSize
+			if end > len(result) {
+				end = len(result)
+			}
+
+			chunk := result[i:end]
+			isDone := end >= len(result)
+
+			responseChan <- StreamResponse{
+				Content: chunk,
+				Done:    isDone,
+			}
+
+			// Small delay to simulate streaming
+			if !isDone {
+				select {
+				case <-ctx.Done():
+					responseChan <- StreamResponse{
+						Content:      result[:end],
+						Error:        ctx.Err(),
+						Done:         true,
+						PartialSaved: true,
+					}
+					return
+				case <-time.After(10 * time.Millisecond):
+					// Continue
+				}
+			}
+		}
+	}()
+
+	return responseChan, nil
+}
+
+// GetPartialResponse returns empty for Custom provider as partial responses are handled in streaming
+func (c *CustomProvider) GetPartialResponse() string {
+	return ""
 }

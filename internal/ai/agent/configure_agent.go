@@ -53,24 +53,24 @@ func NewConfigureAgent(provider ai.Provider) *ConfigureAgent {
 }
 
 // Query handles configuration-related queries with context awareness.
-func (a *ConfigureAgent) Query(ctx context.Context, input string) (string, error) {
+func (a *ConfigureAgent) Query(ctx context.Context, prompt string) (string, error) {
+	if a.provider == nil {
+		return "", fmt.Errorf("AI provider not configured")
+	}
+
 	if err := a.validateRole(); err != nil {
 		return "", err
 	}
 
-	// Build configuration-specific prompt
-	prompt := a.buildConfigurationPrompt(input)
-
-	// Query the provider
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("configuration query failed: %w", err)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, prompt)
 	}
-
-	// Format and enhance the response
-	formattedResponse := a.formatConfigurationResponse(response)
-
-	return formattedResponse, nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(prompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateResponse generates responses for configuration tasks.

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"nix-ai-help/internal/ai"
 	nixoscontext "nix-ai-help/internal/ai/context"
@@ -495,8 +496,6 @@ func showFlakeOptions(out io.Writer) {
 	_, _ = fmt.Fprintln(out, utils.FormatHeader("❄️  Flake Options"))
 	_, _ = fmt.Fprintln(out)
 	_, _ = fmt.Fprintln(out, utils.FormatSubsection("Available Commands", ""))
-	_, _ = fmt.Fprintln(out, "  validate      - Validate flake configuration (nix flake check)")
-	_, _ = fmt.Fprintln(out, "  check         - Check flake integrity (same as validate)")
 	_, _ = fmt.Fprintln(out, "  init          - Initialize a new flake")
 	_, _ = fmt.Fprintln(out, "  update        - Update flake inputs")
 	_, _ = fmt.Fprintln(out, "  show          - Show flake information")
@@ -1392,6 +1391,86 @@ func runSearchCmd(args []string, out io.Writer) {
 	}
 }
 
+// runAskCmdWithStreaming implements real-time streaming for ask command
+func runAskCmdWithStreaming(args []string, out io.Writer, providerParam, modelParam string) {
+	if len(args) == 0 {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Usage: ask <question>"))
+		_, _ = fmt.Fprintln(out, utils.FormatTip("Example: ask How do I enable nginx?"))
+		return
+	}
+
+	question := strings.Join(args, " ")
+	cfg, err := config.LoadUserConfig()
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to load configuration: "+err.Error()))
+		return
+	}
+
+	// Create AI provider manager
+	manager := ai.NewProviderManager(cfg, logger.NewLogger())
+	selectedProvider := cfg.AIModels.SelectionPreferences.DefaultProvider
+	if providerParam != "" {
+		selectedProvider = providerParam
+	}
+	if selectedProvider == "" {
+		selectedProvider = "ollama"
+	}
+
+	var provider ai.Provider
+	if modelParam != "" {
+		provider, err = manager.GetProviderWithModel(selectedProvider, modelParam)
+	} else {
+		provider, err = manager.GetProvider(selectedProvider)
+	}
+
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to initialize AI provider: "+err.Error()))
+		return
+	}
+
+	// Show streaming header
+	_, _ = fmt.Fprintln(out, utils.FormatHeader("🤖 AI Assistant (Streaming)"))
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Question", question))
+	_, _ = fmt.Fprintln(out, utils.FormatDivider())
+
+	// Build prompt (simplified for streaming)
+	prompt := fmt.Sprintf("You are a NixOS expert. Answer this question about NixOS: %s", question)
+
+	// Start streaming
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	responseChan, err := provider.StreamResponse(ctx, prompt)
+	if err != nil {
+		_, _ = fmt.Fprintln(out, utils.FormatError("Failed to start streaming: "+err.Error()))
+		return
+	}
+
+	var fullResponse strings.Builder
+	for chunk := range responseChan {
+		if chunk.Error != nil {
+			if chunk.Content != "" {
+				_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Partial Response", ""))
+				_, _ = fmt.Fprint(out, chunk.Content)
+			}
+			_, _ = fmt.Fprintln(out, utils.FormatError("Streaming error: "+chunk.Error.Error()))
+			return
+		}
+
+		// Print chunk content immediately
+		_, _ = fmt.Fprint(out, chunk.Content)
+		fullResponse.WriteString(chunk.Content)
+
+		if chunk.Done {
+			break
+		}
+	}
+
+	_, _ = fmt.Fprintln(out)
+	_, _ = fmt.Fprintln(out, utils.FormatDivider())
+	_, _ = fmt.Fprintln(out, utils.FormatKeyValue("Complete", fmt.Sprintf("%d chars", fullResponse.Len())))
+}
+
 // Ask command - Enhanced version with comprehensive information sources and validation
 // runAskCmdWithConciseMode is a new version with concise footer-style output
 func runAskCmdWithConciseMode(args []string, out io.Writer, providerParam, modelParam string) {
@@ -1591,7 +1670,16 @@ func runAskCmdWithConciseMode(args []string, out io.Writer, providerParam, model
 
 	// Query the AI provider (silent)
 	ctx := context.Background()
-	response, err := provider.Query(ctx, finalPrompt)
+	var response string
+	if p, ok := provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, finalPrompt)
+	} else if p, ok := provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(finalPrompt)
+	} else {
+		err = fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 
 	if err != nil {
 		_, _ = fmt.Fprintln(out, "❌")
@@ -1844,7 +1932,16 @@ func runAskCmdWithOptionsQuiet(args []string, out io.Writer, providerParam, mode
 
 	// Query the AI provider (silent)
 	ctx := context.Background()
-	response, err := provider.Query(ctx, finalPrompt)
+	var response string
+	if p, ok := provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, finalPrompt)
+	} else if p, ok := provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(finalPrompt)
+	} else {
+		err = fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 
 	if err != nil {
 		_, _ = fmt.Fprintln(out, utils.FormatError("AI error: "+err.Error()))
@@ -2094,7 +2191,16 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 	// Query the AI provider
 	_, _ = fmt.Fprint(out, utils.FormatInfo("Querying AI provider... "))
 	ctx := context.Background()
-	response, err := provider.Query(ctx, finalPrompt)
+	var response string
+	if p, ok := provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err = p.QueryWithContext(ctx, finalPrompt)
+	} else if p, ok := provider.(interface{ Query(string) (string, error) }); ok {
+		response, err = p.Query(finalPrompt)
+	} else {
+		err = fmt.Errorf("provider does not implement QueryWithContext or Query")
+	}
 
 	if err != nil {
 		_, _ = fmt.Fprintln(out, utils.FormatError("failed"))

@@ -429,7 +429,17 @@ type ProviderToLegacyAdapter struct {
 
 // Query implements the legacy AIProvider interface.
 func (a *ProviderToLegacyAdapter) Query(prompt string) (string, error) {
-	return a.provider.Query(context.Background(), prompt)
+	// Try context-aware QueryWithContext first
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(context.Background(), prompt)
+	}
+	// Fallback to legacy Query(prompt string)
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(prompt)
+	}
+	return "", fmt.Errorf("underlying provider does not implement QueryWithContext or Query")
 }
 
 // HealthChecker interface for providers that support health checking

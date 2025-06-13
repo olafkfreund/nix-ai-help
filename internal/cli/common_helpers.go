@@ -42,7 +42,15 @@ type ProviderToLegacyAdapter struct {
 
 // Query implements the legacy AIProvider interface
 func (p *ProviderToLegacyAdapter) Query(prompt string) (string, error) {
-	return p.provider.Query(context.Background(), prompt)
+	if provider, ok := p.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return provider.QueryWithContext(context.Background(), prompt)
+	}
+	if provider, ok := p.provider.(interface{ Query(string) (string, error) }); ok {
+		return provider.Query(prompt)
+	}
+	return "", context.DeadlineExceeded // or another suitable error
 }
 
 // InitializeAIProvider creates the appropriate AI provider based on configuration

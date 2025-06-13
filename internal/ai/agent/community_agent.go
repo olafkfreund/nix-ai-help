@@ -46,7 +46,15 @@ func (a *CommunityAgent) Query(ctx context.Context, input string) (string, error
 	prompt := a.buildCommunityPrompt(input)
 
 	// Use provider to generate response
-	return a.provider.Query(ctx, prompt)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, prompt)
+	}
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(prompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateResponse generates a response for community assistance.
@@ -103,7 +111,15 @@ Provide specific recommendations with links and descriptions.`,
 		resourceType, topic, a.formatCommunityContext())
 
 	ctx := context.Background()
-	return a.provider.Query(ctx, prompt)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, prompt)
+	}
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(prompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GuideContribution provides guidance for contributing to NixOS projects.
@@ -122,7 +138,15 @@ Include step-by-step instructions and best practices.`,
 		contributionType, projectArea, a.formatCommunityContext())
 
 	ctx := context.Background()
-	return a.provider.Query(ctx, prompt)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, prompt)
+	}
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(prompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // RecommendProjects suggests relevant community projects.
@@ -141,7 +165,15 @@ Suggest specific projects with rationale for recommendations.`,
 		strings.Join(interests, ", "), skillLevel, a.formatCommunityContext())
 
 	ctx := context.Background()
-	return a.provider.Query(ctx, prompt)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, prompt)
+	}
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(prompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // ExplainCommunityChannels explains different community communication channels.
@@ -159,7 +191,15 @@ Describe the channels, their culture, and when to use each one.`,
 		purpose, a.formatCommunityContext())
 
 	ctx := context.Background()
-	return a.provider.Query(ctx, prompt)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, prompt)
+	}
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(prompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // PlanCommunityInvolvement helps plan community involvement strategy.
@@ -178,7 +218,15 @@ Provide a structured plan with actionable steps.`,
 		strings.Join(goals, ", "), timeCommitment, a.formatCommunityContext())
 
 	ctx := context.Background()
-	return a.provider.Query(ctx, prompt)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, prompt)
+	}
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(prompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // buildCommunityPrompt constructs a community-specific prompt.

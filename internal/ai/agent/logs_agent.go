@@ -64,12 +64,23 @@ func (a *LogsAgent) Query(ctx context.Context, question string) (string, error) 
 	prompt := a.buildContextualPrompt(question)
 
 	// Use provider to generate response
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("logs agent query failed: %w", err)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", fmt.Errorf("logs agent query failed: %w", err)
+		}
+		return a.enhanceResponseWithLogsGuidance(response), nil
 	}
-
-	return a.enhanceResponseWithLogsGuidance(response), nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", fmt.Errorf("logs agent query failed: %w", err)
+		}
+		return a.enhanceResponseWithLogsGuidance(response), nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateResponse handles logs-specific response generation.

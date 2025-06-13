@@ -40,6 +40,10 @@ func NewBuildAgent(provider ai.Provider) *BuildAgent {
 
 // Query handles build-related questions and analysis
 func (a *BuildAgent) Query(ctx context.Context, question string) (string, error) {
+	if a.provider == nil {
+		return "", fmt.Errorf("AI provider not configured")
+	}
+
 	if err := a.validateRole(); err != nil {
 		return "", err
 	}
@@ -52,7 +56,15 @@ func (a *BuildAgent) Query(ctx context.Context, question string) (string, error)
 	// Build context-aware prompt
 	fullPrompt := a.buildContextualPrompt(prompt, question)
 
-	return a.provider.Query(ctx, fullPrompt)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, fullPrompt)
+	}
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(fullPrompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateResponse handles build-related response generation

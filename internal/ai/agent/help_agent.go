@@ -44,12 +44,15 @@ func (a *HelpAgent) Query(ctx context.Context, question string) (string, error) 
 	// Build help-specific prompt with context
 	prompt := a.buildHelpPrompt(question, a.getHelpContextFromData())
 
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", err
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, prompt)
 	}
-
-	return a.enhanceResponseWithHelpGuidance(response), nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(prompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateResponse generates a response using the provider's GenerateResponse method.
@@ -224,7 +227,15 @@ Suggest the single most appropriate nixai command from this list:
 Respond with just the command name (e.g., "ask", "diagnose", "doctor").`,
 		userInput, strings.Join(a.GetAvailableCommands(), ", "))
 
-	return a.provider.Query(ctx, prompt)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, prompt)
+	}
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(prompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // ExplainWorkflow provides a workflow explanation for accomplishing a goal.

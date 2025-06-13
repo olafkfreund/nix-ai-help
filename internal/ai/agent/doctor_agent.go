@@ -56,7 +56,15 @@ func (a *DoctorAgent) Query(ctx context.Context, question string) (string, error
 	// Build context-aware prompt
 	fullPrompt := a.buildContextualPrompt(prompt, question)
 
-	return a.provider.Query(ctx, fullPrompt)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, fullPrompt)
+	}
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(fullPrompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateResponse handles system health response generation

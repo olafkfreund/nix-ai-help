@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -13,9 +14,10 @@ import (
 
 // OllamaProvider implements the new Provider interface for Ollama.
 type OllamaProvider struct {
-	Endpoint string
-	Model    string
-	Client   *http.Client
+	Endpoint    string
+	Model       string
+	Client      *http.Client
+	lastPartial string // Store partial response for token limit cases
 }
 
 // NewOllamaProvider creates a new OllamaProvider.
@@ -104,6 +106,98 @@ func (o *OllamaProvider) queryWithContext(ctx context.Context, prompt string) (s
 	}
 
 	return result.Response, nil
+}
+
+// StreamResponse implements streaming for Ollama API
+func (o *OllamaProvider) StreamResponse(ctx context.Context, prompt string) (<-chan StreamResponse, error) {
+	responseChan := make(chan StreamResponse, 100)
+
+	go func() {
+		defer close(responseChan)
+
+		reqBody := ollamaRequest{
+			Model:  o.Model,
+			Prompt: prompt,
+			Stream: true,
+		}
+
+		body, err := json.Marshal(reqBody)
+		if err != nil {
+			responseChan <- StreamResponse{Error: fmt.Errorf("failed to marshal request: %w", err), Done: true}
+			return
+		}
+
+		req, err := http.NewRequestWithContext(ctx, "POST", o.Endpoint, bytes.NewBuffer(body))
+		if err != nil {
+			responseChan <- StreamResponse{Error: fmt.Errorf("failed to create request: %w", err), Done: true}
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := o.Client.Do(req)
+		if err != nil {
+			responseChan <- StreamResponse{Error: fmt.Errorf("ollama request failed: %w", err), Done: true}
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			responseChan <- StreamResponse{Error: fmt.Errorf("ollama returned status %d", resp.StatusCode), Done: true}
+			return
+		}
+
+		// Use bufio.Scanner to read line by line for streaming
+		scanner := bufio.NewScanner(resp.Body)
+		var fullResponse strings.Builder
+
+		for scanner.Scan() {
+			var streamResp ollamaResponse
+			if err := json.Unmarshal(scanner.Bytes(), &streamResp); err != nil {
+				continue // Skip malformed responses
+			}
+
+			if streamResp.Error != "" {
+				// Store partial response before sending error
+				o.lastPartial = fullResponse.String()
+				responseChan <- StreamResponse{
+					Content:      fullResponse.String(),
+					Error:        fmt.Errorf("ollama error: %s", streamResp.Error),
+					Done:         true,
+					PartialSaved: fullResponse.Len() > 0,
+				}
+				return
+			}
+
+			fullResponse.WriteString(streamResp.Response)
+
+			responseChan <- StreamResponse{
+				Content: streamResp.Response,
+				Done:    streamResp.Done,
+			}
+
+			if streamResp.Done {
+				o.lastPartial = "" // Clear on successful completion
+				break
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			o.lastPartial = fullResponse.String()
+			responseChan <- StreamResponse{
+				Content:      fullResponse.String(),
+				Error:        err,
+				Done:         true,
+				PartialSaved: fullResponse.Len() > 0,
+			}
+		}
+	}()
+
+	return responseChan, nil
+}
+
+// GetPartialResponse returns the last partial response saved during errors
+func (o *OllamaProvider) GetPartialResponse() string {
+	return o.lastPartial
 }
 
 // HealthCheck checks if the Ollama server is running and accessible

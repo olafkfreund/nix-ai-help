@@ -36,6 +36,19 @@ func NewMcpServerAgent(provider ai.Provider) *McpServerAgent {
 	}
 }
 
+// Helper for all usages in this file:
+func queryProviderWithContextOrFallback(provider ai.Provider, ctx context.Context, prompt string) (string, error) {
+	if p, ok := provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		return p.QueryWithContext(ctx, prompt)
+	}
+	if p, ok := provider.(interface{ Query(string) (string, error) }); ok {
+		return p.Query(prompt)
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
+}
+
 // Query processes MCP server-related queries.
 func (a *McpServerAgent) Query(ctx context.Context, input string) (string, error) {
 	if a.provider == nil {
@@ -46,7 +59,7 @@ func (a *McpServerAgent) Query(ctx context.Context, input string) (string, error
 	prompt := a.buildMcpServerPrompt(input)
 
 	// Use provider to generate response
-	return a.provider.Query(ctx, prompt)
+	return queryProviderWithContextOrFallback(a.provider, ctx, prompt)
 }
 
 // GenerateResponse generates a response for MCP server assistance.
@@ -59,7 +72,7 @@ func (a *McpServerAgent) GenerateResponse(ctx context.Context, input string) (st
 	prompt := a.enhancePromptWithRole(input)
 
 	// Generate response using provider
-	response, err := a.provider.GenerateResponse(ctx, prompt)
+	response, err := queryProviderWithContextOrFallback(a.provider, ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate MCP server response: %w", err)
 	}
@@ -103,7 +116,7 @@ Provide complete setup instructions with configuration examples.`,
 		serverType, requirements, a.formatMcpServerContext())
 
 	ctx := context.Background()
-	return a.provider.Query(ctx, prompt)
+	return queryProviderWithContextOrFallback(a.provider, ctx, prompt)
 }
 
 // DiagnoseMcpIssues diagnoses MCP server problems.
@@ -122,7 +135,7 @@ Provide diagnosis and step-by-step troubleshooting instructions.`,
 		issue, strings.Join(symptoms, ", "), a.formatMcpServerContext())
 
 	ctx := context.Background()
-	return a.provider.Query(ctx, prompt)
+	return queryProviderWithContextOrFallback(a.provider, ctx, prompt)
 }
 
 // OptimizeMcpPerformance provides MCP server performance optimization guidance.
@@ -141,7 +154,7 @@ Provide specific optimization recommendations and implementation steps.`,
 		strings.Join(performanceGoals, ", "), currentMetrics, a.formatMcpServerContext())
 
 	ctx := context.Background()
-	return a.provider.Query(ctx, prompt)
+	return queryProviderWithContextOrFallback(a.provider, ctx, prompt)
 }
 
 // ManageMcpSecurity handles MCP server security configuration.
@@ -160,7 +173,7 @@ Provide security recommendations and configuration updates.`,
 		strings.Join(securityConcerns, ", "), currentConfig, a.formatMcpServerContext())
 
 	ctx := context.Background()
-	return a.provider.Query(ctx, prompt)
+	return queryProviderWithContextOrFallback(a.provider, ctx, prompt)
 }
 
 // IntegrateMcpServer helps integrate MCP server with applications.
@@ -179,7 +192,7 @@ Provide integration guide with examples and best practices.`,
 		targetApp, strings.Join(integrationRequirements, ", "), a.formatMcpServerContext())
 
 	ctx := context.Background()
-	return a.provider.Query(ctx, prompt)
+	return queryProviderWithContextOrFallback(a.provider, ctx, prompt)
 }
 
 // MonitorMcpServer provides monitoring and alerting guidance.
@@ -198,7 +211,7 @@ Provide monitoring setup instructions and alerting configuration.`,
 		strings.Join(monitoringScope, ", "), strings.Join(alertingNeeds, ", "), a.formatMcpServerContext())
 
 	ctx := context.Background()
-	return a.provider.Query(ctx, prompt)
+	return queryProviderWithContextOrFallback(a.provider, ctx, prompt)
 }
 
 // buildMcpServerPrompt constructs an MCP server-specific prompt.

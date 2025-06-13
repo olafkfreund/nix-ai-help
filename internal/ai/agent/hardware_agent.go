@@ -64,12 +64,23 @@ func (a *HardwareAgent) Query(ctx context.Context, question string) (string, err
 	prompt := a.buildContextualPrompt(question)
 
 	// Use provider to generate response
-	response, err := a.provider.Query(ctx, prompt)
-	if err != nil {
-		return "", fmt.Errorf("hardware agent query failed: %w", err)
+	if p, ok := a.provider.(interface {
+		QueryWithContext(context.Context, string) (string, error)
+	}); ok {
+		response, err := p.QueryWithContext(ctx, prompt)
+		if err != nil {
+			return "", fmt.Errorf("hardware agent query failed: %w", err)
+		}
+		return a.enhanceResponseWithHardwareGuidance(response), nil
 	}
-
-	return a.enhanceResponseWithHardwareGuidance(response), nil
+	if p, ok := a.provider.(interface{ Query(string) (string, error) }); ok {
+		response, err := p.Query(prompt)
+		if err != nil {
+			return "", fmt.Errorf("hardware agent query failed: %w", err)
+		}
+		return a.enhanceResponseWithHardwareGuidance(response), nil
+	}
+	return "", fmt.Errorf("provider does not implement QueryWithContext or Query")
 }
 
 // GenerateResponse handles hardware-specific response generation.
