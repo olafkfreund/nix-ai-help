@@ -16,7 +16,7 @@ main
 # Logs and debug files
 *.log
 *debug*.go
-*test*.go
+# *test*.go
 
 # Nix flake lock
 flake.lock
