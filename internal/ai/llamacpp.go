@@ -111,9 +111,16 @@ type llamacppRequest struct {
 	Model  string `json:"model,omitempty"`
 }
 
-// llamacppResponse is the response format from llamacpp's API.
+// llamacppResponse is the response format for llamacpp's native API.
 type llamacppResponse struct {
 	Content string `json:"content"`
+}
+
+// openAIResponse is for OpenAI-compatible endpoints (e.g., /v1/completions)
+type openAIResponse struct {
+	Choices []struct {
+		Text string `json:"text"`
+	} `json:"choices"`
 }
 
 // Query sends a prompt to llamacpp and returns the response.
@@ -123,6 +130,9 @@ func (l *LlamaCppProvider) Query(prompt string) (string, error) {
 		// Save partial result for recovery
 		l.lastPartial = result
 	}
+	if result == "" {
+		return "[llamacpp: No output received from model. Check endpoint compatibility or model settings.]", nil
+	}
 	return result, err
 }
 
@@ -131,6 +141,9 @@ func (l *LlamaCppProvider) QueryContext(ctx context.Context, prompt string) (str
 	result, err := l.queryLlamaCppWithContext(ctx, prompt, false)
 	if err != nil {
 		l.lastPartial = result
+	}
+	if result == "" {
+		return "[llamacpp: No output received from model. Check endpoint compatibility or model settings.]", nil
 	}
 	return result, err
 }
@@ -221,11 +234,23 @@ func (l *LlamaCppProvider) queryLlamaCpp(prompt string, streaming bool) (string,
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	// Try native llamacpp response first
 	var result llamacppResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("llamacpp decode failed: %w", err)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err == nil && result.Content != "" {
+		return result.Content, nil
 	}
-	return result.Content, nil
+	// If not, try OpenAI-compatible response
+	_ = resp.Body.Close() // Reset body for re-read
+	resp, err = l.Client.Post(l.Endpoint, "application/json", bytes.NewBuffer(reqBody))
+	if err != nil {
+		return "", fmt.Errorf("llamacpp request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var oai openAIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&oai); err == nil && len(oai.Choices) > 0 {
+		return oai.Choices[0].Text, nil
+	}
+	return "", fmt.Errorf("llamacpp decode failed: unknown response format")
 }
 
 // queryLlamaCppWithContext is the context-aware implementation
@@ -244,14 +269,26 @@ func (l *LlamaCppProvider) queryLlamaCppWithContext(ctx context.Context, prompt 
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("llamacpp returned status %d", resp.StatusCode)
-	}
-
+	// Try native llamacpp response first
 	var result llamacppResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("llamacpp decode failed: %w", err)
+	if err := json.NewDecoder(resp.Body).Decode(&result); err == nil && result.Content != "" {
+		return result.Content, nil
 	}
-
-	return result.Content, nil
+	// If not, try OpenAI-compatible response
+	_ = resp.Body.Close() // Reset body for re-read
+	req, err = http.NewRequestWithContext(ctx, "POST", l.Endpoint, bytes.NewBuffer(reqBody))
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err = l.Client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("llamacpp request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var oai openAIResponse
+	if err := json.NewDecoder(resp.Body).Decode(&oai); err == nil && len(oai.Choices) > 0 {
+		return oai.Choices[0].Text, nil
+	}
+	return "", fmt.Errorf("llamacpp decode failed: unknown response format")
 }

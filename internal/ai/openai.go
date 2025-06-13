@@ -58,6 +58,7 @@ type Response struct {
 // Choice represents a choice in the response.
 type Choice struct {
 	Message Message `json:"message"`
+	Text    string  `json:"text"`
 }
 
 // StreamRequest represents a streaming request to the OpenAI API.
@@ -121,7 +122,14 @@ func (client *OpenAIClient) GenerateResponseFromMessages(messages []Message) (st
 		return "", fmt.Errorf("no choices in response")
 	}
 
-	return response.Choices[0].Message.Content, nil
+	// Support both chat and completions endpoints
+	if response.Choices[0].Message.Content != "" {
+		return response.Choices[0].Message.Content, nil
+	}
+	if response.Choices[0].Text != "" {
+		return response.Choices[0].Text, nil
+	}
+	return "", fmt.Errorf("no content in OpenAI response (neither message.content nor text)")
 }
 
 // Query implements the AIProvider interface (legacy signature for compatibility).
@@ -193,7 +201,14 @@ func (client *OpenAIClient) GenerateResponseFromMessagesContext(ctx context.Cont
 		return "", fmt.Errorf("no choices in response")
 	}
 
-	return response.Choices[0].Message.Content, nil
+	// Support both chat and completions endpoints
+	if response.Choices[0].Message.Content != "" {
+		return response.Choices[0].Message.Content, nil
+	}
+	if response.Choices[0].Text != "" {
+		return response.Choices[0].Text, nil
+	}
+	return "", fmt.Errorf("no content in OpenAI response (neither message.content nor text)")
 }
 
 // StreamResponse implements streaming for OpenAI API
