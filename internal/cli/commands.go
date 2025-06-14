@@ -58,12 +58,29 @@ Usage:
 		}
 
 		if askQuestion != "" {
-			// Set environment variables for provider and model flags so enhanced ask command can access them
-			if aiProvider != "" {
-				os.Setenv("NIXAI_PROVIDER", aiProvider)
+			// Get current provider and model flag values directly from the command
+			currentProvider, _ := cmd.PersistentFlags().GetString("provider")
+			currentModel, _ := cmd.PersistentFlags().GetString("model")
+
+			// DEBUG: Print what we found
+			fmt.Printf("DEBUG: Root command - askQuestion='%s'\n", askQuestion)
+			fmt.Printf("DEBUG: Root command - currentProvider='%s', aiProvider global='%s'\n", currentProvider, aiProvider)
+			fmt.Printf("DEBUG: Root command - currentModel='%s', aiModel global='%s'\n", currentModel, aiModel)
+
+			// If no provider specified in flags, fall back to global variables
+			if currentProvider == "" {
+				currentProvider = aiProvider
 			}
-			if aiModel != "" {
-				os.Setenv("NIXAI_MODEL", aiModel)
+			if currentModel == "" {
+				currentModel = aiModel
+			}
+
+			// Set environment variables for provider and model flags so enhanced ask command can access them
+			if currentProvider != "" {
+				os.Setenv("NIXAI_PROVIDER", currentProvider)
+			}
+			if currentModel != "" {
+				os.Setenv("NIXAI_MODEL", currentModel)
 			}
 
 			// Use the enhanced ask command implementation instead of simple version
@@ -290,8 +307,19 @@ func setConfig(key, value string) {
 
 	switch key {
 	case "ai_provider":
-		if value != "ollama" && value != "gemini" && value != "openai" {
-			fmt.Println(utils.FormatError("Invalid AI provider. Valid options: ollama, gemini, openai"))
+		// Validate provider using model registry
+		registry := config.NewModelRegistry(cfg)
+		availableProviders := registry.GetAvailableProviders()
+		isValid := false
+		for _, provider := range availableProviders {
+			if value == provider {
+				isValid = true
+				break
+			}
+		}
+		if !isValid {
+			validOptions := strings.Join(availableProviders, ", ")
+			fmt.Println(utils.FormatError("Invalid AI provider. Valid options: " + validOptions))
 			os.Exit(1)
 		}
 		cfg.AIProvider = value
@@ -1140,23 +1168,34 @@ Examples:
   nixai ask "How do I enable SSH?" --quiet
   nixai ask "How do I enable nginx?" --verbose
   nixai ask "Help me troubleshoot my build" --stream`,
-	Args: conditionalArgsValidator(1),
-	Run: func(cmd *cobra.Command, args []string) {
+	Args: conditionalArgsValidator(1), Run: func(cmd *cobra.Command, args []string) {
 		// Get the quiet, verbose, and stream flag values
 		quiet, _ := cmd.Flags().GetBool("quiet")
 		verbose, _ := cmd.Flags().GetBool("verbose")
 		stream, _ := cmd.Flags().GetBool("stream")
 
+		// Get current provider and model flag values - check both command and persistent flags
+		currentProvider, _ := cmd.Root().PersistentFlags().GetString("provider")
+		currentModel, _ := cmd.Root().PersistentFlags().GetString("model")
+
+		// If no provider specified, fall back to global variables
+		if currentProvider == "" {
+			currentProvider = aiProvider
+		}
+		if currentModel == "" {
+			currentModel = aiModel
+		}
+
 		// Route to appropriate version based on flags
 		if stream {
-			runAskCmdWithStreaming(args, cmd.OutOrStdout(), aiProvider, aiModel)
+			runAskCmdWithStreaming(args, cmd.OutOrStdout(), currentProvider, currentModel)
 		} else if quiet {
-			runAskCmdWithOptionsQuiet(args, cmd.OutOrStdout(), aiProvider, aiModel)
+			runAskCmdWithOptionsQuiet(args, cmd.OutOrStdout(), currentProvider, currentModel)
 		} else if verbose {
-			runAskCmdWithOptions(args, cmd.OutOrStdout(), aiProvider, aiModel)
+			runAskCmdWithOptions(args, cmd.OutOrStdout(), currentProvider, currentModel)
 		} else {
 			// Default to concise mode for better user experience
-			runAskCmdWithConciseMode(args, cmd.OutOrStdout(), aiProvider, aiModel)
+			runAskCmdWithConciseMode(args, cmd.OutOrStdout(), currentProvider, currentModel)
 		}
 	},
 }

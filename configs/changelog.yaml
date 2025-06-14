@@ -1,4 +1,30 @@
 changelog:
+  - version: "1.0.7"
+    date: "2025-06-14"
+    highlights:
+      - "GitHub Copilot AI provider integration with OpenAI-compatible API"
+      - "Enhanced AI provider ecosystem with 8 total providers"
+      - "Improved CLI flag handling and environment variable support"
+      - "Dynamic provider validation and configuration management"
+    features:
+      - title: "GitHub Copilot Provider"
+        description: "Full integration with GitHub Copilot using OpenAI-compatible API endpoint, authenticated via GITHUB_TOKEN environment variable."
+      - title: "OpenAI-Compatible Streaming"
+        description: "Real-time streaming support for Copilot with proper error handling and context management."
+      - title: "Dynamic Provider Discovery"
+        description: "CLI validation now uses dynamic provider lists instead of hardcoded values for better extensibility."
+      - title: "Enhanced Configuration Management"
+        description: "Added copilot provider configuration with model options and task-specific recommendations."
+    improvements:
+      - "Fixed CLI flag passing to read provider and model from environment variables"
+      - "Updated provider manager with proper copilot initialization and fallback handling"
+      - "Enhanced default configuration to include copilot provider settings"
+      - "Improved error handling for provider authentication and API communication"
+    bugfixes:
+      - "Fixed runAskCmd() to properly read NIXAI_PROVIDER and NIXAI_MODEL environment variables"
+      - "Resolved provider initialization issues when API keys are not available"
+      - "Fixed CLI validation to support all dynamically available providers"
+
   - version: "1.0.5"
     date: "2025-06-13"
     highlights:

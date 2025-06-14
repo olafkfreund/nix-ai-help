@@ -10,15 +10,15 @@
 
 ## 🆕 Latest Updates (June 2025)
 
-### 🚀 **v1.0.5: Streaming, Unified AI Provider Interface, and CLI/Agent Refactor**
+### 🚀 **v1.0.7: GitHub Copilot Integration and Enhanced Provider Support**
 
-- **Real-time streaming and interface compatibility for all AI providers**
-- **Unified Query/QueryWithContext interface for all providers**
-- **Refactored agent and CLI layers for context-aware and legacy support**
-- **Improved CLI completion and test reliability**
-- **Removed obsolete streaming_temp.go and duplicate helpers**
-- **All usages updated for compatibility and fallback logic**
-- **Improved error handling and progress indicators**
+- **GitHub Copilot AI Provider**: Full integration with GitHub Copilot API using GITHUB_TOKEN authentication
+- **OpenAI-Compatible Streaming**: Real-time streaming support for Copilot provider with fallback handling
+- **Enhanced Provider Management**: Dynamic provider discovery and validation across all AI providers
+- **Improved Configuration**: Updated default configurations with Copilot model recommendations
+- **Privacy-First Options**: Leverage existing GitHub Copilot subscriptions for NixOS assistance
+- **Backward Compatibility**: All existing providers (Ollama, OpenAI, Gemini, etc.) remain fully functional
+- **Unified API Interface**: Consistent Query/QueryWithContext interface across all providers
 
 ### ✨ **Modern TUI Interface** - **NEWLY COMPLETED!**
 

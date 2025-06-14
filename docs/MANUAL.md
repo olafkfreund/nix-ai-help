@@ -2,8 +2,9 @@
 
 ---
 
-## 🚀 v1.0.5 Release Highlights (June 2025)
+## 🚀 v1.0.7 Release Highlights (June 2025)
 
+- **GitHub Copilot AI provider integration with OpenAI-compatible API**
 - **Real-time streaming and interface compatibility for all AI providers**
 - **Unified Query/QueryWithContext interface for all providers**
 - **Refactored agent and CLI layers for context-aware and legacy support**

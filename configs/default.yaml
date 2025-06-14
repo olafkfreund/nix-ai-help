@@ -1,6 +1,6 @@
 default:
-    ai_provider: ollama  # Options: openai, ollama, gemini, claude, groq, llamacpp, custom
-    ai_model: llama3  # Model name for ollama or gemini, e.g., "llama3", "gemini-1.5-flash"
+    ai_provider: copilot  # Options: openai, ollama, gemini, claude, groq, llamacpp, custom, copilot
+    ai_model: gpt-4  # Model name for ollama or gemini, e.g., "llama3", "gemini-1.5-flash"
     # For llamacpp, set endpoint via LLAMACPP_ENDPOINT env var (default: http://localhost:8080/completion)
     # Example: export LLAMACPP_ENDPOINT="http://localhost:8080/completion"
     # Example configuration for llamacpp provider:
@@ -146,6 +146,34 @@ default:
                         max_tokens: 4096
                         recommended_for: ["general", "fast", "budget"]
                         cost_tier: "standard"
+            copilot:
+                name: "GitHub Copilot"
+                description: "GitHub Copilot's AI models with OpenAI compatibility"
+                type: "cloud"
+                base_url: "https://api.githubcopilot.com"
+                available: true
+                supports_streaming: true
+                supports_tools: true
+                requires_api_key: true
+                env_var: "GITHUB_TOKEN"
+                models:
+                    gpt-4:
+                        name: "GPT-4 (Copilot)"
+                        description: "GPT-4 model via GitHub Copilot"
+                        type: "chat"
+                        context_window: 128000
+                        max_tokens: 4096
+                        recommended_for: ["coding", "nixos", "general", "analysis"]
+                        cost_tier: "premium"
+                        default: true
+                    gpt-3.5-turbo:
+                        name: "GPT-3.5 Turbo (Copilot)"
+                        description: "GPT-3.5 Turbo model via GitHub Copilot"
+                        type: "chat"
+                        context_window: 16385
+                        max_tokens: 4096
+                        recommended_for: ["coding", "fast", "general"]
+                        cost_tier: "standard"
             claude:
                 name: "Anthropic Claude"
                 description: "Anthropic's Claude models via API"
@@ -276,12 +304,13 @@ default:
         # Model selection preferences
         selection_preferences:
             # Default provider when none specified
-            default_provider: "ollama"
+            default_provider: "copilot"
             # Default model per provider (overrides model defaults above)
             default_models:
                 ollama: "llama3"
                 gemini: "gemini-2.5-flash-preview-05-20"
                 openai: "gpt-3.5-turbo"
+                copilot: "gpt-4"
                 claude: "claude-sonnet-4-20250514"
                 groq: "llama-3.3-70b-versatile"
                 llamacpp: "llama-2-7b-chat"
@@ -290,18 +319,18 @@ default:
             task_models:
                 nixos_config:
                     primary: ["ollama:llama3", "gemini:gemini-2.5-flash-preview-05-20", "groq:llama-3.3-70b-versatile"]
-                    fallback: ["claude:claude-3-7-sonnet-20250219", "openai:gpt-3.5-turbo"]
+                    fallback: ["claude:claude-3-7-sonnet-20250219", "openai:gpt-3.5-turbo", "copilot:gpt-4"]
                 code_generation:
-                    primary: ["claude:claude-sonnet-4-20250514", "ollama:codellama", "openai:gpt-4"]
+                    primary: ["claude:claude-sonnet-4-20250514", "copilot:gpt-4", "ollama:codellama", "openai:gpt-4"]
                     fallback: ["groq:llama-3.3-70b-versatile", "gemini:gemini-2.5-flash-preview-05-20"]
                 debugging:
-                    primary: ["claude:claude-sonnet-4-20250514", "openai:gpt-4", "gemini:gemini-2.5-flash-preview-05-20"]
+                    primary: ["claude:claude-sonnet-4-20250514", "copilot:gpt-4", "openai:gpt-4", "gemini:gemini-2.5-flash-preview-05-20"]
                     fallback: ["groq:llama-3.3-70b-versatile", "ollama:llama3"]
                 general_help:
                     primary: ["groq:llama3-8b-8192", "ollama:llama3", "gemini:gemini-2.5-flash-preview-05-20"]
-                    fallback: ["claude:claude-3-5-haiku-20241022", "openai:gpt-3.5-turbo"]
+                    fallback: ["claude:claude-3-5-haiku-20241022", "openai:gpt-3.5-turbo", "copilot:gpt-3.5-turbo"]
                 complex_analysis:
-                    primary: ["claude:claude-sonnet-4-20250514", "openai:gpt-4", "gemini:gemini-2.5-flash-preview-05-20"]
+                    primary: ["claude:claude-sonnet-4-20250514", "openai:gpt-4", "copilot:gpt-4", "gemini:gemini-2.5-flash-preview-05-20"]
                     fallback: ["groq:llama-3.3-70b-versatile", "ollama:llama3:70b"]
         # Model discovery and availability checking
         discovery:

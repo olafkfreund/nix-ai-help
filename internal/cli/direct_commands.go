@@ -206,8 +206,19 @@ func setConfigWithOutput(out io.Writer, key, value string) {
 
 	switch key {
 	case "ai_provider":
-		if value != "ollama" && value != "gemini" && value != "openai" {
-			_, _ = fmt.Fprintln(out, utils.FormatError("Invalid AI provider. Valid options: ollama, gemini, openai"))
+		// Validate provider using model registry
+		registry := config.NewModelRegistry(cfg)
+		availableProviders := registry.GetAvailableProviders()
+		isValid := false
+		for _, provider := range availableProviders {
+			if value == provider {
+				isValid = true
+				break
+			}
+		}
+		if !isValid {
+			validOptions := strings.Join(availableProviders, ", ")
+			_, _ = fmt.Fprintln(out, utils.FormatError("Invalid AI provider. Valid options: "+validOptions))
 			return
 		}
 		cfg.AIProvider = value
@@ -1408,13 +1419,18 @@ func runAskCmdWithStreaming(args []string, out io.Writer, providerParam, modelPa
 
 	// Create AI provider manager
 	manager := ai.NewProviderManager(cfg, logger.NewLogger())
+
+	// Determine which provider to use
 	selectedProvider := cfg.AIModels.SelectionPreferences.DefaultProvider
+	// DEBUG: Show what values we're working with
+
 	if providerParam != "" {
 		selectedProvider = providerParam
 	}
 	if selectedProvider == "" {
 		selectedProvider = "ollama"
 	}
+
 
 	var provider ai.Provider
 	if modelParam != "" {
@@ -1474,6 +1490,8 @@ func runAskCmdWithStreaming(args []string, out io.Writer, providerParam, modelPa
 // Ask command - Enhanced version with comprehensive information sources and validation
 // runAskCmdWithConciseMode is a new version with concise footer-style output
 func runAskCmdWithConciseMode(args []string, out io.Writer, providerParam, modelParam string) {
+	// DEBUG: Print what provider parameters we received
+
 	if len(args) == 0 {
 		_, _ = fmt.Fprintln(out, utils.FormatError("Usage: ask <question>"))
 		_, _ = fmt.Fprintln(out, utils.FormatTip("Example: ask How do I enable nginx?"))
@@ -1502,12 +1520,15 @@ func runAskCmdWithConciseMode(args []string, out io.Writer, providerParam, model
 
 	// Determine which provider to use
 	selectedProvider := cfg.AIModels.SelectionPreferences.DefaultProvider
+	// DEBUG: Show what values we're working with
+
 	if providerParam != "" {
 		selectedProvider = providerParam
 	}
 	if selectedProvider == "" {
 		selectedProvider = "ollama"
 	}
+
 
 	var provider ai.Provider
 	if modelParam != "" {
@@ -1700,6 +1721,7 @@ func runAskCmdWithConciseMode(args []string, out io.Writer, providerParam, model
 	}
 	if strings.Contains(response, "configuration.nix") && !strings.Contains(response, "nix-env") {
 		qualityScore++
+
 	}
 
 	// Ultra-minimal footer
@@ -1735,7 +1757,11 @@ func getProviderNameFromProvider(provider ai.Provider) string {
 }
 
 func runAskCmd(args []string, out io.Writer) {
-	runAskCmdWithConciseMode(args, out, "", "")
+	// Read provider and model from environment variables set by root command
+	provider := os.Getenv("NIXAI_PROVIDER")
+	model := os.Getenv("NIXAI_MODEL")
+
+	runAskCmdWithConciseMode(args, out, provider, model)
 }
 
 // runAskCmdWithQuietMode is a wrapper that adds quiet mode support
@@ -1996,6 +2022,7 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 
 	// Determine which provider to use from command flags or config
 	selectedProvider := cfg.AIModels.SelectionPreferences.DefaultProvider
+	// DEBUG: Show what values we're working with
 
 	// Check for direct provider parameter (from subcommand flags)
 	if providerParam != "" {
@@ -2007,6 +2034,7 @@ func runAskCmdWithOptions(args []string, out io.Writer, providerParam, modelPara
 	if selectedProvider == "" {
 		selectedProvider = "ollama"
 	}
+
 
 	// Get the provider with optional model specification
 	var provider ai.Provider

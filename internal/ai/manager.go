@@ -41,9 +41,10 @@ func (pm *ProviderManager) GetProvider(providerName string) (Provider, error) {
 		return provider, nil
 	}
 
-	// Check if provider is available in configuration
-	if !pm.registry.IsProviderAvailable(providerName) {
-		return nil, fmt.Errorf("provider '%s' is not available or configured", providerName)
+	// Check if provider exists in configuration
+	_, err := pm.registry.GetProvider(providerName)
+	if err != nil {
+		return nil, fmt.Errorf("provider '%s' is not configured: %w", providerName, err)
 	}
 
 	// Initialize the provider
@@ -163,6 +164,8 @@ func (pm *ProviderManager) initializeProvider(providerName string) (Provider, er
 		return pm.initializeGeminiProvider(providerConfig)
 	case "openai":
 		return pm.initializeOpenAIProvider(providerConfig)
+	case "copilot":
+		return pm.initializeCopilotProvider(providerConfig)
 	case "claude":
 		return pm.initializeClaudeProvider(providerConfig)
 	case "groq":
@@ -239,6 +242,21 @@ func (pm *ProviderManager) initializeOpenAIProvider(config *config.AIProviderCon
 
 	openaiClient := NewOpenAIClientWithModel(apiKey, defaultModel)
 	return NewProviderWrapper(openaiClient), nil
+}
+
+// initializeCopilotProvider creates a GitHub Copilot provider instance.
+func (pm *ProviderManager) initializeCopilotProvider(config *config.AIProviderConfig) (Provider, error) {
+	apiKey := os.Getenv(config.EnvVar)
+	// Note: We allow initialization even without API key - the error will be reported during actual API calls
+
+	// Get default model for Copilot
+	defaultModel := pm.config.AIModels.SelectionPreferences.DefaultModels["copilot"]
+	if defaultModel == "" {
+		defaultModel = "gpt-4" // fallback for GitHub Copilot
+	}
+
+	copilotClient := NewCopilotClientWithModel(apiKey, defaultModel)
+	return NewProviderWrapper(copilotClient), nil
 }
 
 // initializeLlamaCppProvider creates a LlamaCpp provider instance.
